@@ -41,4 +41,13 @@ yarn-error.log*
 next-env.d.ts
 
 # claude code
-.claude/settings.local.json
+.claude/
+
+# agent skills & tooling (local dev only)
+.agents/
+.mcp.json
+.playwright-mcp/
+.prettierignore
+.prettierrc
+skills-lock.json
+session-report-*.html
