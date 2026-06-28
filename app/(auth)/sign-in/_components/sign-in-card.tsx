@@ -2,8 +2,7 @@
 
 import { motion } from "motion/react";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { signInWithMicrosoft } from "../actions";
 
 export function SignInCard() {
   return (
@@ -21,57 +20,15 @@ export function SignInCard() {
           </p>
         </div>
 
-        <form className="space-y-4" noValidate>
-          <div className="space-y-2">
-            <Label htmlFor="email">Email</Label>
-            <Input
-              id="email"
-              type="email"
-              placeholder="you@company.com"
-              autoComplete="email"
-              className="input-glow border-border bg-secondary/50"
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="password">Password</Label>
-            <Input
-              id="password"
-              type="password"
-              placeholder="••••••••"
-              autoComplete="current-password"
-              className="input-glow border-border bg-secondary/50"
-            />
-          </div>
-
+        <form action={signInWithMicrosoft}>
           <Button
             type="submit"
-            className="btn-press w-full bg-primary text-primary-foreground hover:bg-primary/90"
+            className="btn-press w-full border-border bg-secondary/50 text-foreground hover:bg-secondary"
+            aria-label="Sign in with Microsoft account"
           >
-            Sign in
+            Continue with Microsoft
           </Button>
         </form>
-
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <span className="w-full border-t border-border" />
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-card px-2 text-muted-foreground">or</span>
-          </div>
-        </div>
-
-        <Button
-          variant="outline"
-          className="btn-press w-full border-border bg-secondary/50 text-foreground hover:bg-secondary"
-          aria-label="Continue with Microsoft account"
-        >
-          Continue with Microsoft
-        </Button>
-
-        <p className="mt-4 text-center text-xs text-muted-foreground">
-          Authentication via Auth.js — wired in SALEB-26
-        </p>
       </div>
     </motion.div>
   );
