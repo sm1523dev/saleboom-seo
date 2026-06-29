@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { scans, websites, issues } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
+import { logger } from "@/lib/logger";
 import type { JobContext } from "@/lib/queue";
 import type { SeoIssue } from "@/lib/seo-rules";
 
@@ -17,8 +18,9 @@ export async function handleScanJob(
   context: JobContext
 ): Promise<void> {
   const { scanId, websiteId } = data;
+  const log = logger.child({ component: "worker", scanId, websiteId });
 
-  context.log(`starting scan ${scanId}`);
+  log.info("scan started");
 
   await db
     .update(scans)
@@ -51,12 +53,12 @@ export async function handleScanJob(
       fetchSitemapUrls(`${baseUrl}/sitemap.xml`).catch(() => []),
     ]);
 
-    context.log(`fetched site metadata for ${url}`);
+    log.info("fetched site metadata", { url });
     await context.updateProgress(10);
 
     // Crawl the site
     const crawlResult = await crawlProvider.crawlSite(url, { limit: 100 });
-    context.log(`crawl complete — ${crawlResult.pages.length} page(s)`);
+    log.info("crawl complete", { pages: crawlResult.pages.length });
     await context.updateProgress(60);
 
     // Persist raw crawl data
@@ -74,7 +76,7 @@ export async function handleScanJob(
       sitemapUrls,
     });
     const seoIssues = runSeoRules(siteCtx);
-    context.log(`rules engine found ${seoIssues.length} issue(s)`);
+    log.info("rules engine complete", { issues: seoIssues.length });
 
     // Persist issues
     if (seoIssues.length > 0) {
@@ -89,9 +91,9 @@ export async function handleScanJob(
       .where(eq(scans.id, scanId));
 
     await context.updateProgress(100);
-    context.log(`scan ${scanId} completed — ${seoIssues.length} issue(s) persisted`);
+    log.info("scan completed", { issues: seoIssues.length });
   } catch (err) {
-    context.log(`scan ${scanId} failed: ${String(err)}`);
+    log.error("scan failed", { error: String(err) });
     await db
       .update(scans)
       .set({ status: "failed", updatedAt: new Date() })

@@ -1,20 +1,20 @@
 import { queueProvider } from "@/lib/queue";
+import { logger } from "@/lib/logger";
 import { handleScanJob } from "./handlers/scan.handler";
 import { handleRescanJob } from "./handlers/rescan.handler";
+
+const log = logger.child({ component: "worker" });
 
 queueProvider.registerHandler("scan", handleScanJob);
 queueProvider.registerHandler("rescan", handleRescanJob);
 
 async function main() {
   await queueProvider.start();
-
-  // Register weekly rescan schedule (every Sunday midnight UTC)
   await queueProvider.schedule("rescan", "0 0 * * 0");
-
-  console.log("[workers] started — listening for jobs");
+  log.info("started — listening for jobs");
 
   const shutdown = async () => {
-    console.log("[workers] shutting down...");
+    log.info("shutting down...");
     await queueProvider.stop();
     process.exit(0);
   };
@@ -24,6 +24,6 @@ async function main() {
 }
 
 main().catch((err) => {
-  console.error("[workers] fatal error:", err);
+  log.error("fatal error", { error: String(err) });
   process.exit(1);
 });
