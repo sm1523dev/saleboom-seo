@@ -87,6 +87,7 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }),
   tenantId: varchar("tenant_id", { length: 255 }),
   avatarUrl: text("avatar_url"),
+  passwordHash: varchar("password_hash", { length: 255 }),
   ...timestamps,
 });
 

@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { authProvider } from "@/lib/auth";
 import { SignInCard } from "./_components/sign-in-card";
 
 export const metadata: Metadata = {
@@ -8,5 +9,10 @@ export const metadata: Metadata = {
 };
 
 export default function SignInPage() {
-  return <SignInCard />;
+  // Filter out credentials — it's rendered as the email/password form, not a social button
+  const socialProviders = authProvider
+    .getAvailableProviders()
+    .filter((p) => p !== "credentials" && p !== "mock");
+
+  return <SignInCard socialProviders={socialProviders} />;
 }
