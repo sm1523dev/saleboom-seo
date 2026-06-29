@@ -2,7 +2,7 @@ import type { AuthProvider, AuthSession, RouteHandlers } from "../types";
 
 const MOCK_SESSION: AuthSession = {
   user: {
-    id: "mock-user-id",
+    id: "00000000-0000-0000-0000-000000000001",
     email: "dev@saleboom.com",
     name: "Dev User",
   },

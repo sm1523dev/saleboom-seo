@@ -9,7 +9,7 @@ export class OllamaAIProvider implements AIProvider {
   private readonly ollama: any;
 
   constructor() {
-    const { createOllama } = require("@ai-sdk/ollama");
+    const { createOllama } = require("ollama-ai-provider");
     this.ollama = createOllama({
       baseURL: process.env.OLLAMA_BASE_URL ?? "http://localhost:11434/api",
     });

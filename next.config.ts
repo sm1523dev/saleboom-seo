@@ -16,10 +16,21 @@ const nextConfig: NextConfig = {
   ],
 
   images: {
-    // Add remote image hostnames here as integrations are added
-    // e.g. { protocol: "https", hostname: "avatars.githubusercontent.com" }
     remotePatterns: [],
   },
+
+  // Optional provider packages — only needed when the matching *_PROVIDER env var
+  // selects them. Exclude from the Next.js bundle so unused providers don't cause
+  // "module not found" errors at build time.
+  serverExternalPackages: [
+    "@aws-sdk/client-sqs",
+    "@azure/storage-blob",
+    "@azure/storage-queue",
+    "@ai-sdk/anthropic",
+    "@ai-sdk/ollama",
+    "@ai-sdk/openai",
+    "@ai-sdk/azure",
+  ],
 };
 
 export default nextConfig;
