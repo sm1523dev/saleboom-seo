@@ -1,11 +1,16 @@
-import { app, InvocationContext, Timer } from "@azure/functions";
-import { and, eq, isNull, lt, sql } from "drizzle-orm";
-import { db } from "../lib/db";
-import { scans, websites } from "../../../lib/db/schema";
-import { queueProvider } from "../../../lib/queue";
+import { and, isNull, lt, sql, eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { scans, websites } from "@/lib/db/schema";
+import { queueProvider } from "@/lib/queue";
+import type { JobContext } from "@/lib/queue";
 
-async function rescanTimerHandler(_timer: Timer, context: InvocationContext): Promise<void> {
-  const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
+
+export async function handleRescanJob(
+  _data: Record<string, unknown>,
+  context: JobContext
+): Promise<void> {
+  const sevenDaysAgo = new Date(Date.now() - SEVEN_DAYS_MS);
 
   const staleWebsites = await db
     .selectDistinctOn([scans.websiteId], {
@@ -18,7 +23,7 @@ async function rescanTimerHandler(_timer: Timer, context: InvocationContext): Pr
     .groupBy(scans.websiteId)
     .having(lt(sql<Date>`max(${scans.completedAt})`, sevenDaysAgo));
 
-  context.log(`Enqueueing rescans for ${staleWebsites.length} website(s)`);
+  context.log(`enqueueing rescans for ${staleWebsites.length} website(s)`);
 
   for (const { websiteId } of staleWebsites) {
     const [newScan] = await db
@@ -29,8 +34,3 @@ async function rescanTimerHandler(_timer: Timer, context: InvocationContext): Pr
     await queueProvider.enqueue("scan", { scanId: newScan.id, websiteId });
   }
 }
-
-app.timer("rescan-timer", {
-  schedule: "0 0 * * 0",
-  handler: rescanTimerHandler,
-});
