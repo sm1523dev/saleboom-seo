@@ -30,6 +30,13 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
+# local dev artifacts
+*.png
+*.jpg
+*.jpeg
+dump.rdb
+logs/
+
 # env files (can opt-in for committing if needed)
 .env*
 
