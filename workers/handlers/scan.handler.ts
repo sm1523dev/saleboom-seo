@@ -4,6 +4,7 @@ import { scans, websites, issues } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { logger } from "@/lib/logger";
+import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import type { SeoIssue } from "@/lib/seo-rules";
 
@@ -94,6 +95,7 @@ export async function handleScanJob(
     log.info("scan completed", { issues: seoIssues.length });
   } catch (err) {
     log.error("scan failed", { error: String(err) });
+    captureError(err, { scanId, websiteId });
     await db
       .update(scans)
       .set({ status: "failed", updatedAt: new Date() })
