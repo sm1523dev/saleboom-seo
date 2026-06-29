@@ -30,10 +30,10 @@ yarn-debug.log*
 yarn-error.log*
 .pnpm-debug.log*
 
-# local dev artifacts
-*.png
-*.jpg
-*.jpeg
+# local dev artifacts (root-level screenshots from browser testing)
+/*.png
+/*.jpg
+/*.jpeg
 dump.rdb
 logs/
 
