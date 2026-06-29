@@ -30,3 +30,12 @@ export const CrawlResultSchema = z.object({
 });
 
 export type CrawlResult = z.infer<typeof CrawlResultSchema>;
+
+export type ScrapeOpts = {
+  limit?: number;
+};
+
+export interface CrawlProvider {
+  scrapeUrl(url: string, opts?: ScrapeOpts): Promise<PageResult>;
+  crawlSite(url: string, opts?: ScrapeOpts): Promise<CrawlResult>;
+}
