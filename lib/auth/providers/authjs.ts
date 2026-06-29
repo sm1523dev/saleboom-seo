@@ -4,12 +4,11 @@ import Google from "next-auth/providers/google";
 import GitHub from "next-auth/providers/github";
 import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
 import Facebook from "next-auth/providers/facebook";
-import bcrypt from "bcryptjs";
 import { eq } from "drizzle-orm";
-import { redirect } from "next/navigation";
 import type { NextRequest } from "next/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
+import { verifyPassword } from "@/lib/auth/password";
 import type { AuthProvider, AuthSession, SignInOpts, RouteHandlers } from "../types";
 
 declare module "next-auth" {
@@ -20,20 +19,6 @@ declare module "next-auth" {
     } & DefaultSession["user"];
   }
 }
-
-const PEPPER = process.env.PASSWORD_PEPPER;
-
-async function hashPassword(plaintext: string): Promise<string> {
-  if (!PEPPER) throw new Error("PASSWORD_PEPPER env var is not set");
-  return bcrypt.hash(plaintext + PEPPER, 12);
-}
-
-async function verifyPassword(plaintext: string, storedHash: string): Promise<boolean> {
-  if (!PEPPER) throw new Error("PASSWORD_PEPPER env var is not set");
-  return bcrypt.compare(plaintext + PEPPER, storedHash);
-}
-
-export { hashPassword };
 
 function buildProviders() {
   const list = [
@@ -115,7 +100,7 @@ const { handlers, auth, signIn: nextAuthSignIn, signOut: nextAuthSignOut } = Nex
     async jwt({ token, user, account, profile }) {
       if (account && user) {
         if (account.provider !== "credentials") {
-          // Social sign-in: upsert user in our DB
+          // Social sign-in: upsert into our users table so app-level queries work
           const [dbUser] = await db
             .insert(users)
             .values({
@@ -168,12 +153,6 @@ export class AuthJsProvider implements AuthProvider {
     };
   }
 
-  async requireSession(): Promise<AuthSession> {
-    const session = await this.getSession();
-    if (!session) redirect("/sign-in");
-    return session;
-  }
-
   getAvailableProviders(): string[] {
     const providers = ["credentials"];
     if (process.env.GOOGLE_CLIENT_ID) providers.push("google");
@@ -191,14 +170,13 @@ export class AuthJsProvider implements AuthProvider {
     return nextAuthSignOut(opts) as Promise<never>;
   }
 
-  // Returns the auth() middleware wrapper for use in proxy.ts
+  // NextAuth's auth() wraps any handler and injects request.auth — this is the
+  // auth middleware pattern mandated by NextAuth v5. next/server is unavoidable here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMiddleware(): any {
     return auth(async (request: NextRequest & { auth: unknown }) => {
       const { pathname, search } = request.nextUrl;
-      const isProtected = pathname.startsWith("/dashboard");
-
-      if (isProtected && !request.auth) {
+      if (pathname.startsWith("/dashboard") && !request.auth) {
         const signInUrl = new URL("/sign-in", request.url);
         signInUrl.searchParams.set("callbackUrl", pathname + search);
         const { NextResponse } = await import("next/server");

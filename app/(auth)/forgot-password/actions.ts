@@ -5,9 +5,10 @@ import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { createResetToken } from "@/lib/auth/reset-token";
 import { notificationProvider } from "@/lib/notifications";
+import { parseEmail } from "@/lib/form-validation";
 
 export async function requestPasswordReset(formData: FormData) {
-  const email = (formData.get("email") as string).toLowerCase().trim();
+  const email = parseEmail(formData.get("email"));
 
   // Always silently succeed — never reveal whether the email exists (prevents user enumeration)
   const [user] = await db

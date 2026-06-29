@@ -27,7 +27,6 @@ export class AzureQueueProvider implements QueueProvider {
     await queueClient.createIfNotExists();
 
     const message = JSON.stringify({ ...data, enqueuedAt: new Date().toISOString() });
-    // Azure Queue Storage requires base64-encoded messages
     const encoded = Buffer.from(message).toString("base64");
     const result = await queueClient.sendMessage(encoded);
     return result.messageId;

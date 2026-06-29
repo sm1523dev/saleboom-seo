@@ -4,33 +4,42 @@ import type { StorageProvider, UploadOpts } from "../types";
 
 const STORAGE_DIR = path.resolve(process.cwd(), "storage");
 
+function safeResolve(key: string): string {
+  const resolved = path.resolve(STORAGE_DIR, key);
+  if (!resolved.startsWith(STORAGE_DIR + path.sep) && resolved !== STORAGE_DIR) {
+    throw new Error(`Invalid storage key: "${key}"`);
+  }
+  return resolved;
+}
+
 export class LocalStorageProvider implements StorageProvider {
-  private async ensureDir(key: string): Promise<void> {
-    await fs.mkdir(path.dirname(path.join(STORAGE_DIR, key)), { recursive: true });
+  private async ensureDir(resolved: string): Promise<void> {
+    await fs.mkdir(path.dirname(resolved), { recursive: true });
   }
 
   async upload(key: string, data: Buffer, _opts?: UploadOpts): Promise<string> {
-    await this.ensureDir(key);
-    await fs.writeFile(path.join(STORAGE_DIR, key), data);
+    const resolved = safeResolve(key);
+    await this.ensureDir(resolved);
+    await fs.writeFile(resolved, data);
     return `/storage/${key}`;
   }
 
   async download(key: string): Promise<Buffer> {
-    return fs.readFile(path.join(STORAGE_DIR, key));
+    return fs.readFile(safeResolve(key));
   }
 
   async delete(key: string): Promise<void> {
-    await fs.rm(path.join(STORAGE_DIR, key), { force: true });
+    await fs.rm(safeResolve(key), { force: true });
   }
 
   async getSignedUrl(key: string, _expiresInSeconds: number): Promise<string> {
-    // Local dev: return a direct path (no expiry enforcement)
+    safeResolve(key);
     return `/storage/${key}`;
   }
 
   async exists(key: string): Promise<boolean> {
     try {
-      await fs.access(path.join(STORAGE_DIR, key));
+      await fs.access(safeResolve(key));
       return true;
     } catch {
       return false;
@@ -38,7 +47,7 @@ export class LocalStorageProvider implements StorageProvider {
   }
 
   async list(prefix: string): Promise<string[]> {
-    const dir = path.join(STORAGE_DIR, prefix);
+    const dir = safeResolve(prefix.endsWith("/") ? prefix : prefix + "/x").replace(/\/x$/, "");
     try {
       const entries = await fs.readdir(dir, { withFileTypes: true });
       return entries

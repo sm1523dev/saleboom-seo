@@ -1,4 +1,3 @@
-import { NextResponse } from "next/server";
 import type { AuthProvider, AuthSession, RouteHandlers } from "../types";
 
 const MOCK_SESSION: AuthSession = {
@@ -12,10 +11,6 @@ const MOCK_SESSION: AuthSession = {
 
 export class MockAuthProvider implements AuthProvider {
   async getSession(): Promise<AuthSession | null> {
-    return MOCK_SESSION;
-  }
-
-  async requireSession(): Promise<AuthSession> {
     return MOCK_SESSION;
   }
 
@@ -34,13 +29,11 @@ export class MockAuthProvider implements AuthProvider {
   }
 
   getMiddleware() {
-    return async (_request: Request) => {
-      return NextResponse.next();
-    };
+    return async () => undefined;
   }
 
   get routeHandlers(): RouteHandlers {
-    const handler = async () => NextResponse.json({ ok: true });
+    const handler = async () => Response.json({ ok: true });
     return { GET: handler, POST: handler };
   }
 }

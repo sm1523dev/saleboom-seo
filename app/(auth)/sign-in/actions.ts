@@ -1,10 +1,11 @@
 "use server";
 
 import { authProvider } from "@/lib/auth";
+import { parseEmail, parseRequiredString } from "@/lib/form-validation";
 
 export async function signInWithCredentials(formData: FormData) {
-  const email = formData.get("email") as string;
-  const password = formData.get("password") as string;
+  const email = parseEmail(formData.get("email"));
+  const password = parseRequiredString(formData.get("password"), "Password");
 
   await authProvider.signIn("credentials", {
     email,

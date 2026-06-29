@@ -3,12 +3,14 @@ import { authProvider } from "@/lib/auth";
 import { SignInCard } from "./_components/sign-in-card";
 
 export const metadata: Metadata = {
-  title: "Sign In",
+  title: "Sign In — SaleBoom SEO",
   description: "Sign in to your SaleBoom SEO account to access your dashboard.",
   robots: { index: false, follow: false },
+  openGraph: { title: "Sign In — SaleBoom SEO", description: "Sign in to your account." },
+  twitter: { card: "summary" },
 };
 
-export default function SignInPage() {
+export default async function SignInPage() {
   // Filter out credentials — it's rendered as the email/password form, not a social button
   const socialProviders = authProvider
     .getAvailableProviders()

@@ -3,9 +3,11 @@ import { redirect } from "next/navigation";
 import { ResetPasswordForm } from "./_components/reset-password-form";
 
 export const metadata: Metadata = {
-  title: "Reset Password",
+  title: "Reset Password — SaleBoom SEO",
   description: "Set a new password for your SaleBoom SEO account.",
   robots: { index: false, follow: false },
+  openGraph: { title: "Reset Password — SaleBoom SEO", description: "Set a new password." },
+  twitter: { card: "summary" },
 };
 
 type Props = {

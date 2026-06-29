@@ -7,10 +7,21 @@ export class MockAIProvider implements AIProvider {
     prompt: string,
     opts?: GenerateOpts
   ): Promise<T> {
-    console.log("[ai:mock] generateStructured", { system: opts?.system, prompt: prompt.slice(0, 80) });
-    // Return the schema's default/sample value by parsing an empty object
-    // and letting Zod fill in defaults, or return minimal valid data
-    return schema.parse(buildMinimalValue(schema)) as T;
+    console.log("[ai:mock] generateStructured", {
+      system: opts?.system,
+      prompt: prompt.slice(0, 80),
+    });
+    // Use safeParse on an empty object and return a best-effort fallback.
+    // Avoids coupling to Zod's private _def API.
+    const attempt = schema.safeParse({});
+    if (attempt.success) return attempt.data;
+
+    // If empty object fails validation, try null — schema will reject and we
+    // surface a clear error so developers know the mock needs a fixture.
+    throw new Error(
+      `[ai:mock] Cannot auto-generate mock data for this schema. ` +
+        `Add a fixture to MockAIProvider or use AI_PROVIDER=ollama locally.`
+    );
   }
 
   async generateText(prompt: string, _opts?: GenerateOpts): Promise<string> {
@@ -19,28 +30,6 @@ export class MockAIProvider implements AIProvider {
   }
 
   async generateEmbedding(_text: string): Promise<number[]> {
-    // Return a deterministic 1536-dim zero vector for mock
     return new Array(1536).fill(0);
   }
-}
-
-function buildMinimalValue(schema: z.ZodSchema): unknown {
-  // Introspect the schema to build a minimal valid object
-  const def = (schema as unknown as { _def: { typeName: string; shape?: () => Record<string, z.ZodSchema> } })._def;
-  if (def.typeName === "ZodObject" && def.shape) {
-    const result: Record<string, unknown> = {};
-    for (const [key, fieldSchema] of Object.entries(def.shape())) {
-      result[key] = buildMinimalValue(fieldSchema as z.ZodSchema);
-    }
-    return result;
-  }
-  if (def.typeName === "ZodString") return "[mock]";
-  if (def.typeName === "ZodNumber") return 0;
-  if (def.typeName === "ZodBoolean") return false;
-  if (def.typeName === "ZodArray") return [];
-  if (def.typeName === "ZodEnum") {
-    const values = (def as unknown as { values: string[] }).values;
-    return values[0];
-  }
-  return null;
 }

@@ -1,0 +1,542 @@
+---
+  Commit 1 — Initial commit
+
+  This is Git's auto-generated first commit. It contains only a .gitignore (or nothing at all). Its only purpose is to give the repository a root commit so branches can be created from it. Nothing functional here.
+
+  ---
+  Commit 2 — chore: bootstrap Next.js project
+  
+  This runs create-next-app with the project's chosen stack. What gets created:
+
+  - package.json — lists dependencies: Next.js 16, React 19, TypeScript, Tailwind CSS v4, shadcn/ui, motion, @gsap/react, geist font package
+  - tsconfig.json — TypeScript config with "strict": true, path aliases (@/* → ./), target: "ES2017", lib: ["dom", "ES2017"]. Strict mode means TypeScript will error on any, unannotated function returns, null access — intentional because
+  bugs in production are harder than compiler errors
+  - next.config.ts — Next.js config file. Important: in Next.js 16 this is .ts not .js
+  - tailwind.config.js — should NOT exist per AGENTS.md (Tailwind v4 uses @theme in CSS instead). Gets removed/replaced in the next commit
+  - app/layout.tsx — root layout. Loads Geist Sans and Geist Mono via next/font (zero layout shift, fonts bundled at build time, not fetched from Google at runtime)
+  - app/globals.css — base CSS with @import "tailwindcss" (Tailwind v4 syntax) and @theme {} block for the design tokens
+
+  Why Next.js 16? The project is an App Router SaaS. Next.js 16 adds async cookies(), renames middleware.ts to proxy.ts, and tightens Server Component boundaries. These are all used throughout the project.
+
+  ---
+  Commit 3 — SALEB-23 - feat: add landing page, auth shell, and dashboard skeleton
+  
+  This builds the visible shell — the routes and pages exist even before any real data flows through them.
+
+  Directory structure created
+  
+  app/
+    (public)/          ← marketing pages, no auth needed
+      page.tsx         ← landing page
+    (auth)/
+      sign-in/
+        page.tsx       ← sign-in page (wraps the card component)
+        _components/
+          sign-in-card.tsx  ← the actual sign-in UI
+        actions.ts     ← server function (stub at this point)
+    (dashboard)/
+      page.tsx         ← dashboard home
+      layout.tsx       ← dashboard layout (sidebar, nav)
+      _components/     ← dashboard-specific components
+
+  Why route groups with parentheses?
+
+  (public), (auth), (dashboard) are Next.js route groups. The parentheses mean the folder name is NOT part of the URL. So app/(dashboard)/page.tsx serves /dashboard, not /(dashboard). This lets you have different layouts for different
+  sections without polluting the URL.
+
+  Why _components/ inside route folders?
+
+  Convention from AGENTS.md. A _components/ folder is co-located with the route it belongs to — only that route uses those components. Shared components go to components/shared/. This prevents accidental reuse of something that was never
+  designed to be reused.
+
+  app/globals.css — Tailwind v4 design tokens
+
+  @theme {
+    --primary: 258 90% 66%;         /* violet */
+    --background: 240 10% 3.9%;     /* near-black */
+    --card: 240 8% 6%;
+    --muted: 240 5% 10%;
+    --border: 240 5% 12%;
+  }
+
+  In Tailwind v4, there is no tailwind.config.js. You define your design tokens directly in CSS using the @theme {} block. Tailwind reads these at build time and generates utility classes (bg-background, text-primary, etc.). If you need to
+  add a new color, you add it here — not in a config file.
+
+  motion from "motion/react" (not framer-motion)
+
+  Every animation uses import { motion } from "motion/react". This is the motion package (motion.dev), which is the successor to Framer Motion. The package name is motion, import path is "motion/react". Never use framer-motion — it's a
+  different package.
+
+  ---
+  Commit 4 — SALEB-34 - feat: add postgresql schema with drizzle orm and pgvector
+
+  This defines the entire database. Understanding this commit is critical because every other feature reads/writes these tables.
+
+  New files
+
+  lib/db/index.ts — the Drizzle client singleton
+
+  import { drizzle } from "drizzle-orm/postgres-js";
+  import postgres from "postgres";
+
+  const client = postgres(process.env.DATABASE_URL!);
+  export const db = drizzle(client, { schema });
+
+  Why a singleton? In a Node.js server (Next.js), the module is loaded once. If you created a new connection on every import, you'd exhaust the Postgres connection pool. process.env.DATABASE_URL! — the ! tells TypeScript "I know this is
+  defined". If it isn't at runtime, Postgres will throw immediately on first query, which is the right behavior (fail loudly, not silently).
+
+  lib/db/schema.ts — all table definitions. Key tables:
+
+  - users — stores who signed in via Microsoft Entra. tenantId links to their Azure AD tenant. email, name, avatarUrl come from the OAuth profile.
+  - websites — a user registers their website URL here. verifiedAt tracks if they've proved ownership.
+  - scans — each time a website is crawled, a row is created here. status is an enum (pending → running → completed/failed). rawCrawl is JSONB — stores the raw Firecrawl output so we can re-process without re-crawling.
+  - issues — SEO problems found during a scan. type is the problem category (missing-h1, duplicate-meta, etc.). fixType is either quick (one-click fix) or major (requires manual work). resolvedAt tracks when it was fixed.
+  - cmsConnections — credentials/tokens for connecting to the user's CMS (WordPress, Webflow, etc.). credentialsRef stores a reference to Azure Key Vault, not the credentials themselves.
+  - changeSnapshots — when an issue is auto-fixed via the CMS connection, a before/after snapshot is stored here. This is the audit trail.
+  - aeoMentions — tracks brand mentions in AI answer engines (ChatGPT, Perplexity, Gemini, Claude). mentionEmbedding is a vector(1536) column — this requires pgvector. It stores the semantic embedding of the snippet so you can do similarity
+  searches ("find mentions similar to this one").
+
+  Why vector(1536)?
+
+  1536 is the output dimension of OpenAI's text-embedding-ada-002 model and text-embedding-3-small. When we generate an embedding for a mention, we store those 1536 floats. Later we can use <=> (cosine distance operator from pgvector) to
+  find semantically similar mentions.
+
+  Why soft deletes (deletedAt)?
+
+  Every table has deletedAt timestamp. Instead of DELETE FROM websites WHERE id = ?, we do UPDATE websites SET deleted_at = NOW() WHERE id = ?. This means:
+  - Deleted data is recoverable
+  - Foreign keys don't break (scan still references website even if website is "deleted")
+  - Audit history is preserved
+
+  When querying, you always add .where(isNull(schema.websites.deletedAt)) to exclude soft-deleted rows.
+
+  drizzle.config.ts
+
+  Drizzle Kit (the migration tool) reads this to know where your schema is and where to write migrations:
+
+  export default {
+    schema: "./lib/db/schema.ts",
+    out: "./drizzle",
+    dialect: "postgresql",
+    dbCredentials: { url: process.env.DATABASE_URL! },
+  };
+
+  npm run db:migrate → runs drizzle-kit push → applies schema to the database.
+
+  ---
+  Commit 5 — SALEB-38 - feat: add azure queue storage and functions async scan pipeline
+  
+  This is the async background processing architecture. Understanding this is key because all scan jobs flow through it.
+
+  The problem it solves
+
+  A website crawl takes 30–120 seconds. You cannot do that in a Next.js Route Handler (request timeout). The solution: when a user triggers a scan, you put a message on a queue (< 1ms), return HTTP 200 immediately, and an Azure Function
+  processes the actual crawl in the background.
+
+  lib/queue/types.ts
+
+  export const ScanJobMessageSchema = z.object({
+    scanId: z.string().uuid(),
+    websiteId: z.string().uuid(),
+    enqueuedAt: z.string().datetime(),
+  });
+  export const QUEUE_NAMES = {
+    SCAN_JOBS: "scan-jobs",
+    DEAD_LETTER: "scan-jobs-poison",
+  };
+
+  Why Zod here? The message goes through Azure Queue Storage as a JSON string. When the Function receives it, it parses back to JSON. ScanJobMessageSchema.parse(msg) validates that the parsed JSON has the exact shape we expect — if someone
+  accidentally sends a malformed message, it fails loudly at the parse step, not silently later when scanId is undefined.
+
+  lib/queue/client.ts
+
+  import { QueueServiceClient } from "@azure/storage-queue";
+
+  let _client: QueueServiceClient | null = null;
+
+  export function getQueueClient(): QueueServiceClient {
+    if (!_client) {
+      _client = QueueServiceClient.fromConnectionString(
+        process.env.AZURE_STORAGE_CONNECTION_STRING!
+      );
+    }
+    return _client;
+  }
+
+  Singleton pattern again — one connection, reused across requests. fromConnectionString parses the Azure connection string (which contains the account name, key, and endpoint) and creates the client.
+
+  lib/queue/enqueue-scan.ts
+
+  export async function enqueueScan(websiteId: string, scanId: string) {
+    const client = getQueueClient();
+    const queue = client.getQueueClient(QUEUE_NAMES.SCAN_JOBS);
+    await queue.createIfNotExists();
+    const msg = JSON.stringify({ scanId, websiteId, enqueuedAt: new Date().toISOString() });
+    await queue.sendMessage(Buffer.from(msg).toString("base64"));
+  }
+
+  Azure Queue Storage requires messages to be base64-encoded. If you send raw JSON, the Azure portal and Azure Functions runtime both complain. Buffer.from(msg).toString("base64") encodes the JSON string. The Function runtime automatically
+  decodes it back when it receives the trigger.
+
+  azure-functions/ — separate Node.js project
+
+  This is a completely separate Node.js project from the Next.js app. It has its own package.json, tsconfig.json, node_modules/. Why? Azure Functions deploys independently from the web app — it runs on a separate Azure Functions App Service
+  plan, not inside Next.js.
+
+  azure-functions/host.json
+
+  {
+    "extensions": {
+      "queues": { "maxDequeueCount": 5 }
+    }
+  }
+
+  maxDequeueCount: 5 — if a message is dequeued (picked up by a Function) and not deleted within the lock timeout (by default 30s), Azure puts it back on the queue. If this happens 5 times, Azure moves the message to the poison queue
+  (scan-jobs-poison). This prevents infinite retry loops from a broken message crashing the Function repeatedly. You then inspect the poison queue to find the bad message.
+
+  azure-functions/src/functions/scan-worker.ts
+
+  app.storageQueue("scanWorker", {
+    queueName: "scan-jobs",
+    connection: "AZURE_STORAGE_CONNECTION_STRING",
+    handler: async (message, context) => {
+      const { scanId, websiteId } = ScanJobMessageSchema.parse(message);
+      await db.update(scans).set({ status: "running" }).where(eq(scans.id, scanId));
+      // ... do the actual crawl work ...
+      await db.update(scans).set({ status: "completed" }).where(eq(scans.id, scanId));
+    }
+  });
+
+  This is the Azure Functions v4 model. You call app.storageQueue(...) to register a queue-triggered function. The handler receives the decoded message object. The function:
+  1. Validates the message shape (Zod)
+  2. Updates the scan status to running in the DB (so the UI can show a spinner)
+  3. Does the actual work (Firecrawl crawl — added in later commits)
+  4. Updates status to completed or failed 
+
+  If step 3 throws an uncaught error, the function fails, the message is NOT deleted from the queue, Azure retries up to maxDequeueCount times.
+
+  azure-functions/src/functions/rescan-timer.ts
+
+  app.timer("rescanTimer", {
+    schedule: "0 0 * * 0",  // every Sunday at midnight
+    handler: async () => {
+      const stale = await db.select()
+        .from(websites)
+        .where(/* no scan in last 7 days */);
+      for (const site of stale) {
+        const scan = await db.insert(scans).values({ websiteId: site.id, status: "pending" }).returning();
+        await enqueueScan(site.id, scan[0].id);
+      }
+    }
+  });
+
+  The timer uses a cron expression: 0 0 * * 0 = minute 0, hour 0, any day-of-month, any month, day-of-week 0 (Sunday). Every Sunday at midnight UTC, this runs and re-queues any website that hasn't been scanned in 7 days.
+
+  Cross-project TypeScript imports
+
+  The Azure Functions code imports from the Next.js app's lib/ directory:
+
+  import { db } from "../lib/db";              // azure-functions/src/lib/db.ts
+  import { scans } from "../../../lib/db/schema"; // saleboom_seo/lib/db/schema.ts
+
+  The tsconfig.json in azure-functions/ has "rootDir": ".." which sets the root to the parent saleboom_seo/ folder. This means TypeScript can see both azure-functions/src/ and saleboom_seo/lib/ in the same compilation. The ../../../ path
+  from src/functions/ goes: up to src/, up to azure-functions/, up to saleboom_seo/, then into lib/.
+
+  ---
+  Commits 6 & 7 — chore: add gitignore + chore: add @azure/storage-queue
+  
+  Commit 6 — azure-functions/.gitignore was missing. The first time git add azure-functions/ ran, Git included node_modules/ (tens of thousands of files). This was caught and fixed: git rm -r --cached azure-functions/node_modules/ removed
+  them from Git's tracking without deleting the files on disk, then .gitignore was created so they'd never be tracked again.
+
+  Commit 7 — @azure/storage-queue was added to the root package.json (Next.js app). This was missing from the initial #38 commit — the lib/queue/client.ts imports from this package, so it needs to be in the app's dependencies.
+
+  What to check if queue breaks: AZURE_STORAGE_CONNECTION_STRING env var → must match the storage account where the queue was created. Queue name must be scan-jobs exactly (case-sensitive).
+
+  ---
+  Commit 8 — SALEB-41 - feat: add auth.js nextauth v5 microsoft entra id and proxy protection
+  
+  This is the authentication layer. Every protected page flows through this.
+
+  lib/auth.ts — the core auth config
+
+  import NextAuth from "next-auth";
+  import MicrosoftEntraID from "next-auth/providers/microsoft-entra-id";
+
+  export const { handlers, auth, signIn, signOut } = NextAuth({
+    providers: [
+      MicrosoftEntraID({
+        clientId: process.env.AZURE_AD_CLIENT_ID!,
+        clientSecret: process.env.AZURE_AD_CLIENT_SECRET!,
+        issuer: `https://login.microsoftonline.com/${process.env.AZURE_AD_TENANT_ID}/v2.0`,
+      }),
+    ],
+    session: { strategy: "jwt" },
+    pages: { signIn: "/sign-in" },
+    callbacks: { jwt(...), session(...) }
+  });
+
+  Why issuer with tenant ID? Without a tenant-specific issuer, the OAuth flow would accept logins from ANY Microsoft account (personal, any company). By specifying https://login.microsoftonline.com/{TENANT_ID}/v2.0, only accounts from your
+  specific Azure AD tenant can log in. This is single-tenant auth.
+
+  session: { strategy: "jwt" } — the session is stored in a signed JWT cookie, not in a database table. Pros: no session table needed, scales horizontally (any server can verify the cookie). Cons: you can't "invalidate" a session server-side
+  until the JWT expires. Fine for this project since it's an internal tool.
+
+  JWT callback — extracts id and tenantId from the token and puts them in the JWT:
+  jwt({ token, user, profile }) {
+    if (user?.id) token.id = user.id;
+    if (profile && "tid" in profile) token.tenantId = profile.tid as string;
+    return token;
+  }
+  profile.tid is the Azure AD tenant ID from the ID token claims. We store it so we can verify it later if needed.
+
+  Session callback — copies those values from the JWT into the session object:
+  session({ session, token }) {
+    session.user.id = token.id as string;
+    session.user.tenantId = token.tenantId as string;
+    return session;
+  }
+  This is why session.user.id and session.user.tenantId are available in Server Components.
+
+  Module augmentation:
+  declare module "next-auth" {
+    interface Session {
+      user: { id: string; tenantId?: string } & DefaultSession["user"];
+    } 
+  }
+  By default, session.user only has name, email, image. This tells TypeScript that our session also has id and tenantId. Without this, session.user.id would be a TypeScript error.
+
+  app/api/auth/[...nextauth]/route.ts
+
+  import { handlers } from "@/lib/auth";
+  export const { GET, POST } = handlers;
+
+  This is a catch-all route — the [...nextauth] segment matches any sub-path. Auth.js uses multiple paths: /api/auth/signin, /api/auth/callback/microsoft-entra-id, /api/auth/session, etc. The handlers object from Auth.js handles all of them.
+  You just re-export GET and POST.
+
+  proxy.ts — the route guard
+
+  export const proxy = auth((request) => {
+    const isProtected = request.nextUrl.pathname.startsWith("/dashboard");
+    if (isProtected && !request.auth) {
+      const signInUrl = new URL("/sign-in", request.url);
+      signInUrl.searchParams.set("callbackUrl", pathname + search);
+      return NextResponse.redirect(signInUrl);
+    }
+    return NextResponse.next();
+  });
+
+  This is Next.js 16's equivalent of middleware.ts (renamed to proxy.ts). It runs on every request before any page renders. auth(handler) is a wrapper from Auth.js — it verifies the JWT cookie and attaches the session to request.auth.
+
+  If the path starts with /dashboard and request.auth is null (not logged in), it redirects to /sign-in and appends the attempted URL as callbackUrl so after login the user goes back to where they were trying to go.
+
+  Critical comment in the file: proxy.ts is a FIRST-LINE redirect check only. It is NOT the sole auth check. Why? Because:
+  - The proxy only runs on browser navigation, not on direct API calls
+  - Server Functions (use server) must also call auth() independently
+  - Route Handlers must also verify the session independently
+
+  This is defence-in-depth. If someone finds a way to bypass the proxy, the Server Functions still protect the data.
+
+  config.matcher — tells Next.js which paths this proxy runs on:
+  "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt|.*\\.(?:svg|png|jpg|...)$).*)"
+  Excludes static files, images, and the _next/ build output. If you didn't exclude these, every image request would go through the auth check, slowing down the page.
+
+  lib/auth-utils.ts
+
+  export async function getServerSession(): Promise<Session> {
+    const session = await auth();
+    if (!session) redirect("/sign-in");
+    return session;
+  }
+  
+  This is a convenience wrapper for Server Components. Instead of writing the null-check everywhere, you call getServerSession() at the top of any dashboard page. If not logged in, it redirects. If logged in, it returns the typed Session.
+
+  app/(auth)/sign-in/actions.ts
+
+  "use server";
+  export async function signInWithMicrosoft() {
+    await signIn("microsoft-entra-id", { redirectTo: "/dashboard" });
+  }
+
+  "use server" marks this as a Server Function. When called from a form action attribute, it runs on the server, not in the browser. signIn("microsoft-entra-id", ...) triggers the OAuth redirect to Microsoft's login page. After the user logs
+  in on Microsoft's side, they're redirected back to /api/auth/callback/microsoft-entra-id, the JWT is set, and they land on /dashboard.
+
+  sign-in-card.tsx — the sign-in UI
+
+  <form action={signInWithMicrosoft}>
+    <Button type="submit">Continue with Microsoft</Button>
+  </form>
+
+  The action prop on a <form> can be a Server Function in Next.js App Router. When the form is submitted, the browser POSTs to the server, which calls signInWithMicrosoft(). No JavaScript required for the initial redirect — works even with
+  JS disabled.
+
+  What to check if auth breaks:
+  - AUTH_SECRET env var missing → JWT signing fails
+  - AZURE_AD_CLIENT_ID / AZURE_AD_CLIENT_SECRET wrong → OAuth returns 400
+  - Redirect URI in Azure AD app registration must match {your-domain}/api/auth/callback/microsoft-entra-id
+  - AZURE_AD_TENANT_ID wrong → "unauthorized_client" error
+
+  ---
+  Commit 9 — SALEB-44 - feat: add firecrawl sdk wrapper with typed scrape and crawl
+
+  lib/crawl/types.ts — Zod schemas
+
+  export const PageResultSchema = z.object({
+    url: z.string(),
+    markdown: z.string().optional(),
+    html: z.string().optional(),
+    links: z.array(z.string()).optional(),
+    metadata: PageMetadataSchema.optional(),
+  });
+
+  export const CrawlResultSchema = z.object({
+    jobId: z.string(),
+    total: z.number(),
+    pages: z.array(PageResultSchema),
+  });
+
+  Why define our own Zod types on top of the SDK's TypeScript types? Two reasons:
+  1. Validation at the boundary — the SDK returns Document objects from Firecrawl. If the self-hosted Firecrawl returns an unexpected shape (version mismatch, config issue), PageResultSchema.parse(...) throws a clear Zod error with the exact
+  field that failed, instead of a Cannot read property 'markdown' of undefined somewhere deep in your code.
+  2. Serializable types — Zod schemas can be exported and reused in Server Functions, queue messages, and DB writes. TypeScript interfaces cannot enforce runtime validation.
+
+  PageMetadataSchema captures the SEO-relevant metadata fields: title, description, language, URL, Open Graph tags (ogTitle, ogDescription, ogImage), and statusCode (HTTP status — crucial for detecting 404s and redirects during a crawl).
+
+  lib/crawl/firecrawl-client.ts — the wrapper
+
+  const client = createClient();
+
+  function createClient(): Firecrawl {
+    return new Firecrawl({
+      apiKey: process.env.FIRECRAWL_API_KEY,
+      apiUrl: process.env.FIRECRAWL_API_URL ?? "http://localhost:3002",
+      timeoutMs: process.env.FIRECRAWL_TIMEOUT_MS ? Number(process.env.FIRECRAWL_TIMEOUT_MS) : 30_000,
+      maxRetries: 3,
+      backoffFactor: 2,
+    });
+  }
+
+  apiUrl defaults to http://localhost:3002 — this is for local development with self-hosted Firecrawl. In production, you set FIRECRAWL_API_URL to your deployed Firecrawl instance URL.
+
+  maxRetries: 3, backoffFactor: 2 — the SDK handles retries internally. With backoffFactor 2: retry 1 after ~1s, retry 2 after ~2s, retry 3 after ~4s. This handles transient network errors and momentary Firecrawl overload without hammering
+  the service.
+
+  export { SdkError as FirecrawlError, JobTimeoutError as FirecrawlTimeoutError } — re-exported under friendlier names. In your scan worker, you can write:
+  import { scrapeUrl, FirecrawlError, FirecrawlTimeoutError } from "@/lib/crawl/firecrawl-client";
+  try {
+    const result = await scrapeUrl(url);
+  } catch (e) {
+    if (e instanceof FirecrawlTimeoutError) {
+      // timeout — retry later
+    } else if (e instanceof FirecrawlError) {
+      // API error — log and mark scan failed
+    }
+  }
+
+  scrapeUrl — scrapes a single URL, parses the result through PageResultSchema. onlyMainContent: true strips navigation, footers, ads — you get just the article/page body in markdown, which is what you want for SEO analysis.
+
+  crawlSite — the client.crawl() method is a convenience waiter — it starts the crawl job, polls until completion, and returns the full CrawlJob with all pages in job.data. limit: 100 caps the crawl at 100 pages — prevents runaway costs on
+  large sites.
+
+  What to check if Firecrawl fails:
+  - Is Docker running? docker ps | grep firecrawl
+  - Is the port right? curl http://localhost:3002/health
+  - FIRECRAWL_API_KEY must match what Firecrawl expects (any string for self-hosted)
+  - Timeout errors → increase FIRECRAWL_TIMEOUT_MS
+
+  ---
+  Commit 10 — SALEB-46 - feat: add azure openai client via vercel ai sdk with structured generation
+
+  lib/ai/client.ts — Azure OpenAI singleton
+
+  const azure = createAzure({
+    baseURL: process.env.AZURE_OPENAI_ENDPOINT,
+    apiKey: process.env.AZURE_OPENAI_API_KEY,
+    apiVersion: process.env.AZURE_OPENAI_API_VERSION,
+  });
+
+  export function getModel(deploymentId?: string): LanguageModelV4 {
+    const id = deploymentId ?? process.env.AZURE_OPENAI_DEPLOYMENT;
+    if (!id) throw new Error("AZURE_OPENAI_DEPLOYMENT is not set");
+    return azure.chat(id);
+  }
+
+  Why baseURL not resourceName? The env var is AZURE_OPENAI_ENDPOINT which is a full URL (e.g. https://my-resource.openai.azure.com). The SDK supports either resourceName (it constructs the URL) or baseURL (you give the full URL). Using
+  baseURL is more explicit and supports non-standard deployments.
+
+  azure.chat(deploymentId) — creates a model object bound to that specific Azure OpenAI deployment. The deployment name (e.g. gpt-4o) must match what you created in Azure AI Studio. If it doesn't match, you get a 404 from the Azure API.
+
+  getModel() throws if no deployment set — better than silently using undefined as the model ID, which would give a confusing API error.
+
+  lib/ai/generate.ts — generateStructured<T>()
+
+  export async function generateStructured<T>(
+    schema: z.ZodSchema<T>,
+    prompt: string,
+    opts?: { system?: string; deploymentId?: string }
+  ): Promise<T> {
+    const model = getModel(opts?.deploymentId);
+    const result = await generateText({
+      model,
+      output: Output.object({ schema }),
+      system: opts?.system,
+      prompt,
+    });
+    return result.output as T;
+  }
+
+  Why generateText with Output.object() instead of generateObject()?
+  generateObject is marked @deprecated in the installed version (AI SDK v7). The new API separates the model call (generateText) from the output format (Output.object({ schema })). The output option tells the SDK to use structured output
+  mode — the model is instructed to return JSON matching the schema, and the SDK validates and parses it.
+
+  result.output as T — result.output is typed as InferCompleteOutput<typeof output> which the TypeScript compiler can't simplify to T in a generic context. The as T cast is safe because the schema IS ZodSchema<T> — if the Zod validation
+  passes, the value is T.
+
+  opts?.system — the system prompt. For SEO suggestions this would be something like "You are an SEO expert. Analyse the provided page content and return optimised metadata." For AEO mention extraction: "You are extracting brand mentions
+  from AI answer engine outputs."
+
+  Schemas
+
+  seo-suggestions.ts:
+  z.object({
+    metaTitle: z.string().describe("Optimised page title (50-60 chars)"),
+    metaDescription: z.string().describe("Optimised meta description (150-160 chars)"),
+    h1: z.string().describe("Primary heading for the page"),
+  })
+  The .describe() calls are important — they're included in the JSON schema sent to the model, helping it understand what each field should contain.
+
+  aeo-mentions.ts:
+  z.enum(["chatgpt", "perplexity", "gemini", "claude", "other"])
+  z.enum(["positive", "neutral", "negative"])
+  These enum values match exactly the Postgres enum values in lib/db/schema.ts (aeoPlatformEnum, aeoSentimentEnum). This is intentional — when you insert an extracted mention into the DB, you don't need to transform it. The AI output goes
+  straight into the DB.
+
+  What to check if AI calls fail:
+  - AZURE_OPENAI_ENDPOINT must end with the right path (no trailing / issues)
+  - AZURE_OPENAI_API_VERSION must match the version your deployment supports (e.g. 2024-02-01)
+  - AZURE_OPENAI_DEPLOYMENT must exactly match the deployment name in Azure AI Studio (case-sensitive)
+  - If you get NoObjectGeneratedError — the model returned content that didn't match the schema; check your system prompt
+
+  ---
+  Sprint progress summary
+
+  ┌────────┬──────────┬────────────────────────────────────────────────────┐
+  │ Commit │  Issue   │                   What it built                    │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #1     │ —        │ Git root                                           │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #2     │ —        │ Next.js 16 bootstrap                               │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #3     │ SALEB-23 │ Landing page, sign-in shell, dashboard skeleton    │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #4     │ SALEB-34 │ Full Postgres DB schema (8 tables + pgvector)      │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #5     │ SALEB-38 │ Azure Queue + Functions scan pipeline              │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #6/#7  │ —        │ Fixes: gitignore for node_modules, missing npm dep │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #8     │ SALEB-41 │ Auth: Microsoft Entra ID, JWT session, proxy guard │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #9     │ SALEB-44 │ Firecrawl SDK wrapper (scrape + crawl)             │
+  ├────────┼──────────┼────────────────────────────────────────────────────┤
+  │ #10    │ SALEB-46 │ Azure OpenAI structured generation client          │
+  └────────┴──────────┴────────────────────────────────────────────────────┘
