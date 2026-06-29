@@ -37,8 +37,11 @@ yarn-error.log*
 dump.rdb
 logs/
 
-# env files (can opt-in for committing if needed)
-.env*
+# env files — local secrets never committed, example template always committed
+.env
+.env.local
+.env.*.local
+!.env.local.example
 
 # vercel
 .vercel
