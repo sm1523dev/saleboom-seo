@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: "◎" },
   { href: "/scan", label: "New Scan", icon: "⊙" },
-  { href: "/dashboard/aeo", label: "AEO Intelligence", icon: "◈" },
+  { href: "/aeo", label: "AEO Intelligence", icon: "◈" },
   { href: "/dashboard/cms", label: "CMS Push", icon: "⊛" },
   { href: "/dashboard/reports", label: "Reports", icon: "⊞" },
 ] as const;

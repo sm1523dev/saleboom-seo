@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { eq, and, isNull, inArray, sql, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, scans, issues, aeoMentions } from "@/lib/db/schema";
+import { websites, scans, issues, aeoMentions, aeoProviders } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { CountUp } from "@/components/animations/count-up";
@@ -99,11 +99,17 @@ export default async function DashboardPage() {
           : 100;
     }
 
-    // 5. AEO mention count
+    // 5. AEO mention count — brand_mentioned = true across all providers for this user's sites
     const [aeoRow] = await db
       .select({ count: sql<number>`count(*)::int` })
       .from(aeoMentions)
-      .where(inArray(aeoMentions.websiteId, websiteIds));
+      .innerJoin(aeoProviders, eq(aeoMentions.providerId, aeoProviders.id))
+      .where(
+        and(
+          inArray(aeoProviders.websiteId, websiteIds),
+          eq(aeoMentions.brandMentioned, true),
+        )
+      );
     aeoCount = aeoRow?.count ?? 0;
 
     // 6. Recent scans list (last 5)

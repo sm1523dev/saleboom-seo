@@ -6,9 +6,13 @@ import {
   timestamp,
   jsonb,
   integer,
+  boolean,
+  real,
+  date,
   pgEnum,
   index,
   customType,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 const vector = customType<{ data: number[]; driverData: string }>({
@@ -71,14 +75,6 @@ export const aeoSentimentEnum = pgEnum("aeo_sentiment", [
   "positive",
   "neutral",
   "negative",
-]);
-
-export const aeoPlatformEnum = pgEnum("aeo_platform", [
-  "chatgpt",
-  "perplexity",
-  "gemini",
-  "claude",
-  "other",
 ]);
 
 export const users = pgTable("users", {
@@ -203,24 +199,136 @@ export const aiSuggestions = pgTable(
   ],
 );
 
-export const aeoMentions = pgTable(
-  "aeo_mentions",
+// ─── AEO: Three-Signal Architecture ─────────────────────────────────────────
+
+// Provider type stored as varchar (not enum) — extensible without migrations
+export const aeoProviders = pgTable(
+  "aeo_providers",
   {
     id: uuid("id").defaultRandom().primaryKey(),
     websiteId: uuid("website_id")
       .notNull()
       .references(() => websites.id, { onDelete: "cascade" }),
-    platform: aeoPlatformEnum("platform").notNull(),
-    query: text("query").notNull(),
-    position: integer("position"),
-    snippet: text("snippet"),
+    displayName: varchar("display_name", { length: 100 }).notNull(),
+    // "openai-compat" | "anthropic" | "google" | "perplexity"
+    providerType: varchar("provider_type", { length: 30 }).notNull(),
+    endpointUrl: text("endpoint_url"),
+    // null = use platform-managed env key
+    apiKeyEncrypted: text("api_key_encrypted"),
+    model: varchar("model", { length: 100 }).notNull(),
+    enabled: boolean("enabled").default(true).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("aeo_providers_website_id_idx").on(t.websiteId)],
+);
+
+export const aeoQueries = pgTable(
+  "aeo_queries",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    promptText: text("prompt_text").notNull(),
+    categoryTag: varchar("category_tag", { length: 50 }),
+    active: boolean("active").default(true).notNull(),
+    ...timestamps,
+  },
+  (t) => [index("aeo_queries_website_id_idx").on(t.websiteId)],
+);
+
+// Signal 1 — brand mention results from prompt sampling
+export const aeoMentions = pgTable(
+  "aeo_mentions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerId: uuid("provider_id")
+      .notNull()
+      .references(() => aeoProviders.id, { onDelete: "cascade" }),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => aeoQueries.id, { onDelete: "cascade" }),
+    scanDate: date("scan_date").notNull(),
+    brandMentioned: boolean("brand_mentioned").notNull(),
+    // "strong" (top 20%) | "moderate" (20-50%) | "weak" (50%+) | "absent"
+    positionBucket: varchar("position_bucket", { length: 20 }),
     sentiment: aeoSentimentEnum("sentiment"),
-    mentionEmbedding: vector("mention_embedding", { dimensions: 1536 }),
-    scannedAt: timestamp("scanned_at", { withTimezone: true }).notNull(),
+    surroundingText: text("surrounding_text"),
     ...timestamps,
   },
   (t) => [
-    index("aeo_mentions_website_id_idx").on(t.websiteId),
-    index("aeo_mentions_platform_idx").on(t.platform),
+    index("aeo_mentions_provider_id_idx").on(t.providerId),
+    index("aeo_mentions_query_id_idx").on(t.queryId),
+    // one result per provider+query+day — enforced in worker with onConflictDoNothing
+    uniqueIndex("aeo_mentions_provider_query_date_idx").on(
+      t.providerId,
+      t.queryId,
+      t.scanDate,
+    ),
+  ],
+);
+
+// Signal 3 — citations extracted from RAG platform responses (free, piggybacks on Signal 1)
+export const aeoCitations = pgTable(
+  "aeo_citations",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    providerId: uuid("provider_id")
+      .notNull()
+      .references(() => aeoProviders.id, { onDelete: "cascade" }),
+    queryId: uuid("query_id")
+      .notNull()
+      .references(() => aeoQueries.id, { onDelete: "cascade" }),
+    scanDate: date("scan_date").notNull(),
+    citedUrl: text("cited_url").notNull(),
+    isOwnDomain: boolean("is_own_domain").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("aeo_citations_provider_id_idx").on(t.providerId),
+    index("aeo_citations_is_own_domain_idx").on(t.isOwnDomain),
+  ],
+);
+
+// Signal 2 — real visits originating from AI platforms (tracked via JS snippet)
+export const aiReferrals = pgTable(
+  "ai_referrals",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    visitedAt: timestamp("visited_at", { withTimezone: true }).notNull(),
+    referrerPlatform: varchar("referrer_platform", { length: 60 }).notNull(),
+    landingPath: text("landing_path").notNull(),
+    sessionId: uuid("session_id").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("ai_referrals_website_id_idx").on(t.websiteId),
+    index("ai_referrals_visited_at_idx").on(t.visitedAt),
+    // deduplicate: one row per session
+    uniqueIndex("ai_referrals_session_idx").on(t.websiteId, t.sessionId),
+  ],
+);
+
+// Composite AEO score snapshot — one row per website per run
+export const aeoScores = pgTable(
+  "aeo_scores",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    scoredAt: timestamp("scored_at", { withTimezone: true }).notNull(),
+    signal1Rate: real("signal1_rate").notNull(),
+    signal2Index: real("signal2_index").notNull(),
+    signal3Rate: real("signal3_rate").notNull(),
+    compositeScore: real("composite_score").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("aeo_scores_website_id_idx").on(t.websiteId),
+    index("aeo_scores_scored_at_idx").on(t.scoredAt),
   ],
 );
