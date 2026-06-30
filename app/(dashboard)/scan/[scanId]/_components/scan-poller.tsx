@@ -7,11 +7,12 @@ import { motion } from "motion/react";
 type Props = {
   scanId: string;
   initialStatus: string;
+  websiteId: string;
 };
 
 const POLL_INTERVAL = 3000;
 
-export function ScanPoller({ scanId, initialStatus }: Props) {
+export function ScanPoller({ scanId, initialStatus, websiteId }: Props) {
   const router = useRouter();
   const statusRef = useRef(initialStatus);
 
@@ -26,7 +27,7 @@ export function ScanPoller({ scanId, initialStatus }: Props) {
         statusRef.current = data.status;
 
         if (data.status === "completed") {
-          router.push("/dashboard");
+          router.push(`/website/${websiteId}`);
         } else if (data.status === "failed") {
           router.refresh();
         }

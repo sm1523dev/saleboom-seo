@@ -102,7 +102,7 @@ export default async function ScanStatusPage({ params }: Props) {
           </Link>
         )}
 
-        <ScanPoller scanId={scan.id} initialStatus={scan.status} />
+        <ScanPoller scanId={scan.id} initialStatus={scan.status} websiteId={scan.websiteId} />
       </section>
 
       <div className="flex gap-3 text-sm">
