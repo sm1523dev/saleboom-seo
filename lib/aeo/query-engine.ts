@@ -4,8 +4,7 @@ const PERPLEXITY_BASE_URL = "https://api.perplexity.ai";
 const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 function resolveKey(provider: AeoProvider): string {
-  if (provider.apiKeyEnvVar) return process.env[provider.apiKeyEnvVar] ?? "missing-api-key";
-  return "missing-api-key";
+  return (provider.apiKeyEnvVar ? process.env[provider.apiKeyEnvVar] : undefined) ?? "";
 }
 
 function mockResponse(prompt: string): QueryResult {
@@ -27,7 +26,8 @@ export async function queryAeoProvider(
   provider: AeoProvider,
   prompt: string
 ): Promise<QueryResult> {
-  if (process.env.AI_PROVIDER === "mock") return mockResponse(prompt);
+  const apiKey = provider.apiKeyEnvVar ? process.env[provider.apiKeyEnvVar] : undefined;
+  if (!apiKey) return mockResponse(prompt);
 
   const { generateText } = await import("ai");
 
