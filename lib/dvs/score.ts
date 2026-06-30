@@ -1,4 +1,4 @@
-import { eq, desc, inArray } from "drizzle-orm";
+import { eq, and, desc, inArray, gte } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, issues, aeoScores, dvsScores } from "@/lib/db/schema";
 import { computeSeoScore } from "@/lib/seo-score";
@@ -14,7 +14,7 @@ export async function persistDvsScore(websiteId: string): Promise<number> {
   const [latestScan] = await db
     .select({ id: scans.id })
     .from(scans)
-    .where(eq(scans.websiteId, websiteId))
+    .where(and(eq(scans.websiteId, websiteId), eq(scans.status, "completed")))
     .orderBy(desc(scans.completedAt))
     .limit(1);
 
@@ -57,7 +57,6 @@ export async function getDvsHistory(
   const cutoff = new Date();
   cutoff.setDate(cutoff.getDate() - days);
 
-  const { gte } = await import("drizzle-orm");
   return db
     .select({
       scoredAt: dvsScores.scoredAt,
@@ -66,8 +65,6 @@ export async function getDvsHistory(
       compositeScore: dvsScores.compositeScore,
     })
     .from(dvsScores)
-    .where(
-      inArray(dvsScores.websiteId, websiteIds)
-    )
+    .where(and(inArray(dvsScores.websiteId, websiteIds), gte(dvsScores.scoredAt, cutoff)))
     .orderBy(dvsScores.scoredAt);
 }
