@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { motion } from "motion/react";
+import { AnimatePresence, motion } from "motion/react";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -246,46 +246,7 @@ export function ResultsView({
 
       {/* AI Suggestions */}
       {suggestions.length > 0 && (
-        <section aria-label="AI-generated suggestions">
-          <h2 className="mb-3 font-semibold">
-            AI Copy Suggestions
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
-            </span>
-          </h2>
-          <div className="space-y-3">
-            {suggestions.map((s) => (
-              <div
-                key={s.id}
-                className="rounded-xl border border-border bg-card p-4"
-              >
-                <p className="mb-3 truncate font-mono text-xs text-muted-foreground">
-                  {s.pageUrl}
-                </p>
-                <dl className="space-y-2 text-sm">
-                  {s.metaTitle && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Meta Title</dt>
-                      <dd className="mt-0.5 font-medium">{s.metaTitle}</dd>
-                    </div>
-                  )}
-                  {s.metaDescription && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">Meta Description</dt>
-                      <dd className="mt-0.5 text-muted-foreground">{s.metaDescription}</dd>
-                    </div>
-                  )}
-                  {s.h1 && (
-                    <div>
-                      <dt className="text-xs text-muted-foreground">H1</dt>
-                      <dd className="mt-0.5 font-medium">{s.h1}</dd>
-                    </div>
-                  )}
-                </dl>
-              </div>
-            ))}
-          </div>
-        </section>
+        <AiSuggestionsSection suggestions={suggestions} />
       )}
 
       {/* Issue list */}
@@ -383,5 +344,70 @@ export function ResultsView({
         Scan ID: <span className="font-mono">{scanId}</span>
       </div>
     </div>
+  );
+}
+
+function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <section aria-label="AI-generated suggestions">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+        aria-expanded={open}
+      >
+        <span className="font-semibold">
+          AI Copy Suggestions
+          <span className="ml-2 text-xs font-normal text-muted-foreground">
+            {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+          </span>
+        </span>
+        <span className={cn("text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
+          ▾
+        </span>
+      </button>
+
+      <AnimatePresence initial={false}>
+        {open && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: "auto" }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+            className="overflow-hidden"
+          >
+            <div className="space-y-3 pt-3">
+              {suggestions.map((s) => (
+                <div key={s.id} className="rounded-xl border border-border bg-card p-4">
+                  <p className="mb-3 truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
+                  <dl className="space-y-2 text-sm">
+                    {s.metaTitle && (
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Meta Title</dt>
+                        <dd className="mt-0.5 font-medium">{s.metaTitle}</dd>
+                      </div>
+                    )}
+                    {s.metaDescription && (
+                      <div>
+                        <dt className="text-xs text-muted-foreground">Meta Description</dt>
+                        <dd className="mt-0.5 text-muted-foreground">{s.metaDescription}</dd>
+                      </div>
+                    )}
+                    {s.h1 && (
+                      <div>
+                        <dt className="text-xs text-muted-foreground">H1</dt>
+                        <dd className="mt-0.5 font-medium">{s.h1}</dd>
+                      </div>
+                    )}
+                  </dl>
+                </div>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </section>
   );
 }
