@@ -80,6 +80,9 @@ export default async function AuditResultsPage({ params }: Props) {
     .select({
       id: aiSuggestions.id,
       pageUrl: aiSuggestions.pageUrl,
+      currentMetaTitle: aiSuggestions.currentMetaTitle,
+      currentMetaDescription: aiSuggestions.currentMetaDescription,
+      currentH1: aiSuggestions.currentH1,
       metaTitle: aiSuggestions.metaTitle,
       metaDescription: aiSuggestions.metaDescription,
       h1: aiSuggestions.h1,

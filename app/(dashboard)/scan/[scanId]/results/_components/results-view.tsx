@@ -30,6 +30,9 @@ type Issue = {
 type Suggestion = {
   id: string;
   pageUrl: string;
+  currentMetaTitle: string | null;
+  currentMetaDescription: string | null;
+  currentH1: string | null;
   metaTitle: string | null;
   metaDescription: string | null;
   h1: string | null;
@@ -347,20 +350,11 @@ export function ResultsView({
   );
 }
 
-const FIELD_LABELS: Record<string, { label: string; hint: string }> = {
-  metaTitle: {
-    label: "Page Title",
-    hint: "Shown as the headline in Google search results",
-  },
-  metaDescription: {
-    label: "Page Description",
-    hint: "The short summary shown under the title in Google results",
-  },
-  h1: {
-    label: "Main Heading",
-    hint: "The primary heading visitors see when they land on the page",
-  },
-};
+const FIELDS: { key: "metaTitle" | "metaDescription" | "h1"; currentKey: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; label: string; hint: string }[] = [
+  { key: "metaTitle", currentKey: "currentMetaTitle", label: "Page Title", hint: "Shown as the headline in Google search results" },
+  { key: "metaDescription", currentKey: "currentMetaDescription", label: "Page Description", hint: "The short summary shown under the title in Google results" },
+  { key: "h1", currentKey: "currentH1", label: "Main Heading", hint: "The primary heading visitors see when they land on the page" },
+];
 
 function CopyButton({ text }: { text: string }) {
   const [copied, setCopied] = useState(false);
@@ -386,12 +380,6 @@ function CopyButton({ text }: { text: string }) {
 function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
   const [open, setOpen] = useState(false);
 
-  const fields = [
-    { key: "metaTitle" as const, ...FIELD_LABELS.metaTitle },
-    { key: "metaDescription" as const, ...FIELD_LABELS.metaDescription },
-    { key: "h1" as const, ...FIELD_LABELS.h1 },
-  ];
-
   return (
     <section aria-label="AI-generated page improvements">
       <button
@@ -408,7 +396,7 @@ function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
             </span>
           </span>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            AI-written titles and descriptions — copy and paste into your website
+            See what's currently on your page and what AI suggests instead — copy to apply
           </p>
         </div>
         <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
@@ -429,19 +417,35 @@ function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
               {suggestions.map((s) => (
                 <div key={s.id} className="rounded-xl border border-border bg-card p-4">
                   <p className="mb-4 truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
-                  <div className="space-y-4">
-                    {fields.map(({ key, label, hint }) => {
-                      const value = s[key];
-                      if (!value) return null;
+                  <div className="space-y-5">
+                    {FIELDS.map(({ key, currentKey, label, hint }) => {
+                      const suggested = s[key];
+                      if (!suggested) return null;
+                      const current = s[currentKey];
                       return (
                         <div key={key}>
-                          <div className="mb-1 flex items-baseline gap-2">
+                          <div className="mb-2 flex items-baseline gap-2">
                             <span className="text-xs font-medium">{label}</span>
                             <span className="text-xs text-muted-foreground">{hint}</span>
                           </div>
-                          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                            <p className="flex-1 text-sm">{value}</p>
-                            <CopyButton text={value} />
+                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                            {/* Current */}
+                            <div>
+                              <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+                              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 min-h-[2.5rem]">
+                                {current
+                                  ? <p className="text-sm text-muted-foreground">{current}</p>
+                                  : <p className="text-sm italic text-muted-foreground/50">Not set</p>}
+                              </div>
+                            </div>
+                            {/* Suggested */}
+                            <div>
+                              <p className="mb-1 text-xs font-medium text-primary">AI Suggestion</p>
+                              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 min-h-[2.5rem]">
+                                <p className="flex-1 text-sm">{suggested}</p>
+                                <CopyButton text={suggested} />
+                              </div>
+                            </div>
                           </div>
                         </div>
                       );

@@ -147,19 +147,29 @@ async function generateAndPersistSuggestions(
     pages.map((p) => generateSeoSuggestion(p, scanId))
   );
 
+  // Build page lookup for current values
+  const pageMap = new Map(pages.map((p) => [p.url, p]));
+
   const rows = results
     .flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []))
-    .map((r) => ({
-      scanId,
-      pageUrl: r.pageUrl,
-      metaTitle: r.suggestion.metaTitle,
-      metaDescription: r.suggestion.metaDescription,
-      h1: r.suggestion.h1,
-      latencyMs: r.latencyMs,
-    }));
+    .map((r) => {
+      const page = pageMap.get(r.pageUrl);
+      return {
+        scanId,
+        pageUrl: r.pageUrl,
+        currentMetaTitle: page?.title ?? null,
+        currentMetaDescription: page?.description ?? null,
+        currentH1: page?.h1s?.[0] ?? null,
+        metaTitle: r.suggestion.metaTitle,
+        metaDescription: r.suggestion.metaDescription,
+        h1: r.suggestion.h1,
+        latencyMs: r.latencyMs,
+      };
+    });
 
   if (rows.length > 0) {
-    await db.insert(aiSuggestions).values(rows);
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    await db.insert(aiSuggestions).values(rows as any[]);
     log.info("ai suggestions generated", { count: rows.length });
   }
 }

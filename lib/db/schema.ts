@@ -184,6 +184,11 @@ export const aiSuggestions = pgTable(
       .notNull()
       .references(() => scans.id, { onDelete: "cascade" }),
     pageUrl: text("page_url").notNull(),
+    // Current values (before)
+    currentMetaTitle: text("current_meta_title"),
+    currentMetaDescription: text("current_meta_description"),
+    currentH1: text("current_h1"),
+    // AI-suggested values (after)
     metaTitle: text("meta_title"),
     metaDescription: text("meta_description"),
     h1: text("h1"),
