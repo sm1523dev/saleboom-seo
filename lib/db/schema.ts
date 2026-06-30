@@ -11,27 +11,9 @@ import {
   date,
   pgEnum,
   index,
-  customType,
   uniqueIndex,
 } from "drizzle-orm/pg-core";
 
-const vector = customType<{ data: number[]; driverData: string }>({
-  dataType(config: unknown) {
-    const dim = (config as Record<string, unknown> | undefined)?.dimensions as
-      | number
-      | undefined;
-    return dim ? `vector(${dim})` : "vector";
-  },
-  toDriver(val: number[]): string {
-    return `[${val.join(",")}]`;
-  },
-  fromDriver(val: string): number[] {
-    return val
-      .replace(/^\[|\]$/g, "")
-      .split(",")
-      .map(Number);
-  },
-});
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
