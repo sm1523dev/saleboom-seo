@@ -180,6 +180,29 @@ export const changeSnapshots = pgTable(
   ],
 );
 
+export const aiSuggestions = pgTable(
+  "ai_suggestions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    scanId: uuid("scan_id")
+      .notNull()
+      .references(() => scans.id, { onDelete: "cascade" }),
+    pageUrl: text("page_url").notNull(),
+    metaTitle: text("meta_title"),
+    metaDescription: text("meta_description"),
+    h1: text("h1"),
+    model: varchar("model", { length: 100 }),
+    promptTokens: integer("prompt_tokens"),
+    completionTokens: integer("completion_tokens"),
+    latencyMs: integer("latency_ms"),
+    ...timestamps,
+  },
+  (t) => [
+    index("ai_suggestions_scan_id_idx").on(t.scanId),
+    index("ai_suggestions_page_url_idx").on(t.pageUrl),
+  ],
+);
+
 export const aeoMentions = pgTable(
   "aeo_mentions",
   {

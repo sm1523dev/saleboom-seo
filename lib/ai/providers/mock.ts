@@ -1,31 +1,34 @@
 import type { z } from "zod";
 import type { AIProvider, GenerateOpts } from "../types";
+import { logger } from "@/lib/logger";
+
+// Domain extracted from "Page URL: https://example.com/path" in the prompt
+function extractDomain(prompt: string): string {
+  const match = prompt.match(/Page URL:\s*(https?:\/\/([^/\s]+))/);
+  return match?.[2] ?? "example.com";
+}
 
 export class MockAIProvider implements AIProvider {
   async generateStructured<T>(
     schema: z.ZodSchema<T>,
     prompt: string,
-    opts?: GenerateOpts
+    _opts?: GenerateOpts
   ): Promise<T> {
-    console.log("[ai:mock] generateStructured", {
-      system: opts?.system,
-      prompt: prompt.slice(0, 80),
-    });
-    // Use safeParse on an empty object and return a best-effort fallback.
-    // Avoids coupling to Zod's private _def API.
-    const attempt = schema.safeParse({});
-    if (attempt.success) return attempt.data;
-
-    // If empty object fails validation, try null — schema will reject and we
-    // surface a clear error so developers know the mock needs a fixture.
-    throw new Error(
-      `[ai:mock] Cannot auto-generate mock data for this schema. ` +
-        `Add a fixture to MockAIProvider or use AI_PROVIDER=ollama locally.`
-    );
+    const domain = extractDomain(prompt);
+    // Return a realistic-looking stub that satisfies the SeoSuggestionSchema
+    const stub = {
+      metaTitle: `${domain} — Professional Services & Solutions`,
+      metaDescription: `Discover what ${domain} offers. Trusted by thousands of users. Get started today and see the difference for yourself.`,
+      h1: `Welcome to ${domain}`,
+    };
+    const result = schema.safeParse(stub);
+    if (result.success) return result.data;
+    // Schema doesn't match SeoSuggestions — return empty object and log
+    logger.warn("[ai:mock] schema mismatch — returning empty object");
+    return {} as T;
   }
 
-  async generateText(prompt: string, _opts?: GenerateOpts): Promise<string> {
-    console.log("[ai:mock] generateText", { prompt: prompt.slice(0, 80) });
+  async generateText(_prompt: string, _opts?: GenerateOpts): Promise<string> {
     return "[mock AI response]";
   }
 

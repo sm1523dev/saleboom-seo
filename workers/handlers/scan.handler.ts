@@ -1,12 +1,14 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
+import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import type { SeoIssue } from "@/lib/seo-rules";
+import type { ParsedPage } from "@/lib/seo-rules/types";
 
 export type ScanJobData = {
   scanId: string;
@@ -84,6 +86,17 @@ export async function handleScanJob(
       await persistIssues(scanId, seoIssues);
     }
 
+    await context.updateProgress(85);
+
+    // Generate AI suggestions for pages with critical/high issues (up to 10 pages)
+    const pagesNeedingSuggestions = siteCtx.pages
+      .filter((p) => seoIssues.some((i) => i.pageUrl === p.url && (i.severity === "critical" || i.severity === "high")))
+      .slice(0, 10);
+
+    if (pagesNeedingSuggestions.length > 0) {
+      await generateAndPersistSuggestions(scanId, pagesNeedingSuggestions, log);
+    }
+
     await context.updateProgress(95);
 
     await db
@@ -119,6 +132,33 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<voi
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
     await db.insert(issues).values(rows.slice(i, i + BATCH));
+  }
+}
+
+async function generateAndPersistSuggestions(
+  scanId: string,
+  pages: ParsedPage[],
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  log: any
+): Promise<void> {
+  const results = await Promise.allSettled(
+    pages.map((p) => generateSeoSuggestion(p, scanId))
+  );
+
+  const rows = results
+    .flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []))
+    .map((r) => ({
+      scanId,
+      pageUrl: r.pageUrl,
+      metaTitle: r.suggestion.metaTitle,
+      metaDescription: r.suggestion.metaDescription,
+      h1: r.suggestion.h1,
+      latencyMs: r.latencyMs,
+    }));
+
+  if (rows.length > 0) {
+    await db.insert(aiSuggestions).values(rows);
+    log.info("ai suggestions generated", { count: rows.length });
   }
 }
 

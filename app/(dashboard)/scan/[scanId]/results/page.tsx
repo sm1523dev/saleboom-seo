@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
@@ -76,6 +76,17 @@ export default async function AuditResultsPage({ params }: Props) {
   const score = computeSeoScore(scanIssues.map((i) => i.severity));
   const fixCounts = countByFixType(scanIssues);
 
+  const suggestions = await db
+    .select({
+      id: aiSuggestions.id,
+      pageUrl: aiSuggestions.pageUrl,
+      metaTitle: aiSuggestions.metaTitle,
+      metaDescription: aiSuggestions.metaDescription,
+      h1: aiSuggestions.h1,
+    })
+    .from(aiSuggestions)
+    .where(eq(aiSuggestions.scanId, scanId));
+
   return (
     <ResultsView
       scanId={scanId}
@@ -85,6 +96,7 @@ export default async function AuditResultsPage({ params }: Props) {
       score={score}
       fixCounts={fixCounts}
       issues={scanIssues}
+      suggestions={suggestions}
     />
   );
 }

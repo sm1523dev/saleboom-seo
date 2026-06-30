@@ -27,6 +27,14 @@ type Issue = {
   fixType: FixType;
 };
 
+type Suggestion = {
+  id: string;
+  pageUrl: string;
+  metaTitle: string | null;
+  metaDescription: string | null;
+  h1: string | null;
+};
+
 type Props = {
   scanId: string;
   websiteName: string;
@@ -35,6 +43,7 @@ type Props = {
   score: number;
   fixCounts: { quick: number; major: number };
   issues: Issue[];
+  suggestions: Suggestion[];
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -79,6 +88,7 @@ export function ResultsView({
   score,
   fixCounts,
   issues,
+  suggestions,
 }: Props) {
   const [filter, setFilter] = useState<Severity | null>(null);
 
@@ -211,6 +221,50 @@ export function ResultsView({
           })}
         </div>
       </section>
+
+      {/* AI Suggestions */}
+      {suggestions.length > 0 && (
+        <section aria-label="AI-generated suggestions">
+          <h2 className="mb-3 font-semibold">
+            AI Copy Suggestions
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+            </span>
+          </h2>
+          <div className="space-y-3">
+            {suggestions.map((s) => (
+              <div
+                key={s.id}
+                className="rounded-xl border border-border bg-card p-4"
+              >
+                <p className="mb-3 truncate font-mono text-xs text-muted-foreground">
+                  {s.pageUrl}
+                </p>
+                <dl className="space-y-2 text-sm">
+                  {s.metaTitle && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Meta Title</dt>
+                      <dd className="mt-0.5 font-medium">{s.metaTitle}</dd>
+                    </div>
+                  )}
+                  {s.metaDescription && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">Meta Description</dt>
+                      <dd className="mt-0.5 text-muted-foreground">{s.metaDescription}</dd>
+                    </div>
+                  )}
+                  {s.h1 && (
+                    <div>
+                      <dt className="text-xs text-muted-foreground">H1</dt>
+                      <dd className="mt-0.5 font-medium">{s.h1}</dd>
+                    </div>
+                  )}
+                </dl>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Issue list */}
       <section aria-label="Issue list">
