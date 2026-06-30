@@ -347,24 +347,71 @@ export function ResultsView({
   );
 }
 
+const FIELD_LABELS: Record<string, { label: string; hint: string }> = {
+  metaTitle: {
+    label: "Page Title",
+    hint: "Shown as the headline in Google search results",
+  },
+  metaDescription: {
+    label: "Page Description",
+    hint: "The short summary shown under the title in Google results",
+  },
+  h1: {
+    label: "Main Heading",
+    hint: "The primary heading visitors see when they land on the page",
+  },
+};
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+
+  async function handleCopy() {
+    await navigator.clipboard.writeText(text);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={handleCopy}
+      aria-label="Copy to clipboard"
+      className="shrink-0 rounded-md border border-border px-2 py-1 font-mono text-xs text-muted-foreground transition-colors hover:border-primary/40 hover:text-primary"
+    >
+      {copied ? "Copied!" : "Copy"}
+    </button>
+  );
+}
+
 function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
   const [open, setOpen] = useState(false);
 
+  const fields = [
+    { key: "metaTitle" as const, ...FIELD_LABELS.metaTitle },
+    { key: "metaDescription" as const, ...FIELD_LABELS.metaDescription },
+    { key: "h1" as const, ...FIELD_LABELS.h1 },
+  ];
+
   return (
-    <section aria-label="AI-generated suggestions">
+    <section aria-label="AI-generated page improvements">
       <button
         type="button"
         onClick={() => setOpen((o) => !o)}
         className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
         aria-expanded={open}
       >
-        <span className="font-semibold">
-          AI Copy Suggestions
-          <span className="ml-2 text-xs font-normal text-muted-foreground">
-            {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+        <div>
+          <span className="font-semibold">
+            Suggested Page Improvements
+            <span className="ml-2 text-xs font-normal text-muted-foreground">
+              {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+            </span>
           </span>
-        </span>
-        <span className={cn("text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
+          <p className="mt-0.5 text-xs text-muted-foreground">
+            AI-written titles and descriptions — copy and paste into your website
+          </p>
+        </div>
+        <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
           ▾
         </span>
       </button>
@@ -381,27 +428,25 @@ function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
             <div className="space-y-3 pt-3">
               {suggestions.map((s) => (
                 <div key={s.id} className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-3 truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
-                  <dl className="space-y-2 text-sm">
-                    {s.metaTitle && (
-                      <div>
-                        <dt className="text-xs text-muted-foreground">Meta Title</dt>
-                        <dd className="mt-0.5 font-medium">{s.metaTitle}</dd>
-                      </div>
-                    )}
-                    {s.metaDescription && (
-                      <div>
-                        <dt className="text-xs text-muted-foreground">Meta Description</dt>
-                        <dd className="mt-0.5 text-muted-foreground">{s.metaDescription}</dd>
-                      </div>
-                    )}
-                    {s.h1 && (
-                      <div>
-                        <dt className="text-xs text-muted-foreground">H1</dt>
-                        <dd className="mt-0.5 font-medium">{s.h1}</dd>
-                      </div>
-                    )}
-                  </dl>
+                  <p className="mb-4 truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
+                  <div className="space-y-4">
+                    {fields.map(({ key, label, hint }) => {
+                      const value = s[key];
+                      if (!value) return null;
+                      return (
+                        <div key={key}>
+                          <div className="mb-1 flex items-baseline gap-2">
+                            <span className="text-xs font-medium">{label}</span>
+                            <span className="text-xs text-muted-foreground">{hint}</span>
+                          </div>
+                          <div className="flex items-start gap-2 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                            <p className="flex-1 text-sm">{value}</p>
+                            <CopyButton text={value} />
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
                 </div>
               ))}
             </div>
