@@ -5,6 +5,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
+import { ScanPoller } from "./_components/scan-poller";
 
 export const metadata: Metadata = {
   title: "Scan Status",
@@ -101,12 +102,7 @@ export default async function ScanStatusPage({ params }: Props) {
           </Link>
         )}
 
-        {(scan.status === "pending" || scan.status === "running") && (
-          <p className="mt-6 text-xs text-muted-foreground">
-            This page will update in a future release. For now, check back in a
-            few minutes and refresh.
-          </p>
-        )}
+        <ScanPoller scanId={scan.id} initialStatus={scan.status} />
       </section>
 
       <div className="flex gap-3 text-sm">
