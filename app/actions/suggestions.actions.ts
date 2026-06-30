@@ -1,13 +1,13 @@
 "use server";
 
-import { eq, inArray } from "drizzle-orm";
+import { inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 
-export async function dismissSuggestions(suggestionIds: string[]): Promise<void> {
+export async function ignoreSuggestions(suggestionIds: string[]): Promise<void> {
   if (suggestionIds.length === 0) return;
-  await getServerSession(); // auth gate
+  await getServerSession();
 
   await db
     .update(aiSuggestions)

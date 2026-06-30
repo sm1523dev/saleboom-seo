@@ -4,7 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { dismissSuggestions } from "@/app/actions/suggestions.actions";
+import { ignoreSuggestions } from "@/app/actions/suggestions.actions";
+import { ignoreIssues } from "@/app/actions/issues.actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -98,10 +99,12 @@ export function ResultsView({
   suggestions,
   pastSuggestions,
 }: Props) {
+  const router = useRouter();
   const [filter, setFilter] = useState<Severity | null>(null);
   const [fixFilter, setFixFilter] = useState<"quick" | "major" | null>(null);
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
   const [showIssueCmsPrompt, setShowIssueCmsPrompt] = useState(false);
+  const [isIgnoringIssues, startIgnoreIssuesTransition] = useTransition();
 
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
@@ -305,19 +308,40 @@ export function ResultsView({
                 Clear filter ×
               </button>
             )}
-            {/* Quick fix bulk action */}
-            {filtered.some((i) => i.fixType === "quick") && (
+            {/* Issue bulk actions */}
+            <div className="flex gap-2">
               <button
                 type="button"
-                onClick={() => setShowIssueCmsPrompt(true)}
-                title="CMS connection required — coming soon"
-                className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
+                onClick={() => {
+                  const ids = selectedIssues.size > 0
+                    ? Array.from(selectedIssues)
+                    : filtered.map((i) => i.id);
+                  startIgnoreIssuesTransition(async () => {
+                    await ignoreIssues(ids);
+                    setSelectedIssues(new Set());
+                    router.refresh();
+                  });
+                }}
+                disabled={isIgnoringIssues}
+                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
               >
                 {selectedIssues.size > 0
-                  ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
-                  : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
+                  ? `Ignore ${selectedIssues.size} selected`
+                  : `Ignore all`}
               </button>
-            )}
+              {filtered.some((i) => i.fixType === "quick") && (
+                <button
+                  type="button"
+                  onClick={() => setShowIssueCmsPrompt(true)}
+                  title="CMS connection required — coming soon"
+                  className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
+                >
+                  {selectedIssues.size > 0
+                    ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
+                    : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
+                </button>
+              )}
+            </div>
           </div>
         </div>
 
@@ -467,10 +491,10 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
     setShowCmsPrompt(true);
   }
 
-  function handleDismissSelected() {
+  function handleIgnoreSelected() {
     const ids = selected.size > 0 ? Array.from(selected) : suggestions.map((s) => s.id);
     startTransition(async () => {
-      await dismissSuggestions(ids);
+      await ignoreSuggestions(ids);
       setSelected(new Set());
       router.refresh();
     });
@@ -480,9 +504,9 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
     ? `Apply ${selected.size} suggestion${selected.size !== 1 ? "s" : ""}`
     : `Apply all ${suggestions.length} suggestions`;
 
-  const dismissLabel = selected.size > 0
-    ? `Skip ${selected.size} selected`
-    : "Skip all";
+  const ignoreLabel = selected.size > 0
+    ? `Ignore ${selected.size} selected`
+    : "Ignore all";
 
   return (
     <section aria-label="AI-generated page improvements" className="space-y-3">
@@ -569,11 +593,11 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
                     <div className="flex gap-2">
                       <button
                         type="button"
-                        onClick={handleDismissSelected}
+                        onClick={handleIgnoreSelected}
                         disabled={isPending}
                         className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
                       >
-                        {dismissLabel}
+                        {ignoreLabel}
                       </button>
                       <button
                         type="button"

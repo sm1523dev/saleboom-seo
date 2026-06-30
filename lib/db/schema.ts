@@ -131,6 +131,7 @@ export const issues = pgTable(
     description: text("description"),
     fixType: fixTypeEnum("fix_type"),
     resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+    ignoredAt: timestamp("ignored_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [

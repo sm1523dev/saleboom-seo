@@ -1,4 +1,4 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
@@ -82,9 +82,20 @@ export async function handleScanJob(
     const seoIssues = runSeoRules(siteCtx);
     log.info("rules engine complete", { issues: seoIssues.length });
 
-    // Persist issues
-    if (seoIssues.length > 0) {
-      await persistIssues(scanId, seoIssues);
+    // Skip issue types previously ignored by the user for this website
+    const ignoredRows = await db
+      .selectDistinct({ type: issues.type })
+      .from(issues)
+      .innerJoin(scans, eq(issues.scanId, scans.id))
+      .where(and(eq(scans.websiteId, websiteId), sql`${issues.ignoredAt} is not null`));
+    const ignoredTypeSet = new Set(ignoredRows.map((r) => r.type));
+
+    const filteredIssues = ignoredTypeSet.size > 0
+      ? seoIssues.filter((i) => !ignoredTypeSet.has(i.type))
+      : seoIssues;
+
+    if (filteredIssues.length > 0) {
+      await persistIssues(scanId, filteredIssues);
     }
 
     await context.updateProgress(85);
