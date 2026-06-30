@@ -91,6 +91,7 @@ export function ResultsView({
   suggestions,
 }: Props) {
   const [filter, setFilter] = useState<Severity | null>(null);
+  const [fixFilter, setFixFilter] = useState<"quick" | "major" | null>(null);
 
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
@@ -100,8 +101,9 @@ export function ResultsView({
     { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
   );
 
-  const filtered =
-    filter ? issues.filter((i) => i.severity === filter) : issues;
+  const filtered = issues
+    .filter((i) => !filter || i.severity === filter)
+    .filter((i) => !fixFilter || i.fixType === fixFilter);
 
   const formattedDate = completedAt
     ? new Intl.DateTimeFormat("en", {
@@ -167,12 +169,32 @@ export function ResultsView({
             {scoreGrade(score)}
           </p>
           <div className="mt-3 flex w-full gap-2 text-xs">
-            <span className="flex-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-center text-primary">
+            <button
+              type="button"
+              onClick={() => setFixFilter(fixFilter === "quick" ? null : "quick")}
+              aria-pressed={fixFilter === "quick"}
+              className={cn(
+                "btn-press flex-1 rounded-md border px-2 py-1 text-center transition-colors",
+                fixFilter === "quick"
+                  ? "border-primary/50 bg-primary/20 text-primary ring-1 ring-primary/30"
+                  : "border-primary/30 bg-primary/10 text-primary hover:bg-primary/20"
+              )}
+            >
               {fixCounts.quick} quick fix{fixCounts.quick !== 1 ? "es" : ""}
-            </span>
-            <span className="flex-1 rounded-md border border-border bg-muted px-2 py-1 text-center text-muted-foreground">
+            </button>
+            <button
+              type="button"
+              onClick={() => setFixFilter(fixFilter === "major" ? null : "major")}
+              aria-pressed={fixFilter === "major"}
+              className={cn(
+                "btn-press flex-1 rounded-md border px-2 py-1 text-center transition-colors",
+                fixFilter === "major"
+                  ? "border-foreground/30 bg-foreground/10 text-foreground ring-1 ring-foreground/20"
+                  : "border-border bg-muted text-muted-foreground hover:text-foreground hover:bg-accent"
+              )}
+            >
               {fixCounts.major} major fix{fixCounts.major !== 1 ? "es" : ""}
-            </span>
+            </button>
           </div>
         </motion.div>
 
@@ -272,14 +294,16 @@ export function ResultsView({
           <h2 className="font-semibold">
             {filter
               ? `${SEVERITY_CONFIG[filter].label} Issues (${filtered.length})`
-              : `All Issues (${issues.length})`}
+              : fixFilter
+                ? `${fixFilter === "quick" ? "Quick Fix" : "Major Fix"} Issues (${filtered.length})`
+                : `All Issues (${issues.length})`}
           </h2>
-          {filter && (
+          {(filter || fixFilter) && (
             <button
               type="button"
-              onClick={() => setFilter(null)}
+              onClick={() => { setFilter(null); setFixFilter(null); }}
               className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Clear severity filter"
+              aria-label="Clear filters"
             >
               Clear filter ×
             </button>
