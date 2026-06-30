@@ -1,5 +1,6 @@
+import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { aeoProviders } from "@/lib/db/schema";
+import { aeoProviders, aeoQueries } from "@/lib/db/schema";
 import type { AeoProviderType } from "./types";
 
 type SeedRow = {
@@ -49,4 +50,31 @@ export async function seedDefaultProviders(websiteId: string): Promise<void> {
 
   // Skip providers whose env key is missing — they will be ignored at query time
   await db.insert(aeoProviders).values(rows).onConflictDoNothing();
+}
+
+export async function seedDefaultQueries(
+  websiteId: string,
+  websiteName: string,
+  websiteUrl: string
+): Promise<void> {
+  const existing = await db
+    .select({ id: aeoQueries.id })
+    .from(aeoQueries)
+    .where(eq(aeoQueries.websiteId, websiteId))
+    .limit(1);
+
+  if (existing.length > 0) return; // already seeded
+
+  let domain = websiteUrl;
+  try { domain = new URL(websiteUrl).hostname.replace(/^www\./, ""); } catch { /* keep raw */ }
+
+  const prompts = [
+    `Tell me about ${websiteName}`,
+    `What is ${domain} and what do they offer?`,
+    `Best alternatives to ${websiteName}`,
+  ];
+
+  await db.insert(aeoQueries).values(
+    prompts.map((promptText) => ({ websiteId, promptText, active: true }))
+  );
 }

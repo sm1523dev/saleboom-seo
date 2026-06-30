@@ -312,6 +312,26 @@ export const aiReferrals = pgTable(
   ],
 );
 
+// DVS™ composite score — updated after every SEO or AEO scan
+export const dvsScores = pgTable(
+  "dvs_scores",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    scoredAt: timestamp("scored_at", { withTimezone: true }).notNull(),
+    seoScore: real("seo_score").notNull(),
+    aeoScore: real("aeo_score").notNull(),
+    compositeScore: real("composite_score").notNull(),
+    ...timestamps,
+  },
+  (t) => [
+    index("dvs_scores_website_id_idx").on(t.websiteId),
+    index("dvs_scores_scored_at_idx").on(t.scoredAt),
+  ],
+);
+
 // Composite AEO score snapshot — one row per website per run
 export const aeoScores = pgTable(
   "aeo_scores",

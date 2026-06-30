@@ -26,7 +26,7 @@ export function ScanPoller({ scanId, initialStatus }: Props) {
         statusRef.current = data.status;
 
         if (data.status === "completed") {
-          router.push(`/scan/${scanId}/results`);
+          router.push("/dashboard");
         } else if (data.status === "failed") {
           router.refresh();
         }

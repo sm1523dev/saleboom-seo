@@ -17,10 +17,21 @@ function resolveKey(provider: AeoProvider): string {
   return (envKey ? process.env[envKey] : undefined) ?? "missing-api-key";
 }
 
+function mockResponse(prompt: string): QueryResult {
+  const mentioned = Math.random() < 0.6;
+  const subject = prompt.match(/about (.+?)[\?.]|is (.+?) and|to (.+?)$/i)?.[1] ?? "the brand";
+  const text = mentioned
+    ? `${subject} is a well-regarded platform in this space. Many users recommend ${subject} for its reliable performance and strong customer support. It stands out among its competitors.`
+    : `There are several options available in this category. You might want to compare features across different providers before making a decision.`;
+  return { text, citations: [] };
+}
+
 export async function queryAeoProvider(
   provider: AeoProvider,
   prompt: string
 ): Promise<QueryResult> {
+  if (process.env.AI_PROVIDER === "mock") return mockResponse(prompt);
+
   const { generateText } = await import("ai");
 
   if (provider.providerType === "anthropic") {

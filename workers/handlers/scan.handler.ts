@@ -4,6 +4,7 @@ import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
+import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
@@ -104,6 +105,7 @@ export async function handleScanJob(
       .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
       .where(eq(scans.id, scanId));
 
+    await persistDvsScore(websiteId);
     await context.updateProgress(100);
     log.info("scan completed", { issues: seoIssues.length });
   } catch (err) {
