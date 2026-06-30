@@ -5,6 +5,7 @@ import { db } from "@/lib/db";
 import { scans, websites, issues } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
+import { countByFixType } from "@/lib/fix-classifier";
 import { ResultsView } from "./_components/results-view";
 
 export const metadata: Metadata = {
@@ -73,6 +74,7 @@ export default async function AuditResultsPage({ params }: Props) {
     .orderBy(issues.severity, issues.type);
 
   const score = computeSeoScore(scanIssues.map((i) => i.severity));
+  const fixCounts = countByFixType(scanIssues);
 
   return (
     <ResultsView
@@ -81,6 +83,7 @@ export default async function AuditResultsPage({ params }: Props) {
       websiteUrl={website?.url ?? ""}
       completedAt={scan.completedAt?.toISOString() ?? null}
       score={score}
+      fixCounts={fixCounts}
       issues={scanIssues}
     />
   );

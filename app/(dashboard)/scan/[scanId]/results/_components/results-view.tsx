@@ -33,6 +33,7 @@ type Props = {
   websiteUrl: string;
   completedAt: string | null;
   score: number;
+  fixCounts: { quick: number; major: number };
   issues: Issue[];
 };
 
@@ -76,6 +77,7 @@ export function ResultsView({
   websiteUrl,
   completedAt,
   score,
+  fixCounts,
   issues,
 }: Props) {
   const [filter, setFilter] = useState<Severity | null>(null);
@@ -154,6 +156,14 @@ export function ResultsView({
           <p className={cn("mt-1 text-xs font-medium", scoreColorClass(score))}>
             {scoreGrade(score)}
           </p>
+          <div className="mt-3 flex w-full gap-2 text-xs">
+            <span className="flex-1 rounded-md border border-primary/30 bg-primary/10 px-2 py-1 text-center text-primary">
+              {fixCounts.quick} quick fix{fixCounts.quick !== 1 ? "es" : ""}
+            </span>
+            <span className="flex-1 rounded-md border border-border bg-muted px-2 py-1 text-center text-muted-foreground">
+              {fixCounts.major} major fix{fixCounts.major !== 1 ? "es" : ""}
+            </span>
+          </div>
         </motion.div>
 
         {/* Severity counts */}
