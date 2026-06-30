@@ -444,7 +444,6 @@ function CopyButton({ text }: { text: string }) {
 
 function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: Suggestion[]; pastSuggestions: Suggestion[] }) {
   const [open, setOpen] = useState(false);
-  const [pastOpen, setPastOpen] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [showCmsPrompt, setShowCmsPrompt] = useState(false);
@@ -647,69 +646,7 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
         </>
       )}
 
-      {/* Past suggestions */}
-      {pastSuggestions.length > 0 && (
-        <>
-          <button
-            type="button"
-            onClick={() => setPastOpen((o) => !o)}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-2 text-left transition-colors hover:bg-accent"
-            aria-expanded={pastOpen}
-          >
-            <span className="text-sm text-muted-foreground">
-              Past Suggestions
-              <span className="ml-2 text-xs">({pastSuggestions.length} page{pastSuggestions.length !== 1 ? "s" : ""})</span>
-            </span>
-            <span className={cn("text-xs text-muted-foreground transition-transform duration-200", pastOpen && "rotate-180")} aria-hidden="true">
-              ▾
-            </span>
-          </button>
-
-          <AnimatePresence initial={false}>
-            {pastOpen && (
-              <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-                className="overflow-hidden"
-              >
-                <div className="space-y-3 pt-1">
-                  {pastSuggestions.map((s) => (
-                    <div key={s.id} className="rounded-xl border border-border bg-card p-4 opacity-70">
-                      <div className="mb-3 flex items-center justify-between">
-                        <p className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
-                        <span className={cn("rounded-full border px-2 py-0.5 text-xs capitalize",
-                          s.status === "applied"
-                            ? "border-green-500/30 bg-green-500/10 text-green-400"
-                            : "border-border bg-muted text-muted-foreground"
-                        )}>
-                          {s.status}
-                        </span>
-                      </div>
-                      <div className="space-y-3">
-                        {FIELDS.map(({ key, label }) => {
-                          const suggested = s[key];
-                          if (!suggested) return null;
-                          return (
-                            <div key={key} className="flex items-start justify-between gap-2">
-                              <div>
-                                <p className="text-xs text-muted-foreground">{label}</p>
-                                <p className="mt-0.5 text-sm">{suggested}</p>
-                              </div>
-                              <CopyButton text={suggested} />
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </>
-      )}
+      {/* Past suggestions are accessible via scan history — no separate section needed */}
     </section>
   );
 }

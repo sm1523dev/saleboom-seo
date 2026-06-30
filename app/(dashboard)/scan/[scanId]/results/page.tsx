@@ -6,7 +6,7 @@ import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
-import { ne } from "drizzle-orm";
+
 import { ResultsView } from "./_components/results-view";
 
 export const metadata: Metadata = {
