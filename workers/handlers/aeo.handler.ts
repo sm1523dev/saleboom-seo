@@ -33,7 +33,10 @@ export async function handleAeoJob(
       catch { return website.name; }
     })();
 
-    const brandName = website.name;
+    // Strip www. and TLD for broader matching ("semrush" matches "SEMrush", "Semrush.com", etc.)
+    const brandName = website.name
+      .replace(/^www\./, "")
+      .replace(/\.[a-z]{2,}$/, "");
 
     const [providers, queries] = await Promise.all([
       db.select().from(aeoProviders).where(eq(aeoProviders.enabled, true)),
