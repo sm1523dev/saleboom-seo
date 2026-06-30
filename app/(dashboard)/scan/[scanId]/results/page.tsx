@@ -6,6 +6,7 @@ import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
+import { ne } from "drizzle-orm";
 import { ResultsView } from "./_components/results-view";
 
 export const metadata: Metadata = {
@@ -76,10 +77,11 @@ export default async function AuditResultsPage({ params }: Props) {
   const score = computeSeoScore(scanIssues);
   const fixCounts = countByFixType(scanIssues);
 
-  const suggestions = await db
+  const allSuggestions = await db
     .select({
       id: aiSuggestions.id,
       pageUrl: aiSuggestions.pageUrl,
+      status: aiSuggestions.status,
       currentMetaTitle: aiSuggestions.currentMetaTitle,
       currentMetaDescription: aiSuggestions.currentMetaDescription,
       currentH1: aiSuggestions.currentH1,
@@ -89,6 +91,9 @@ export default async function AuditResultsPage({ params }: Props) {
     })
     .from(aiSuggestions)
     .where(eq(aiSuggestions.scanId, scanId));
+
+  const suggestions = allSuggestions.filter((s) => s.status === "pending");
+  const pastSuggestions = allSuggestions.filter((s) => s.status !== "pending");
 
   return (
     <ResultsView
@@ -100,6 +105,7 @@ export default async function AuditResultsPage({ params }: Props) {
       fixCounts={fixCounts}
       issues={scanIssues}
       suggestions={suggestions}
+      pastSuggestions={pastSuggestions}
     />
   );
 }

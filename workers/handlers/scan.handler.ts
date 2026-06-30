@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { crawlProvider } from "@/lib/crawl";
@@ -90,12 +90,25 @@ export async function handleScanJob(
     await context.updateProgress(85);
 
     // Generate AI suggestions for pages with critical/high issues (up to 10 pages)
+    // Skip pages the user already dismissed in a previous scan for this website
+    const dismissedPages = await db
+      .select({ pageUrl: aiSuggestions.pageUrl })
+      .from(aiSuggestions)
+      .where(and(
+        eq(aiSuggestions.websiteId, websiteId),
+        eq(aiSuggestions.status, "dismissed"),
+      ));
+    const dismissedUrls = new Set(dismissedPages.map((d) => d.pageUrl));
+
     const pagesNeedingSuggestions = siteCtx.pages
-      .filter((p) => seoIssues.some((i) => i.pageUrl === p.url && (i.severity === "critical" || i.severity === "high")))
+      .filter((p) =>
+        !dismissedUrls.has(p.url) &&
+        seoIssues.some((i) => i.pageUrl === p.url && (i.severity === "critical" || i.severity === "high"))
+      )
       .slice(0, 10);
 
     if (pagesNeedingSuggestions.length > 0) {
-      await generateAndPersistSuggestions(scanId, pagesNeedingSuggestions, log);
+      await generateAndPersistSuggestions(scanId, websiteId, pagesNeedingSuggestions, log);
     }
 
     await context.updateProgress(95);
@@ -139,6 +152,7 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<voi
 
 async function generateAndPersistSuggestions(
   scanId: string,
+  websiteId: string,
   pages: ParsedPage[],
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   log: any
@@ -156,6 +170,7 @@ async function generateAndPersistSuggestions(
       const page = pageMap.get(r.pageUrl);
       return {
         scanId,
+        websiteId,
         pageUrl: r.pageUrl,
         currentMetaTitle: page?.title ?? null,
         currentMetaDescription: page?.description ?? null,
@@ -164,6 +179,7 @@ async function generateAndPersistSuggestions(
         metaDescription: r.suggestion.metaDescription,
         h1: r.suggestion.h1,
         latencyMs: r.latencyMs,
+        status: "pending" as const,
       };
     });
 

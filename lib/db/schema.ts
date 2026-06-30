@@ -176,6 +176,12 @@ export const changeSnapshots = pgTable(
   ],
 );
 
+export const suggestionStatusEnum = pgEnum("suggestion_status", [
+  "pending",
+  "dismissed",
+  "applied",
+]);
+
 export const aiSuggestions = pgTable(
   "ai_suggestions",
   {
@@ -183,6 +189,10 @@ export const aiSuggestions = pgTable(
     scanId: uuid("scan_id")
       .notNull()
       .references(() => scans.id, { onDelete: "cascade" }),
+    // denormalised for cross-scan queries (dismissed pages lookup in worker)
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
     pageUrl: text("page_url").notNull(),
     // Current values (before)
     currentMetaTitle: text("current_meta_title"),
@@ -196,10 +206,14 @@ export const aiSuggestions = pgTable(
     promptTokens: integer("prompt_tokens"),
     completionTokens: integer("completion_tokens"),
     latencyMs: integer("latency_ms"),
+    status: suggestionStatusEnum("status").default("pending").notNull(),
+    dismissedAt: timestamp("dismissed_at", { withTimezone: true }),
+    appliedAt: timestamp("applied_at", { withTimezone: true }),
     ...timestamps,
   },
   (t) => [
     index("ai_suggestions_scan_id_idx").on(t.scanId),
+    index("ai_suggestions_website_id_idx").on(t.websiteId),
     index("ai_suggestions_page_url_idx").on(t.pageUrl),
   ],
 );

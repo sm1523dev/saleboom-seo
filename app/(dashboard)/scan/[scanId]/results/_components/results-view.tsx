@@ -1,8 +1,10 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
+import { dismissSuggestions } from "@/app/actions/suggestions.actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -30,6 +32,7 @@ type Issue = {
 type Suggestion = {
   id: string;
   pageUrl: string;
+  status: string;
   currentMetaTitle: string | null;
   currentMetaDescription: string | null;
   currentH1: string | null;
@@ -47,6 +50,7 @@ type Props = {
   fixCounts: { quick: number; major: number };
   issues: Issue[];
   suggestions: Suggestion[];
+  pastSuggestions: Suggestion[];
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -92,9 +96,12 @@ export function ResultsView({
   fixCounts,
   issues,
   suggestions,
+  pastSuggestions,
 }: Props) {
   const [filter, setFilter] = useState<Severity | null>(null);
   const [fixFilter, setFixFilter] = useState<"quick" | "major" | null>(null);
+  const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
+  const [showIssueCmsPrompt, setShowIssueCmsPrompt] = useState(false);
 
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
@@ -248,13 +255,38 @@ export function ResultsView({
       </section>
 
       {/* AI Suggestions */}
-      {suggestions.length > 0 && (
-        <AiSuggestionsSection suggestions={suggestions} />
+      {(suggestions.length > 0 || pastSuggestions.length > 0) && (
+        <AiSuggestionsSection suggestions={suggestions} pastSuggestions={pastSuggestions} />
       )}
 
       {/* Issue list */}
       <section aria-label="Issue list">
-        <div className="mb-3 flex items-center justify-between">
+        {/* CMS prompt for issues */}
+        {showIssueCmsPrompt && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+            <motion.div
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+            >
+              <h3 className="font-semibold">Connect your CMS to auto-fix</h3>
+              <p className="mt-2 text-sm text-muted-foreground">
+                Quick fixes can be applied directly to your website with one click — once your CMS is connected.
+                WordPress, Shopify, and Webflow support coming soon.
+              </p>
+              <div className="mt-5 flex gap-3">
+                <button type="button" onClick={() => setShowIssueCmsPrompt(false)} className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent">
+                  Got it
+                </button>
+                <button type="button" disabled className="flex-1 cursor-not-allowed rounded-lg bg-primary/40 px-4 py-2 text-sm font-medium text-primary-foreground">
+                  Connect CMS — Coming soon
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+
+        <div className="mb-3 flex items-center justify-between gap-3">
           <h2 className="font-semibold">
             {filter
               ? `${SEVERITY_CONFIG[filter].label} Issues (${filtered.length})`
@@ -262,16 +294,31 @@ export function ResultsView({
                 ? `${fixFilter === "quick" ? "Quick Fix" : "Major Fix"} Issues (${filtered.length})`
                 : `All Issues (${issues.length})`}
           </h2>
-          {(filter || fixFilter) && (
-            <button
-              type="button"
-              onClick={() => { setFilter(null); setFixFilter(null); }}
-              className="text-xs text-muted-foreground hover:text-foreground transition-colors"
-              aria-label="Clear filters"
-            >
-              Clear filter ×
-            </button>
-          )}
+          <div className="flex items-center gap-2">
+            {(filter || fixFilter) && (
+              <button
+                type="button"
+                onClick={() => { setFilter(null); setFixFilter(null); }}
+                className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                aria-label="Clear filters"
+              >
+                Clear filter ×
+              </button>
+            )}
+            {/* Quick fix bulk action */}
+            {filtered.some((i) => i.fixType === "quick") && (
+              <button
+                type="button"
+                onClick={() => setShowIssueCmsPrompt(true)}
+                title="CMS connection required — coming soon"
+                className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
+              >
+                {selectedIssues.size > 0
+                  ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
+                  : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
+              </button>
+            )}
+          </div>
         </div>
 
         {filtered.length === 0 ? (
@@ -287,6 +334,7 @@ export function ResultsView({
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
+                  <TableHead className="w-8 pr-0" />
                   <TableHead className="w-28 text-xs">Severity</TableHead>
                   <TableHead className="text-xs">Issue</TableHead>
                   <TableHead className="w-24 text-xs">Fix Type</TableHead>
@@ -295,11 +343,28 @@ export function ResultsView({
               <TableBody>
                 {filtered.map((issue) => {
                   const cfg = SEVERITY_CONFIG[issue.severity];
+                  const isQuick = issue.fixType === "quick";
                   return (
                     <TableRow
                       key={issue.id}
-                      className="border-border align-top"
+                      className={cn("border-border align-top", isQuick && selectedIssues.has(issue.id) && "bg-primary/5")}
                     >
+                      <TableCell className="py-3 w-8 pr-0">
+                        {isQuick && (
+                          <input
+                            type="checkbox"
+                            checked={selectedIssues.has(issue.id)}
+                            onChange={() => setSelectedIssues((prev) => {
+                              const next = new Set(prev);
+                              if (next.has(issue.id)) next.delete(issue.id);
+                              else next.add(issue.id);
+                              return next;
+                            })}
+                            className="rounded"
+                            aria-label={`Select ${issue.title}`}
+                          />
+                        )}
+                      </TableCell>
                       <TableCell className="py-3">
                         <Badge
                           variant="outline"
@@ -377,86 +442,274 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function AiSuggestionsSection({ suggestions }: { suggestions: Suggestion[] }) {
+function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: Suggestion[]; pastSuggestions: Suggestion[] }) {
   const [open, setOpen] = useState(false);
+  const [pastOpen, setPastOpen] = useState(false);
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [isPending, startTransition] = useTransition();
+  const [showCmsPrompt, setShowCmsPrompt] = useState(false);
+  const router = useRouter();
+
+  function toggleSelect(id: string) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  function toggleAll() {
+    if (selected.size === suggestions.length) setSelected(new Set());
+    else setSelected(new Set(suggestions.map((s) => s.id)));
+  }
+
+  function handleApply() {
+    setShowCmsPrompt(true);
+  }
+
+  function handleDismissSelected() {
+    const ids = selected.size > 0 ? Array.from(selected) : suggestions.map((s) => s.id);
+    startTransition(async () => {
+      await dismissSuggestions(ids);
+      setSelected(new Set());
+      router.refresh();
+    });
+  }
+
+  const applyLabel = selected.size > 0
+    ? `Apply ${selected.size} suggestion${selected.size !== 1 ? "s" : ""}`
+    : `Apply all ${suggestions.length} suggestions`;
+
+  const dismissLabel = selected.size > 0
+    ? `Skip ${selected.size} selected`
+    : "Skip all";
 
   return (
-    <section aria-label="AI-generated page improvements">
-      <button
-        type="button"
-        onClick={() => setOpen((o) => !o)}
-        className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
-        aria-expanded={open}
-      >
-        <div>
-          <span className="font-semibold">
-            Suggested Page Improvements
-            <span className="ml-2 text-xs font-normal text-muted-foreground">
-              {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
-            </span>
-          </span>
-          <p className="mt-0.5 text-xs text-muted-foreground">
-            See what's currently on your page and what AI suggests instead — copy to apply
-          </p>
-        </div>
-        <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
-          ▾
-        </span>
-      </button>
-
-      <AnimatePresence initial={false}>
-        {open && (
+    <section aria-label="AI-generated page improvements" className="space-y-3">
+      {/* CMS prompt popup */}
+      {showCmsPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <motion.div
-            initial={{ opacity: 0, height: 0 }}
-            animate={{ opacity: 1, height: "auto" }}
-            exit={{ opacity: 0, height: 0 }}
-            transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
-            className="overflow-hidden"
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
           >
-            <div className="space-y-3 pt-3">
-              {suggestions.map((s) => (
-                <div key={s.id} className="rounded-xl border border-border bg-card p-4">
-                  <p className="mb-4 truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
-                  <div className="space-y-5">
-                    {FIELDS.map(({ key, currentKey, label, hint }) => {
-                      const suggested = s[key];
-                      if (!suggested) return null;
-                      const current = s[currentKey];
-                      return (
-                        <div key={key}>
-                          <div className="mb-2 flex items-baseline gap-2">
-                            <span className="text-xs font-medium">{label}</span>
-                            <span className="text-xs text-muted-foreground">{hint}</span>
-                          </div>
-                          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                            {/* Current */}
-                            <div>
-                              <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
-                              <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 min-h-[2.5rem]">
-                                {current
-                                  ? <p className="text-sm text-muted-foreground">{current}</p>
-                                  : <p className="text-sm italic text-muted-foreground/50">Not set</p>}
-                              </div>
-                            </div>
-                            {/* Suggested */}
-                            <div>
-                              <p className="mb-1 text-xs font-medium text-primary">AI Suggestion</p>
-                              <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 min-h-[2.5rem]">
-                                <p className="flex-1 text-sm">{suggested}</p>
-                                <CopyButton text={suggested} />
-                              </div>
-                            </div>
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+            <h3 className="font-semibold">Connect your CMS to apply</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              One-click apply is coming soon. Connect your CMS (WordPress, Shopify, Webflow)
+              and we'll push these fixes directly to your site — no copy-paste needed.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowCmsPrompt(false)}
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
+              >
+                Got it
+              </button>
+              <button
+                type="button"
+                disabled
+                className="flex-1 cursor-not-allowed rounded-lg bg-primary/40 px-4 py-2 text-sm font-medium text-primary-foreground"
+              >
+                Connect CMS — Coming soon
+              </button>
             </div>
           </motion.div>
-        )}
-      </AnimatePresence>
+        </div>
+      )}
+
+      {/* Active suggestions */}
+      {suggestions.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setOpen((o) => !o)}
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+            aria-expanded={open}
+          >
+            <div>
+              <span className="font-semibold">
+                Suggested Page Improvements
+                <span className="ml-2 text-xs font-normal text-muted-foreground">
+                  {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+                </span>
+              </span>
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                See current content vs AI suggestion — select pages to apply or skip
+              </p>
+            </div>
+            <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
+              ▾
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {open && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-3">
+                  {/* Bulk actions bar */}
+                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
+                    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
+                      <input
+                        type="checkbox"
+                        checked={selected.size === suggestions.length && suggestions.length > 0}
+                        onChange={toggleAll}
+                        className="rounded"
+                        aria-label="Select all suggestions"
+                      />
+                      {selected.size > 0 ? `${selected.size} selected` : "Select all"}
+                    </label>
+                    <div className="flex gap-2">
+                      <button
+                        type="button"
+                        onClick={handleDismissSelected}
+                        disabled={isPending}
+                        className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+                      >
+                        {dismissLabel}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleApply}
+                        disabled={suggestions.length === 0}
+                        title="CMS connection required — coming soon"
+                        className="btn-press rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
+                      >
+                        {applyLabel}
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Suggestion cards */}
+                  {suggestions.map((s) => (
+                    <div
+                      key={s.id}
+                      className={cn(
+                        "rounded-xl border bg-card p-4 transition-colors",
+                        selected.has(s.id) ? "border-primary/40 bg-primary/5" : "border-border"
+                      )}
+                    >
+                      <label className="mb-4 flex cursor-pointer items-center gap-2">
+                        <input
+                          type="checkbox"
+                          checked={selected.has(s.id)}
+                          onChange={() => toggleSelect(s.id)}
+                          className="rounded"
+                        />
+                        <span className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</span>
+                      </label>
+                      <div className="space-y-5">
+                        {FIELDS.map(({ key, currentKey, label, hint }) => {
+                          const suggested = s[key];
+                          if (!suggested) return null;
+                          const current = s[currentKey];
+                          return (
+                            <div key={key}>
+                              <div className="mb-2 flex items-baseline gap-2">
+                                <span className="text-xs font-medium">{label}</span>
+                                <span className="text-xs text-muted-foreground">{hint}</span>
+                              </div>
+                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                <div>
+                                  <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+                                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 min-h-[2.5rem]">
+                                    {current
+                                      ? <p className="text-sm text-muted-foreground">{current}</p>
+                                      : <p className="text-sm italic text-muted-foreground/50">Not set</p>}
+                                  </div>
+                                </div>
+                                <div>
+                                  <p className="mb-1 text-xs font-medium text-primary">AI Suggestion</p>
+                                  <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 min-h-[2.5rem]">
+                                    <p className="flex-1 text-sm">{suggested}</p>
+                                    <CopyButton text={suggested} />
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
+
+      {/* Past suggestions */}
+      {pastSuggestions.length > 0 && (
+        <>
+          <button
+            type="button"
+            onClick={() => setPastOpen((o) => !o)}
+            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-2 text-left transition-colors hover:bg-accent"
+            aria-expanded={pastOpen}
+          >
+            <span className="text-sm text-muted-foreground">
+              Past Suggestions
+              <span className="ml-2 text-xs">({pastSuggestions.length} page{pastSuggestions.length !== 1 ? "s" : ""})</span>
+            </span>
+            <span className={cn("text-xs text-muted-foreground transition-transform duration-200", pastOpen && "rotate-180")} aria-hidden="true">
+              ▾
+            </span>
+          </button>
+
+          <AnimatePresence initial={false}>
+            {pastOpen && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.25, ease: [0.23, 1, 0.32, 1] }}
+                className="overflow-hidden"
+              >
+                <div className="space-y-3 pt-1">
+                  {pastSuggestions.map((s) => (
+                    <div key={s.id} className="rounded-xl border border-border bg-card p-4 opacity-70">
+                      <div className="mb-3 flex items-center justify-between">
+                        <p className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
+                        <span className={cn("rounded-full border px-2 py-0.5 text-xs capitalize",
+                          s.status === "applied"
+                            ? "border-green-500/30 bg-green-500/10 text-green-400"
+                            : "border-border bg-muted text-muted-foreground"
+                        )}>
+                          {s.status}
+                        </span>
+                      </div>
+                      <div className="space-y-3">
+                        {FIELDS.map(({ key, label }) => {
+                          const suggested = s[key];
+                          if (!suggested) return null;
+                          return (
+                            <div key={key} className="flex items-start justify-between gap-2">
+                              <div>
+                                <p className="text-xs text-muted-foreground">{label}</p>
+                                <p className="mt-0.5 text-sm">{suggested}</p>
+                              </div>
+                              <CopyButton text={suggested} />
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </>
+      )}
     </section>
   );
 }
