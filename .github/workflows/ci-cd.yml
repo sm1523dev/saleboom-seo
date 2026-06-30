@@ -1,0 +1,104 @@
+name: CI / CD
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  NODE_VERSION: "22"
+
+jobs:
+  # ─── quality gate ────────────────────────────────────────────────────────────
+  quality:
+    name: Lint & type-check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      - name: Type-check
+        run: npx tsc --noEmit
+
+  # ─── build ───────────────────────────────────────────────────────────────────
+  build:
+    name: Build
+    runs-on: ubuntu-latest
+    needs: quality
+    # Only on pushes to main, not PRs
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    env:
+      # Stub values for build-time analysis; real values injected at runtime
+      # via Azure App Service application settings.
+      NEXTAUTH_URL: https://placeholder.azurewebsites.net
+      NEXTAUTH_SECRET: ${{ secrets.NEXTAUTH_SECRET }}
+      DATABASE_URL: ${{ secrets.DATABASE_URL }}
+      AUTH_PROVIDER: mock
+      AI_PROVIDER: mock
+      QUEUE_PROVIDER: bullmq
+      CRAWL_PROVIDER: firecrawl
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Next.js app
+        run: npm run build
+
+      - name: Package build artefact
+        run: |
+          zip -r app.zip . \
+            --exclude "*.git*" \
+            --exclude "node_modules/.cache/*" \
+            --exclude ".env*" \
+            --exclude "logs/*" \
+            --exclude "*.png" \
+            --exclude "*.jpg"
+
+      - name: Upload artefact
+        uses: actions/upload-artifact@v4
+        with:
+          name: next-app
+          path: app.zip
+          retention-days: 1
+
+  # ─── deploy ──────────────────────────────────────────────────────────────────
+  deploy:
+    name: Deploy to Azure App Service
+    runs-on: ubuntu-latest
+    needs: build
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.webapp-url }}
+    steps:
+      - name: Download artefact
+        uses: actions/download-artifact@v4
+        with:
+          name: next-app
+
+      - name: Deploy to Azure Web App
+        id: deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: ${{ secrets.AZURE_WEBAPP_NAME }}
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: app.zip
