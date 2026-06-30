@@ -89,13 +89,18 @@ export default async function DashboardPage() {
         .where(and(inArray(issues.scanId, latestIds), isNull(issues.resolvedAt), isNull(issues.deletedAt)));
       openIssueCount = issueRow?.count ?? 0;
 
-      // Top 3 critical/high issues
-      topIssues = await db
+      // Top 3 critical/high issues — deduplicated by type (one entry per issue type)
+      const allTopIssues = await db
         .select({ id: issues.id, title: issues.title, severity: issues.severity, fixType: issues.fixType, type: issues.type })
         .from(issues)
         .where(and(inArray(issues.scanId, latestIds), isNull(issues.resolvedAt), inArray(issues.severity, ["critical", "high"])))
-        .orderBy(issues.severity)
-        .limit(3);
+        .orderBy(issues.severity);
+      const seenTypes = new Set<string>();
+      topIssues = allTopIssues.filter((i) => {
+        if (seenTypes.has(i.type)) return false;
+        seenTypes.add(i.type);
+        return true;
+      }).slice(0, 3);
 
       // SEO delta vs previous scan
       if (prevIds.length > 0) {

@@ -4,7 +4,6 @@ import { websites, aeoProviders, aeoQueries, aeoMentions, aeoCitations, aeoScore
 import { queryAeoProvider } from "@/lib/aeo/query-engine";
 import { parseMention, extractCitations } from "@/lib/aeo/mention-parser";
 import { computeAeoScore } from "@/lib/aeo/score";
-import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
@@ -164,7 +163,6 @@ export async function handleAeoJob(
       compositeScore: score,
     });
 
-    await persistDvsScore(websiteId);
     await context.updateProgress(100);
     log.info("aeo scan completed", { mentionsFound, citationsFound, score });
   } catch (err) {
