@@ -4,6 +4,7 @@ import { eq, and, isNull, inArray, sql, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { websites, scans, issues, aeoMentions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
+import { computeSeoScore } from "@/lib/seo-score";
 import { CountUp } from "@/components/animations/count-up";
 import { StaggerChildren } from "@/components/animations/stagger-children";
 
@@ -13,23 +14,6 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type Severity = "critical" | "high" | "medium" | "low" | "info";
-
-const PENALTY: Record<Severity, number> = {
-  critical: 5,
-  high: 3,
-  medium: 1.5,
-  low: 0.5,
-  info: 0,
-};
-
-function computeSeoScore(severities: (string | null)[]): number {
-  const total = severities.reduce(
-    (sum, s) => sum + (s ? ((PENALTY as Record<string, number>)[s] ?? 0) : 0),
-    0
-  );
-  return Math.max(0, Math.round(100 - total));
-}
 
 export default async function DashboardPage() {
   const session = await getServerSession();

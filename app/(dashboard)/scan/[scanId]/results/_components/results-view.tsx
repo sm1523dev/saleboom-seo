@@ -13,6 +13,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
+import { scoreColorClass, scoreGrade } from "@/lib/seo-score";
 
 type Severity = "critical" | "high" | "medium" | "low" | "info";
 type FixType = "quick" | "major" | null;
@@ -68,12 +69,6 @@ const SEVERITY_CONFIG: Record<
   },
 };
 
-function scoreColor(score: number): string {
-  if (score >= 80) return "text-green-400";
-  if (score >= 60) return "text-yellow-400";
-  if (score >= 40) return "text-orange-400";
-  return "text-red-400";
-}
 
 export function ResultsView({
   scanId,
@@ -149,13 +144,16 @@ export function ResultsView({
           <p
             className={cn(
               "mt-2 font-mono text-6xl font-bold tabular-nums",
-              scoreColor(score)
+              scoreColorClass(score)
             )}
             aria-label={`SEO score: ${score} out of 100`}
           >
             {score}
           </p>
           <p className="mt-1 text-xs text-muted-foreground">/ 100</p>
+          <p className={cn("mt-1 text-xs font-medium", scoreColorClass(score))}>
+            {scoreGrade(score)}
+          </p>
         </motion.div>
 
         {/* Severity counts */}

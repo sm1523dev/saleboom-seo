@@ -4,6 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
+import { computeSeoScore } from "@/lib/seo-score";
 import { ResultsView } from "./_components/results-view";
 
 export const metadata: Metadata = {
@@ -85,20 +86,3 @@ export default async function AuditResultsPage({ params }: Props) {
   );
 }
 
-type Severity = "critical" | "high" | "medium" | "low" | "info";
-
-const PENALTY: Record<Severity, number> = {
-  critical: 5,
-  high: 3,
-  medium: 1.5,
-  low: 0.5,
-  info: 0,
-};
-
-function computeSeoScore(severities: (Severity | null)[]): number {
-  const total = severities.reduce(
-    (sum, s) => sum + (s ? (PENALTY[s] ?? 0) : 0),
-    0
-  );
-  return Math.max(0, Math.round(100 - total));
-}
