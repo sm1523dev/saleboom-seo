@@ -6,6 +6,7 @@ import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
+import { isNotNull } from "drizzle-orm";
 
 import { ResultsView } from "./_components/results-view";
 
@@ -61,7 +62,7 @@ export default async function AuditResultsPage({ params }: Props) {
     .where(eq(websites.id, scan.websiteId))
     .limit(1);
 
-  const scanIssues = await db
+  const allIssues = await db
     .select({
       id: issues.id,
       type: issues.type,
@@ -69,10 +70,14 @@ export default async function AuditResultsPage({ params }: Props) {
       title: issues.title,
       description: issues.description,
       fixType: issues.fixType,
+      ignoredAt: issues.ignoredAt,
     })
     .from(issues)
     .where(eq(issues.scanId, scanId))
     .orderBy(issues.severity, issues.type);
+
+  const scanIssues = allIssues.filter((i) => !i.ignoredAt);
+  const ignoredIssues = allIssues.filter((i) => !!i.ignoredAt);
 
   const score = computeSeoScore(scanIssues);
   const fixCounts = countByFixType(scanIssues);
@@ -104,6 +109,7 @@ export default async function AuditResultsPage({ params }: Props) {
       score={score}
       fixCounts={fixCounts}
       issues={scanIssues}
+      ignoredIssues={ignoredIssues}
       suggestions={suggestions}
       pastSuggestions={pastSuggestions}
     />

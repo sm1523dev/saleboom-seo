@@ -4,8 +4,8 @@ import Link from "next/link";
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
-import { ignoreSuggestions } from "@/app/actions/suggestions.actions";
-import { ignoreIssues } from "@/app/actions/issues.actions";
+import { ignoreSuggestions, unignoreSuggestions } from "@/app/actions/suggestions.actions";
+import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -50,6 +50,7 @@ type Props = {
   score: number;
   fixCounts: { quick: number; major: number };
   issues: Issue[];
+  ignoredIssues: Issue[];
   suggestions: Suggestion[];
   pastSuggestions: Suggestion[];
 };
@@ -96,6 +97,7 @@ export function ResultsView({
   score,
   fixCounts,
   issues,
+  ignoredIssues,
   suggestions,
   pastSuggestions,
 }: Props) {
@@ -105,6 +107,8 @@ export function ResultsView({
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
   const [showIssueCmsPrompt, setShowIssueCmsPrompt] = useState(false);
   const [isIgnoringIssues, startIgnoreIssuesTransition] = useTransition();
+  const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
+  const [isUnignoringIssues, startUnignoreIssuesTransition] = useTransition();
 
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
@@ -432,6 +436,73 @@ export function ResultsView({
         )}
       </section>
 
+      {/* Ignored issues */}
+      {ignoredIssues.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowIgnoredIssues((o) => !o)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showIgnoredIssues ? "Hide" : "Show"} ignored ({ignoredIssues.length})
+          </button>
+          <AnimatePresence initial={false}>
+            {showIgnoredIssues && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="mt-3 overflow-hidden"
+              >
+                <div className="overflow-hidden rounded-xl border border-border bg-card opacity-60">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-xs">Severity</TableHead>
+                        <TableHead className="text-xs">Issue</TableHead>
+                        <TableHead className="w-24 text-xs" />
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {ignoredIssues.map((issue) => {
+                        const cfg = SEVERITY_CONFIG[issue.severity as Severity];
+                        return (
+                          <TableRow key={issue.id} className="border-border align-top">
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={cn("text-xs font-medium", cfg?.className)}>
+                                {cfg?.label ?? issue.severity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <p className="text-sm font-medium line-through text-muted-foreground">{issue.title}</p>
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground/60">{issue.type}</p>
+                            </TableCell>
+                            <TableCell className="py-3 text-right">
+                              <button
+                                type="button"
+                                disabled={isUnignoringIssues}
+                                onClick={() => startUnignoreIssuesTransition(async () => {
+                                  await unignoreIssues([issue.id]);
+                                  router.refresh();
+                                })}
+                                className="text-xs text-muted-foreground hover:text-foreground transition-colors disabled:opacity-50"
+                              >
+                                Un-ignore
+                              </button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
       <div className="text-xs text-muted-foreground">
         Scan ID: <span className="font-mono">{scanId}</span>
       </div>
@@ -471,6 +542,8 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
   const [showCmsPrompt, setShowCmsPrompt] = useState(false);
+  const [showIgnored, setShowIgnored] = useState(false);
+  const [isUnignoring, startUnignoreTransition] = useTransition();
   const router = useRouter();
 
   function toggleSelect(id: string) {
@@ -670,7 +743,63 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
         </>
       )}
 
-      {/* Past suggestions are accessible via scan history — no separate section needed */}
+      {/* Ignored suggestions toggle */}
+      {pastSuggestions.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowIgnored((o) => !o)}
+            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            {showIgnored ? "Hide" : "Show"} ignored ({pastSuggestions.length})
+          </button>
+          <AnimatePresence initial={false}>
+            {showIgnored && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="mt-3 overflow-hidden space-y-3"
+              >
+                {pastSuggestions.map((s) => (
+                  <div key={s.id} className="rounded-xl border border-border bg-card p-4 opacity-60">
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <p className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
+                      <button
+                        type="button"
+                        disabled={isUnignoring}
+                        onClick={() => startUnignoreTransition(async () => {
+                          await unignoreSuggestions([s.id]);
+                          router.refresh();
+                        })}
+                        className="shrink-0 text-xs text-primary hover:underline disabled:opacity-50"
+                      >
+                        Un-ignore
+                      </button>
+                    </div>
+                    <div className="space-y-2">
+                      {FIELDS.map(({ key, label }) => {
+                        const suggested = s[key];
+                        if (!suggested) return null;
+                        return (
+                          <div key={key} className="flex items-start gap-2">
+                            <div className="flex-1">
+                              <p className="text-xs text-muted-foreground">{label}</p>
+                              <p className="mt-0.5 text-sm line-through text-muted-foreground">{suggested}</p>
+                            </div>
+                            <CopyButton text={suggested} />
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
     </section>
   );
 }

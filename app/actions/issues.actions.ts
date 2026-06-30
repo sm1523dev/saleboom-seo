@@ -8,9 +8,17 @@ import { getServerSession } from "@/lib/auth-utils";
 export async function ignoreIssues(issueIds: string[]): Promise<void> {
   if (issueIds.length === 0) return;
   await getServerSession();
-
   await db
     .update(issues)
     .set({ ignoredAt: new Date(), updatedAt: new Date() })
+    .where(inArray(issues.id, issueIds));
+}
+
+export async function unignoreIssues(issueIds: string[]): Promise<void> {
+  if (issueIds.length === 0) return;
+  await getServerSession();
+  await db
+    .update(issues)
+    .set({ ignoredAt: null, updatedAt: new Date() })
     .where(inArray(issues.id, issueIds));
 }
