@@ -73,7 +73,7 @@ export default async function AuditResultsPage({ params }: Props) {
     .where(eq(issues.scanId, scanId))
     .orderBy(issues.severity, issues.type);
 
-  const score = computeSeoScore(scanIssues.map((i) => i.severity));
+  const score = computeSeoScore(scanIssues);
   const fixCounts = countByFixType(scanIssues);
 
   const suggestions = await db

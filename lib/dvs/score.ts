@@ -20,11 +20,11 @@ export async function persistDvsScore(websiteId: string): Promise<number> {
 
   let seoScore = 0;
   if (latestScan) {
-    const severities = await db
-      .select({ severity: issues.severity })
+    const scanIssues = await db
+      .select({ type: issues.type, severity: issues.severity })
       .from(issues)
       .where(eq(issues.scanId, latestScan.id));
-    seoScore = computeSeoScore(severities.map((i) => i.severity));
+    seoScore = computeSeoScore(scanIssues);
   }
 
   // Get latest AEO score

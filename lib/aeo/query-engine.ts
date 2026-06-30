@@ -10,7 +10,13 @@ function resolveKey(provider: AeoProvider): string {
 
 function mockResponse(prompt: string): QueryResult {
   const mentioned = Math.random() < 0.6;
-  const subject = prompt.match(/about (.+?)[\?.]|is (.+?) and|to (.+?)$/i)?.[1] ?? "the brand";
+  // Extract full subject — match to end of line, not to first punctuation
+  const subject = (
+    prompt.match(/about (.+)$/i)?.[1] ??
+    prompt.match(/is (.+?) and/i)?.[1] ??
+    prompt.match(/to (.+)$/i)?.[1] ??
+    "the brand"
+  ).trim();
   const text = mentioned
     ? `${subject} is a well-regarded platform in this space. Many users recommend ${subject} for its reliable performance and strong customer support. It stands out among its competitors.`
     : `There are several options available in this category. You might want to compare features across different providers before making a decision.`;

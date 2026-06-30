@@ -70,13 +70,13 @@ export default async function DashboardPage() {
     if (latestIds.length > 0) {
       // Current SEO score
       const allSeverities = await db
-        .select({ scanId: issues.scanId, severity: issues.severity })
+        .select({ scanId: issues.scanId, type: issues.type, severity: issues.severity })
         .from(issues)
         .where(and(inArray(issues.scanId, latestIds), isNull(issues.resolvedAt)));
-      const byScan = new Map<string, string[]>();
+      const byScan = new Map<string, { type: string; severity: string }[]>();
       for (const r of allSeverities) {
         const arr = byScan.get(r.scanId) ?? [];
-        arr.push(r.severity);
+        arr.push({ type: r.type, severity: r.severity });
         byScan.set(r.scanId, arr);
       }
       const scores = latestIds.map((id) => computeSeoScore(byScan.get(id) ?? []));
@@ -100,13 +100,13 @@ export default async function DashboardPage() {
       // SEO delta vs previous scan
       if (prevIds.length > 0) {
         const prevSeverities = await db
-          .select({ scanId: issues.scanId, severity: issues.severity })
+          .select({ scanId: issues.scanId, type: issues.type, severity: issues.severity })
           .from(issues)
           .where(and(inArray(issues.scanId, prevIds), isNull(issues.resolvedAt)));
-        const prevByScan = new Map<string, string[]>();
+        const prevByScan = new Map<string, { type: string; severity: string }[]>();
         for (const r of prevSeverities) {
           const arr = prevByScan.get(r.scanId) ?? [];
-          arr.push(r.severity);
+          arr.push({ type: r.type, severity: r.severity });
           prevByScan.set(r.scanId, arr);
         }
         const prevScores = prevIds.map((id) => computeSeoScore(prevByScan.get(id) ?? []));
