@@ -7,32 +7,32 @@ import { aeoProviders, aeoQueries } from "@/lib/db/schema";
 // Google: https://aistudio.google.com (free tier)
 const GLOBAL_PROVIDERS = [
   {
-    displayName: "ChatGPT Style (Llama 3.3)",
+    displayName: "GPT-OSS 120B (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "llama-3.3-70b-versatile",
+    model: "openai/gpt-oss-120b",
   },
   {
-    displayName: "DeepSeek R1 (via Groq)",
+    displayName: "GPT-OSS 20B (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "deepseek-r1-distill-llama-70b",
+    model: "openai/gpt-oss-20b",
   },
   {
-    displayName: "Qwen QwQ (via Groq)",
+    displayName: "Qwen 3.6 27B (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "qwen-qwq-32b",
+    model: "qwen/qwen3.6-27b",
   },
   {
-    displayName: "Meta AI (Llama 3.1 8B)",
+    displayName: "Qwen 3 32B (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "llama-3.1-8b-instant",
+    model: "qwen/qwen3-32b",
   },
 ] as const;
 
