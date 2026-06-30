@@ -84,6 +84,7 @@ export async function handleAeoJob(
     }[] = [];
 
     let mentionsFound = 0;
+    let successfulQueries = 0;
     let citationsFound = 0;
     let ragQueriesRun = 0;
 
@@ -125,6 +126,7 @@ export async function handleAeoJob(
       }
 
       if (mention.brandMentioned) mentionsFound++;
+      successfulQueries++;
       if (p.providerType === "perplexity") {
         ragQueriesRun++;
         if (dedupedCitations.some((c) => c.isOwnDomain)) citationsFound++;
@@ -146,7 +148,7 @@ export async function handleAeoJob(
     // Compute and persist composite score
     const score = computeAeoScore({
       mentionsFound,
-      queriesRun: pairs.length,
+      queriesRun: successfulQueries,
       aiReferrals: 0, // Signal 2 comes from live JS snippet, not from this job
       totalReferrals: 1,
       citationsFound,
@@ -156,7 +158,7 @@ export async function handleAeoJob(
     await db.insert(aeoScores).values({
       websiteId,
       scoredAt: new Date(),
-      signal1Rate: pairs.length > 0 ? mentionsFound / pairs.length : 0,
+      signal1Rate: successfulQueries > 0 ? mentionsFound / successfulQueries : 0,
       signal2Index: 0,
       signal3Rate: ragQueriesRun > 0 ? citationsFound / ragQueriesRun : 0,
       compositeScore: score,

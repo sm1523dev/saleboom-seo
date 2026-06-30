@@ -14,18 +14,18 @@ const GLOBAL_PROVIDERS = [
     model: "llama-3.3-70b-versatile",
   },
   {
-    displayName: "Google Gemma (via Groq)",
+    displayName: "DeepSeek R1 (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "gemma2-9b-it",
+    model: "deepseek-r1-distill-llama-70b",
   },
   {
-    displayName: "Meta AI (Llama 3.1 70B)",
+    displayName: "Qwen QwQ (via Groq)",
     providerType: "openai-compat",
     endpointUrl: "https://api.groq.com/openai/v1",
     apiKeyEnvVar: "GROQ_API_KEY",
-    model: "llama-3.1-70b-versatile",
+    model: "qwen-qwq-32b",
   },
   {
     displayName: "Meta AI (Llama 3.1 8B)",
