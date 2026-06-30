@@ -1,36 +1,78 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# SaleBoom SEO
 
-## Getting Started
+AI-powered SEO + AEO (Answer Engine Optimization) platform. Scans websites for SEO issues, tracks brand visibility across AI tools, and generates AI-written copy suggestions.
 
-First, run the development server:
+---
+
+## Local setup
+
+### Prerequisites
+
+- Node.js 22+
+- PostgreSQL 17
+- Redis 7
+
+**Or skip both and use Docker:**
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm run docker:up
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Steps
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# 1. Clone and install
+git clone https://github.com/SaleBoomSEO/SEO_Integration.git
+cd SEO_Integration
+npm install
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# 2. Configure environment
+cp .env.local.example .env.local
+# Edit .env.local and fill in your API keys (see below)
 
-## Learn More
+# 3. Create the database (skip if using Docker)
+createdb saleboom_seo
 
-To learn more about Next.js, take a look at the following resources:
+# 4. Run migrations
+npm run db:push
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+# 5. Start
+npm run dev:all
+```
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+The app runs at `http://localhost:3000`. The queue dashboard runs at `http://localhost:4000/admin/queues`.
 
-## Deploy on Vercel
+---
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## API keys
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+| Key | Required | Where to get |
+|-----|----------|--------------|
+| `GROQ_API_KEY` | Yes | [console.groq.com](https://console.groq.com) — free tier |
+| `FIRECRAWL_API_KEY` | Yes | [firecrawl.dev](https://firecrawl.dev) — free tier |
+| `GOOGLE_AI_API_KEY` | Optional | [aistudio.google.com/apikey](https://aistudio.google.com/apikey) — free |
+
+---
+
+## npm scripts
+
+| Command | What it does |
+|---------|-------------|
+| `npm run dev:all` | Start Next.js + worker together (recommended) |
+| `npm run dev:nextjs` | Next.js only |
+| `npm run dev:worker` | Worker only |
+| `npm run docker:up` | Start Postgres + Redis in Docker |
+| `npm run docker:down` | Stop Docker services |
+| `npm run db:push` | Apply schema changes to database |
+| `npm run db:studio` | Open Drizzle Studio (DB browser) |
+| `npm run lint` | Run ESLint |
+
+---
+
+## Tech stack
+
+- **Next.js 16** (App Router) · **React 19** · **TypeScript**
+- **Drizzle ORM** · **PostgreSQL 17**
+- **BullMQ** · **Redis** (job queue)
+- **Groq** (AI — free tier) · **Firecrawl** (web crawling)
+- **Tailwind CSS v4** · **shadcn/ui** · **motion.dev**
