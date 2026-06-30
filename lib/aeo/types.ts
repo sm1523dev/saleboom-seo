@@ -5,7 +5,7 @@ export type AeoProvider = {
   displayName: string;
   providerType: AeoProviderType;
   endpointUrl: string | null;
-  apiKeyEncrypted: string | null;
+  apiKeyEnvVar: string | null;
   model: string;
 };
 

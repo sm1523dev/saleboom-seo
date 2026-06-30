@@ -1,55 +1,48 @@
 import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { aeoProviders, aeoQueries } from "@/lib/db/schema";
-import type { AeoProviderType } from "./types";
 
-type SeedRow = {
-  displayName: string;
-  providerType: AeoProviderType;
-  endpointUrl: string | null;
-  model: string;
-};
-
-const DEFAULT_PROVIDERS: SeedRow[] = [
+// Platform-managed global providers — all free, no user configuration needed.
+// Groq: https://console.groq.com (free tier, OpenAI-compatible)
+// Google: https://aistudio.google.com (free tier)
+const GLOBAL_PROVIDERS = [
   {
-    displayName: "ChatGPT (GPT-4o)",
+    displayName: "ChatGPT Style (Llama 3.3)",
     providerType: "openai-compat",
-    endpointUrl: null,
-    model: "gpt-4o",
+    endpointUrl: "https://api.groq.com/openai/v1",
+    apiKeyEnvVar: "GROQ_API_KEY",
+    model: "llama-3.3-70b-versatile",
   },
   {
-    displayName: "Claude Sonnet 4.6",
-    providerType: "anthropic",
-    endpointUrl: null,
-    model: "claude-sonnet-4-6",
-  },
-  {
-    displayName: "Gemini 1.5 Pro",
+    displayName: "Google Gemini",
     providerType: "google",
     endpointUrl: null,
-    model: "gemini-1.5-pro",
+    apiKeyEnvVar: "GOOGLE_AI_API_KEY",
+    model: "gemini-1.5-flash",
   },
   {
-    displayName: "Perplexity Sonar",
-    providerType: "perplexity",
-    endpointUrl: null,
-    model: "sonar",
+    displayName: "Open Assistant (Mixtral)",
+    providerType: "openai-compat",
+    endpointUrl: "https://api.groq.com/openai/v1",
+    apiKeyEnvVar: "GROQ_API_KEY",
+    model: "mixtral-8x7b-32768",
   },
-];
+  {
+    displayName: "Meta AI (Llama 3.1)",
+    providerType: "openai-compat",
+    endpointUrl: "https://api.groq.com/openai/v1",
+    apiKeyEnvVar: "GROQ_API_KEY",
+    model: "llama-3.1-8b-instant",
+  },
+] as const;
 
-export async function seedDefaultProviders(websiteId: string): Promise<void> {
-  const rows = DEFAULT_PROVIDERS.map((p) => ({
-    websiteId,
-    displayName: p.displayName,
-    providerType: p.providerType,
-    endpointUrl: p.endpointUrl,
-    apiKeyEncrypted: null, // use platform-managed env keys
-    model: p.model,
-    enabled: true,
-  }));
-
-  // Skip providers whose env key is missing — they will be ignored at query time
-  await db.insert(aeoProviders).values(rows).onConflictDoNothing();
+export async function seedGlobalProviders(): Promise<void> {
+  for (const p of GLOBAL_PROVIDERS) {
+    await db
+      .insert(aeoProviders)
+      .values({ ...p, enabled: true })
+      .onConflictDoNothing();
+  }
 }
 
 export async function seedDefaultQueries(
@@ -63,7 +56,7 @@ export async function seedDefaultQueries(
     .where(eq(aeoQueries.websiteId, websiteId))
     .limit(1);
 
-  if (existing.length > 0) return; // already seeded
+  if (existing.length > 0) return;
 
   let domain = websiteUrl;
   try { domain = new URL(websiteUrl).hostname.replace(/^www\./, ""); } catch { /* keep raw */ }

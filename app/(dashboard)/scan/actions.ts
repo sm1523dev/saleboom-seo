@@ -1,13 +1,13 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { eq, and } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, scans, aeoProviders } from "@/lib/db/schema";
+import { websites, scans } from "@/lib/db/schema";
 import { queueProvider } from "@/lib/queue";
 import { getServerSession } from "@/lib/auth-utils";
 import { parseWebsiteUrl } from "@/lib/form-validation";
-import { seedDefaultProviders, seedDefaultQueries } from "@/lib/aeo/seed-providers";
+import { seedDefaultQueries } from "@/lib/aeo/seed-providers";
 
 export type ScanActionState = { error: string } | null;
 
@@ -34,7 +34,6 @@ export async function startScanAction(
     .limit(1);
 
   let websiteId: string;
-  let isNewWebsite = false;
 
   if (existing.length > 0) {
     websiteId = existing[0].id;
@@ -45,27 +44,11 @@ export async function startScanAction(
       .values({ userId: session.user.id, url, name: hostname })
       .returning({ id: websites.id });
     websiteId = website.id;
-    isNewWebsite = true;
   }
 
-  // Seed AEO providers + queries on first scan per website
-  if (isNewWebsite) {
-    const hostname = new URL(url).hostname;
-    await seedDefaultProviders(websiteId);
-    await seedDefaultQueries(websiteId, hostname, url);
-  } else {
-    // Existing website — seed providers/queries if somehow missing
-    const [hasProvider] = await db
-      .select({ id: aeoProviders.id })
-      .from(aeoProviders)
-      .where(eq(aeoProviders.websiteId, websiteId))
-      .limit(1);
-    if (!hasProvider) {
-      const hostname = new URL(url).hostname;
-      await seedDefaultProviders(websiteId);
-      await seedDefaultQueries(websiteId, hostname, url);
-    }
-  }
+  // Seed default AEO queries for this website (idempotent — skips if already exist)
+  const hostname = new URL(url).hostname;
+  await seedDefaultQueries(websiteId, hostname, url);
 
   // Create scan record
   const [scan] = await db

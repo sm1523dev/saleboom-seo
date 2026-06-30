@@ -48,7 +48,7 @@ export default async function AeoPage() {
   const providers = await db
     .select({ id: aeoProviders.id, displayName: aeoProviders.displayName, model: aeoProviders.model })
     .from(aeoProviders)
-    .where(inArray(aeoProviders.websiteId, websiteIds));
+    .where(eq(aeoProviders.enabled, true));
 
   const providerIds = providers.map((p) => p.id);
 
@@ -61,7 +61,11 @@ export default async function AeoPage() {
             mentioned: sql<number>`count(*) filter (where ${aeoMentions.brandMentioned})::int`,
           })
           .from(aeoMentions)
-          .where(and(inArray(aeoMentions.providerId, providerIds), gte(aeoMentions.scanDate, cutoff)))
+          .where(and(
+            inArray(aeoMentions.websiteId, websiteIds),
+            inArray(aeoMentions.providerId, providerIds),
+            gte(aeoMentions.scanDate, cutoff)
+          ))
           .groupBy(aeoMentions.providerId)
       : [];
 
@@ -91,7 +95,7 @@ export default async function AeoPage() {
           .from(aeoCitations)
           .where(
             and(
-              inArray(aeoCitations.providerId, providerIds),
+              inArray(aeoCitations.websiteId, websiteIds),
               gte(aeoCitations.scanDate, cutoff),
               eq(aeoCitations.isOwnDomain, true),
             )

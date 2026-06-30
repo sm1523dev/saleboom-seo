@@ -36,9 +36,7 @@ export async function handleAeoJob(
     const brandName = website.name;
 
     const [providers, queries] = await Promise.all([
-      db.select().from(aeoProviders).where(
-        and(eq(aeoProviders.websiteId, websiteId), eq(aeoProviders.enabled, true))
-      ),
+      db.select().from(aeoProviders).where(eq(aeoProviders.enabled, true)),
       db.select().from(aeoQueries).where(
         and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true))
       ),
@@ -62,6 +60,7 @@ export async function handleAeoJob(
     );
 
     type MentionRow = {
+      websiteId: string;
       providerId: string;
       queryId: string;
       scanDate: string;
@@ -73,6 +72,7 @@ export async function handleAeoJob(
     const mentionRows: MentionRow[] = [];
 
     const citationRows: {
+      websiteId: string;
       providerId: string;
       queryId: string;
       scanDate: string;
@@ -107,6 +107,7 @@ export async function handleAeoJob(
       );
 
       mentionRows.push({
+        websiteId,
         providerId: p.id,
         queryId: q.id,
         scanDate: today,
@@ -117,7 +118,7 @@ export async function handleAeoJob(
       });
 
       for (const c of dedupedCitations) {
-        citationRows.push({ providerId: p.id, queryId: q.id, scanDate: today, ...c });
+        citationRows.push({ websiteId, providerId: p.id, queryId: q.id, scanDate: today, ...c });
       }
 
       if (mention.brandMentioned) mentionsFound++;

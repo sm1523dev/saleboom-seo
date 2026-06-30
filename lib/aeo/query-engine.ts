@@ -1,20 +1,11 @@
 import type { AeoProvider, QueryResult } from "./types";
 
-const PROVIDER_ENV_KEYS: Record<string, string> = {
-  "openai-compat": "OPENAI_API_KEY",
-  anthropic: "ANTHROPIC_API_KEY",
-  google: "GOOGLE_AI_API_KEY",
-  perplexity: "PERPLEXITY_API_KEY",
-};
-
 const PERPLEXITY_BASE_URL = "https://api.perplexity.ai";
-// Google exposes an OpenAI-compatible endpoint — no extra SDK needed
 const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
 function resolveKey(provider: AeoProvider): string {
-  if (provider.apiKeyEncrypted) return provider.apiKeyEncrypted;
-  const envKey = PROVIDER_ENV_KEYS[provider.providerType];
-  return (envKey ? process.env[envKey] : undefined) ?? "missing-api-key";
+  if (provider.apiKeyEnvVar) return process.env[provider.apiKeyEnvVar] ?? "missing-api-key";
+  return "missing-api-key";
 }
 
 function mockResponse(prompt: string): QueryResult {

@@ -202,24 +202,22 @@ export const aiSuggestions = pgTable(
 // ─── AEO: Three-Signal Architecture ─────────────────────────────────────────
 
 // Provider type stored as varchar (not enum) — extensible without migrations
+// Platform-managed global providers — no per-user configuration
 export const aeoProviders = pgTable(
   "aeo_providers",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    websiteId: uuid("website_id")
-      .notNull()
-      .references(() => websites.id, { onDelete: "cascade" }),
-    displayName: varchar("display_name", { length: 100 }).notNull(),
+    displayName: varchar("display_name", { length: 100 }).notNull().unique(),
     // "openai-compat" | "anthropic" | "google" | "perplexity"
     providerType: varchar("provider_type", { length: 30 }).notNull(),
     endpointUrl: text("endpoint_url"),
-    // null = use platform-managed env key
-    apiKeyEncrypted: text("api_key_encrypted"),
+    // "env:GROQ_API_KEY" — resolved at query time from env vars
+    apiKeyEnvVar: varchar("api_key_env_var", { length: 100 }),
     model: varchar("model", { length: 100 }).notNull(),
     enabled: boolean("enabled").default(true).notNull(),
     ...timestamps,
   },
-  (t) => [index("aeo_providers_website_id_idx").on(t.websiteId)],
+  (t) => [index("aeo_providers_enabled_idx").on(t.enabled)],
 );
 
 export const aeoQueries = pgTable(
@@ -242,6 +240,9 @@ export const aeoMentions = pgTable(
   "aeo_mentions",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
     providerId: uuid("provider_id")
       .notNull()
       .references(() => aeoProviders.id, { onDelete: "cascade" }),
@@ -257,9 +258,8 @@ export const aeoMentions = pgTable(
     ...timestamps,
   },
   (t) => [
+    index("aeo_mentions_website_id_idx").on(t.websiteId),
     index("aeo_mentions_provider_id_idx").on(t.providerId),
-    index("aeo_mentions_query_id_idx").on(t.queryId),
-    // one result per provider+query+day — enforced in worker with onConflictDoNothing
     uniqueIndex("aeo_mentions_provider_query_date_idx").on(
       t.providerId,
       t.queryId,
@@ -273,6 +273,9 @@ export const aeoCitations = pgTable(
   "aeo_citations",
   {
     id: uuid("id").defaultRandom().primaryKey(),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
     providerId: uuid("provider_id")
       .notNull()
       .references(() => aeoProviders.id, { onDelete: "cascade" }),
@@ -285,6 +288,7 @@ export const aeoCitations = pgTable(
     ...timestamps,
   },
   (t) => [
+    index("aeo_citations_website_id_idx").on(t.websiteId),
     index("aeo_citations_provider_id_idx").on(t.providerId),
     index("aeo_citations_is_own_domain_idx").on(t.isOwnDomain),
   ],

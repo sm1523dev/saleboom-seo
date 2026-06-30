@@ -172,7 +172,7 @@ export default async function DashboardPage() {
     const providerRows = await db
       .select({ id: aeoProviders.id, displayName: aeoProviders.displayName })
       .from(aeoProviders)
-      .where(inArray(aeoProviders.websiteId, websiteIds));
+      .where(eq(aeoProviders.enabled, true));
 
     if (providerRows.length > 0) {
       const thirtyDaysAgo = new Date();
@@ -185,7 +185,11 @@ export default async function DashboardPage() {
           mentioned: sql<number>`count(*) filter (where ${aeoMentions.brandMentioned})::int`,
         })
         .from(aeoMentions)
-        .where(and(inArray(aeoMentions.providerId, providerRows.map((p) => p.id)), gte(aeoMentions.scanDate, cutoff)))
+        .where(and(
+          inArray(aeoMentions.websiteId, websiteIds),
+          inArray(aeoMentions.providerId, providerRows.map((p) => p.id)),
+          gte(aeoMentions.scanDate, cutoff)
+        ))
         .groupBy(aeoMentions.providerId);
 
       const statsMap = new Map(mentionStats.map((s) => [s.providerId, s]));

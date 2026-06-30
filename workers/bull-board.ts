@@ -5,7 +5,7 @@ import { ExpressAdapter } from "@bull-board/express";
 import { Queue } from "bullmq";
 import { logger } from "@/lib/logger";
 
-const QUEUE_NAMES = ["scan", "rescan"];
+const QUEUE_NAMES = ["scan", "rescan", "aeo-scan"];
 const PORT = Number(process.env.BULL_BOARD_PORT ?? 4000);
 
 export function startBullBoard(): void {
