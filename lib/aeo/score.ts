@@ -14,5 +14,5 @@ export function computeAeoScore(input: AeoScoreInput): number {
     1.0
   );
   const signal3Rate = input.ragQueriesRun > 0 ? input.citationsFound / input.ragQueriesRun : 0;
-  return Math.round((signal1Rate * 0.4 + signal2Index * 0.4 + signal3Rate * 0.2) * 100);
+  return Math.round((signal1Rate * 0.7 + signal2Index * 0.2 + signal3Rate * 0.1) * 100);
 }
