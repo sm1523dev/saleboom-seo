@@ -9,6 +9,11 @@ export const metadata: Metadata = {
   twitter: { card: "summary" },
 };
 
-export default function SignUpPage() {
-  return <SignUpCard />;
+export default async function SignUpPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
+  return <SignUpCard callbackUrl={callbackUrl} />;
 }

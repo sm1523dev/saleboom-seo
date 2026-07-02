@@ -26,9 +26,12 @@ export async function signUpWithCredentials(formData: FormData) {
   const passwordHash = await hashPassword(password);
   await db.insert(users).values({ email, name: nameStr, passwordHash });
 
+  const raw = formData.get("callbackUrl");
+  const redirectTo = typeof raw === "string" && raw.startsWith("/") ? raw : "/dashboard";
+
   await authProvider.signIn("credentials", {
     email,
     password,
-    redirectTo: "/dashboard",
+    redirectTo,
   } as Parameters<typeof authProvider.signIn>[1]);
 }

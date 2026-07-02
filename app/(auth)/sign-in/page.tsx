@@ -10,11 +10,15 @@ export const metadata: Metadata = {
   twitter: { card: "summary" },
 };
 
-export default async function SignInPage() {
-  // Filter out credentials — it's rendered as the email/password form, not a social button
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string }>;
+}) {
+  const { callbackUrl } = await searchParams;
   const socialProviders = authProvider
     .getAvailableProviders()
     .filter((p) => p !== "credentials" && p !== "mock");
 
-  return <SignInCard socialProviders={socialProviders} />;
+  return <SignInCard socialProviders={socialProviders} callbackUrl={callbackUrl} />;
 }

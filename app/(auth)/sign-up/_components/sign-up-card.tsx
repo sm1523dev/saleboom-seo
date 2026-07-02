@@ -7,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { signUpWithCredentials } from "../actions";
 
-export function SignUpCard() {
+export function SignUpCard({ callbackUrl }: { callbackUrl?: string }) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -24,6 +24,9 @@ export function SignUpCard() {
         </div>
 
         <form action={signUpWithCredentials} className="space-y-4">
+          {callbackUrl && (
+            <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          )}
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
             <Input
@@ -67,7 +70,10 @@ export function SignUpCard() {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Already have an account?{" "}
-          <Link href="/sign-in" className="text-primary hover:underline">
+          <Link
+            href={callbackUrl ? `/sign-in?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/sign-in"}
+            className="text-primary hover:underline"
+          >
             Sign in
           </Link>
         </p>

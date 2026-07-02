@@ -174,9 +174,11 @@ export class AuthJsProvider implements AuthProvider {
   // auth middleware pattern mandated by NextAuth v5. next/server is unavoidable here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMiddleware(): any {
+    const PROTECTED = ["/dashboard", "/scan", "/website", "/seo", "/aeo"];
     return auth(async (request: NextRequest & { auth: unknown }) => {
       const { pathname, search } = request.nextUrl;
-      if (pathname.startsWith("/dashboard") && !request.auth) {
+      const isProtected = PROTECTED.some((p) => pathname.startsWith(p));
+      if (isProtected && !request.auth) {
         const signInUrl = new URL("/sign-in", request.url);
         signInUrl.searchParams.set("callbackUrl", pathname + search);
         const { NextResponse } = await import("next/server");

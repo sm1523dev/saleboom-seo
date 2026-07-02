@@ -16,9 +16,10 @@ const PROVIDER_LABELS: Record<string, string> = {
 
 type Props = {
   socialProviders: string[];
+  callbackUrl?: string;
 };
 
-export function SignInCard({ socialProviders }: Props) {
+export function SignInCard({ socialProviders, callbackUrl }: Props) {
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -35,6 +36,9 @@ export function SignInCard({ socialProviders }: Props) {
         </div>
 
         <form action={signInWithCredentials} className="space-y-4">
+          {callbackUrl && (
+            <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
             <Input
@@ -85,7 +89,7 @@ export function SignInCard({ socialProviders }: Props) {
 
             <div className="space-y-2">
               {socialProviders.map((provider) => (
-                <form key={provider} action={signInWithProvider.bind(null, provider)}>
+                <form key={provider} action={signInWithProvider.bind(null, provider, callbackUrl)}>
                   <Button
                     type="submit"
                     variant="outline"
@@ -102,7 +106,10 @@ export function SignInCard({ socialProviders }: Props) {
 
         <p className="mt-6 text-center text-sm text-muted-foreground">
           Don&apos;t have an account?{" "}
-          <Link href="/sign-up" className="text-primary hover:underline">
+          <Link
+            href={callbackUrl ? `/sign-up?callbackUrl=${encodeURIComponent(callbackUrl)}` : "/sign-up"}
+            className="text-primary hover:underline"
+          >
             Create one
           </Link>
         </p>
