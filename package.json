@@ -6,7 +6,7 @@
     "dev": "next dev",
     "dev:all": "concurrently --names \"nextjs,worker\" --prefix-colors \"cyan,yellow\" \"npm run dev:nextjs\" \"npm run dev:worker\"",
     "dev:nextjs": "mkdir -p logs && next dev 2>&1 | tee logs/nextjs.log",
-    "dev:worker": "mkdir -p logs && npx tsx --env-file=.env.local workers/index.ts 2>&1 | tee logs/worker.log",
+    "dev:worker": "mkdir -p logs && npx tsx --env-file=.env workers/index.ts 2>&1 | tee logs/worker.log",
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
