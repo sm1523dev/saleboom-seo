@@ -92,7 +92,10 @@ function buildProviders() {
 
 const { handlers, auth, signIn: nextAuthSignIn, signOut: nextAuthSignOut } = NextAuth({
   providers: buildProviders(),
-  session: { strategy: "jwt" },
+  session: {
+    strategy: "jwt",
+    maxAge: 30 * 24 * 60 * 60, // 30 days
+  },
   pages: {
     signIn: "/sign-in",
   },
@@ -175,14 +178,22 @@ export class AuthJsProvider implements AuthProvider {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMiddleware(): any {
     const PROTECTED = ["/dashboard", "/scan", "/website", "/seo", "/aeo"];
+    const AUTH_PAGES = ["/", "/sign-in", "/sign-up"];
     return auth(async (request: NextRequest & { auth: unknown }) => {
+      const { NextResponse } = await import("next/server");
       const { pathname, search } = request.nextUrl;
+
       const isProtected = PROTECTED.some((p) => pathname.startsWith(p));
       if (isProtected && !request.auth) {
         const signInUrl = new URL("/sign-in", request.url);
         signInUrl.searchParams.set("callbackUrl", pathname + search);
-        const { NextResponse } = await import("next/server");
         return NextResponse.redirect(signInUrl);
+      }
+
+      // Logged-in users visiting public/auth pages → send to dashboard
+      const isAuthPage = AUTH_PAGES.includes(pathname);
+      if (isAuthPage && request.auth) {
+        return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     });
   }
