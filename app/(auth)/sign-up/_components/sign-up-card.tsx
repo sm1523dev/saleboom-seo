@@ -77,6 +77,12 @@ export function SignUpCard({ callbackUrl }: { callbackUrl?: string }) {
             Sign in
           </Link>
         </p>
+
+        <div className="mt-4 text-center">
+          <Link href="/" className="text-xs text-muted-foreground hover:text-foreground transition-colors">
+            ← Back to home
+          </Link>
+        </div>
       </div>
     </motion.div>
   );
