@@ -1,0 +1,15 @@
+apiVersion: traefik.io/v1alpha1
+kind: IngressRoute
+metadata:
+  name: saleboomseo
+  namespace: saleboomseo
+spec:
+  entryPoints:
+    - web
+    - websecure
+  routes:
+    - match: Host(`saleboomseo.dpdns.org`)
+      kind: Rule
+      services:
+        - name: nextjs
+          port: 3000

@@ -43,6 +43,11 @@ logs/
 .env.*.local
 !.env.local.example
 
+# k8s — plain secrets never committed, sealed secrets and examples are safe to commit
+k8s/**/secrets.yaml
+!k8s/**/*.yaml.example
+!k8s/**/sealed-secret.yaml
+
 # vercel
 .vercel
 

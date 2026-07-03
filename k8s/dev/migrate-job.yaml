@@ -1,0 +1,19 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: db-migrate
+  namespace: saleboomseo
+  annotations:
+    # Delete completed job after 10 minutes
+    ttlSecondsAfterFinished: "600"
+spec:
+  template:
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: migrate
+          image: ghcr.io/sm1523dev/saleboomseo:latest
+          command: ["npm", "run", "db:migrate"]
+          envFrom:
+            - secretRef:
+                name: saleboomseo-secrets
