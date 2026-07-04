@@ -7,11 +7,11 @@ function createProvider(): NotificationProvider {
     case "resend":
       return new (require("./providers/resend").ResendNotificationProvider)();
     case "sendgrid":
-      return new (require("./providers/sendgrid").SendGridNotificationProvider)();
+      return new (require(/* webpackIgnore: true */ "./providers/sendgrid").SendGridNotificationProvider)();
     case "twilio":
-      return new (require("./providers/twilio").TwilioNotificationProvider)();
+      return new (require(/* webpackIgnore: true */ "./providers/twilio").TwilioNotificationProvider)();
     case "ses":
-      return new (require("./providers/aws-ses").AwsSesNotificationProvider)();
+      return new (require(/* webpackIgnore: true */ "./providers/aws-ses").AwsSesNotificationProvider)();
     case "mock":
       return new (require("./providers/mock").MockNotificationProvider)();
     default:

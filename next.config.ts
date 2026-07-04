@@ -27,12 +27,15 @@ const nextConfig: NextConfig = {
   // "module not found" errors at build time.
   serverExternalPackages: [
     "@aws-sdk/client-sqs",
+    "@aws-sdk/client-sesv2",
     "@azure/storage-blob",
     "@azure/storage-queue",
     "@ai-sdk/anthropic",
     "@ai-sdk/ollama",
     "@ai-sdk/openai",
     "@ai-sdk/azure",
+    "@sendgrid/mail",
+    "twilio",
   ],
 };
 
