@@ -10,16 +10,19 @@ env:
   IMAGE_WORKER: ghcr.io/sm1523dev/saleboomseo-worker
 
 jobs:
-  build-and-deploy:
+  build:
+    name: Build & Push Images
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
+    outputs:
+      sha: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
 
-      - name: Set up QEMU (ARM64 emulation)
+      - name: Set up QEMU (ARM64 cross-compilation)
         uses: docker/setup-qemu-action@v3
 
       - name: Set up Docker Buildx
@@ -58,14 +61,19 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to Pi via SSH
-        uses: appleboy/ssh-action@v1
-        with:
-          host: ${{ secrets.PI_HOST }}
-          username: ${{ secrets.PI_USER }}
-          key: ${{ secrets.PI_SSH_KEY }}
-          script: |
-            export KUBECONFIG=$HOME/.kube/kubepi
-            kubectl rollout restart deployment/nextjs -n saleboomseo
-            kubectl rollout restart deployment/worker -n saleboomseo
-            kubectl rollout status deployment/nextjs -n saleboomseo --timeout=120s
+  deploy:
+    name: Deploy to Pi
+    runs-on: self-hosted
+    needs: build
+
+    steps:
+      - name: Pull images into k3s
+        run: |
+          sudo k3s ctr images pull ${{ env.IMAGE_APP }}:latest
+          sudo k3s ctr images pull ${{ env.IMAGE_WORKER }}:latest
+
+      - name: Rollout restart
+        run: |
+          kubectl rollout restart deployment/nextjs deployment/worker -n saleboomseo
+          kubectl rollout status deployment/nextjs -n saleboomseo --timeout=120s
+          kubectl rollout status deployment/worker -n saleboomseo --timeout=120s
