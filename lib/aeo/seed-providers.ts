@@ -6,61 +6,68 @@ import { aeoProviders, aeoQueries } from "@/lib/db/schema";
 // Groq: https://console.groq.com (free tier, OpenAI-compatible)
 // Google: https://aistudio.google.com (free tier)
 // 3 architecture families × 2 models each = 6 AEO signal sources.
-// Covers Western AI, Google AI, and Asian AI ecosystems for broad brand visibility signal.
+// All via NVIDIA NIM (single API key). Covers Western, Alibaba/Qwen, and Asian AI ecosystems.
+const NIM = "https://integrate.api.nvidia.com/v1";
+
 const GLOBAL_PROVIDERS = [
-  // Family 1 — OpenAI GPT-OSS (Groq, free tier)
+  // Family 1 — OpenAI GPT-OSS (via NVIDIA NIM)
   {
-    displayName: "GPT-OSS 120B (Groq)",
+    displayName: "GPT-OSS 120B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: "https://api.groq.com/openai/v1",
-    apiKeyEnvVar: "GROQ_API_KEY",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "openai/gpt-oss-120b",
   },
   {
-    displayName: "GPT-OSS 20B (Groq)",
+    displayName: "GPT-OSS 20B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: "https://api.groq.com/openai/v1",
-    apiKeyEnvVar: "GROQ_API_KEY",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "openai/gpt-oss-20b",
   },
-  // Family 2 — Google Gemini (Google AI Studio, free tier)
+  // Family 2 — Qwen/Alibaba (via NVIDIA NIM)
   {
-    displayName: "Gemini 2.0 Flash (Google)",
-    providerType: "google",
-    endpointUrl: null,
-    apiKeyEnvVar: "GOOGLE_AI_API_KEY",
-    model: "gemini-2.0-flash",
-  },
-  {
-    displayName: "Gemini 1.5 Flash (Google)",
-    providerType: "google",
-    endpointUrl: null,
-    apiKeyEnvVar: "GOOGLE_AI_API_KEY",
-    model: "gemini-1.5-flash",
-  },
-  // Family 3 — Asian AI (NVIDIA NIM preview, free tier)
-  // Kimi (Moonshot AI) + GLM (Zhipu AI) — represent Chinese/Asian AI ecosystem
-  {
-    displayName: "Kimi K2.6 (NVIDIA NIM)",
+    displayName: "Qwen 3.5 122B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: "https://integrate.api.nvidia.com/v1",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "qwen/qwen3.5-122b-a10b",
+  },
+  {
+    displayName: "Qwen 3 Next 80B (NIM)",
+    providerType: "openai-compat",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "qwen/qwen3-next-80b-a3b-instruct",
+  },
+  // Family 3 — Asian AI: Kimi (Moonshot) + GLM (Zhipu) via NVIDIA NIM
+  {
+    displayName: "Kimi K2.6 (NIM)",
+    providerType: "openai-compat",
+    endpointUrl: NIM,
     apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "moonshotai/kimi-k2.6",
   },
   {
-    displayName: "GLM 5.2 (NVIDIA NIM)",
+    displayName: "GLM 5.2 (NIM)",
     providerType: "openai-compat",
-    endpointUrl: "https://integrate.api.nvidia.com/v1",
+    endpointUrl: NIM,
     apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "z-ai/glm-5.2",
   },
 ] as const;
 
 const DEPRECATED_PROVIDER_NAMES = [
-  "Qwen 3 32B (via Groq)",   // deprecated 2026-07-17 on Groq
-  "Qwen 3.6 27B (via Groq)", // replaced by NVIDIA NIM Asian family
-  "GPT-OSS 120B (via Groq)", // renamed — display name changed
-  "GPT-OSS 20B (via Groq)",  // renamed — display name changed
+  "Qwen 3 32B (via Groq)",
+  "Qwen 3.6 27B (via Groq)",
+  "GPT-OSS 120B (via Groq)",
+  "GPT-OSS 20B (via Groq)",
+  "GPT-OSS 120B (Groq)",
+  "GPT-OSS 20B (Groq)",
+  "Gemini 2.0 Flash (Google)",
+  "Gemini 1.5 Flash (Google)",
+  "Kimi K2.6 (NVIDIA NIM)",
+  "GLM 5.2 (NVIDIA NIM)",
 ];
 
 export async function seedGlobalProviders(): Promise<void> {
