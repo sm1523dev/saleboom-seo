@@ -51,6 +51,7 @@ export const changeStatusEnum = pgEnum("change_status", [
   "applied",
   "failed",
   "reverted",
+  "rolled_back",
 ]);
 
 export const aeoSentimentEnum = pgEnum("aeo_sentiment", [
@@ -143,21 +144,36 @@ export const changeSnapshots = pgTable(
   "change_snapshots",
   {
     id: uuid("id").defaultRandom().primaryKey(),
-    issueId: uuid("issue_id")
-      .notNull()
-      .references(() => issues.id, { onDelete: "cascade" }),
-    cmsConnectionId: uuid("cms_connection_id")
-      .notNull()
-      .references(() => cmsConnections.id, { onDelete: "cascade" }),
+    // Which page and field this snapshot covers
+    pageUrl: text("page_url").notNull(),
+    fieldChanged: text("field_changed").notNull(), // "meta_title" | "meta_description" | "h1"
     beforeState: jsonb("before_state"),
     afterState: jsonb("after_state"),
     status: changeStatusEnum("status").notNull().default("pending"),
+    // Set when the change is pushed to CMS
+    cmsConnectionId: uuid("cms_connection_id").references(
+      () => cmsConnections.id,
+      { onDelete: "set null" },
+    ),
     appliedAt: timestamp("applied_at", { withTimezone: true }),
+    // Set when the change is rolled back
+    rolledBackAt: timestamp("rolled_back_at", { withTimezone: true }),
+    // Source: either from an AI suggestion or a manual issue fix
+    suggestionId: uuid("suggestion_id").references(() => aiSuggestions.id, {
+      onDelete: "set null",
+    }),
+    issueId: uuid("issue_id").references(() => issues.id, {
+      onDelete: "set null",
+    }),
+    userId: uuid("user_id").references(() => users.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [
-    index("change_snapshots_issue_id_idx").on(t.issueId),
+    index("change_snapshots_page_url_idx").on(t.pageUrl),
+    index("change_snapshots_status_idx").on(t.status),
     index("change_snapshots_cms_id_idx").on(t.cmsConnectionId),
+    index("change_snapshots_suggestion_id_idx").on(t.suggestionId),
+    index("change_snapshots_issue_id_idx").on(t.issueId),
   ],
 );
 
