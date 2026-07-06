@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ignoreSuggestions, unignoreSuggestions } from "@/app/actions/suggestions.actions";
 import { approveSuggestionField, unapproveField, approveAllSuggestions } from "@/app/actions/changes.actions";
+import { generateAndQueueIssueFixes } from "@/app/actions/quick-fix.actions";
 import type { CmsField } from "@/lib/cms/types";
 import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
 import { Badge } from "@/components/ui/badge";
@@ -25,6 +26,7 @@ type FixType = "quick" | "major" | null;
 
 type Issue = {
   id: string;
+  pageUrl: string | null;
   type: string;
   severity: Severity;
   title: string;
@@ -374,8 +376,8 @@ export function ResultsView({
               </button>
               {filtered.some((i) => i.fixType === "quick") && (
                 <BulkFixButton
-                  suggestions={suggestions}
-                  websiteId={websiteId}
+                  selectedIssues={selectedIssues}
+                  allQuickIssues={filtered.filter((i) => i.fixType === "quick")}
                 />
               )}
             </div>
@@ -570,36 +572,31 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BulkFixButton({ suggestions, websiteId }: { suggestions: Suggestion[]; websiteId: string }) {
+function BulkFixButton({ selectedIssues, allQuickIssues }: { selectedIssues: Set<string>; allQuickIssues: Issue[] }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
-  if (suggestions.length === 0) {
-    return (
-      <button
-        type="button"
-        onClick={() => {
-          const el = document.getElementById("ai-suggestions");
-          if (el) el.scrollIntoView({ behavior: "smooth" });
-        }}
-        className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
-      >
-        Fix all quick fixes
-      </button>
-    );
-  }
+  const targetIds = selectedIssues.size > 0
+    ? Array.from(selectedIssues).filter((id) => allQuickIssues.some((i) => i.id === id && i.fixType === "quick"))
+    : allQuickIssues.map((i) => i.id);
+
+  if (targetIds.length === 0) return null;
 
   return (
     <button
       type="button"
       disabled={isPending}
       onClick={() => startTransition(async () => {
-        await approveAllSuggestions(suggestions.map((s) => s.id));
+        await generateAndQueueIssueFixes(targetIds);
         router.push("/changes");
       })}
       className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
     >
-      {isPending ? "Adding to queue…" : `Add all ${suggestions.length} AI fix${suggestions.length !== 1 ? "es" : ""} to queue`}
+      {isPending
+        ? "Generating fixes…"
+        : selectedIssues.size > 0
+          ? `Fix ${targetIds.length} selected`
+          : `Fix all ${targetIds.length} quick fixes`}
     </button>
   );
 }

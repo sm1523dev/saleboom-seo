@@ -110,6 +110,7 @@ export const issues = pgTable(
     scanId: uuid("scan_id")
       .notNull()
       .references(() => scans.id, { onDelete: "cascade" }),
+    pageUrl: text("page_url"),
     type: varchar("type", { length: 100 }).notNull(),
     severity: severityEnum("severity").notNull(),
     title: varchar("title", { length: 500 }).notNull(),

@@ -68,6 +68,7 @@ export default async function AuditResultsPage({ params }: Props) {
   const allIssues = await db
     .select({
       id: issues.id,
+      pageUrl: issues.pageUrl,
       type: issues.type,
       severity: issues.severity,
       title: issues.title,

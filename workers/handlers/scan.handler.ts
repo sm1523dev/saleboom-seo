@@ -193,6 +193,7 @@ async function _runScanJob(
 async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<void> {
   const rows = seoIssues.map((issue) => ({
     scanId,
+    pageUrl: issue.pageUrl ?? null,
     type: issue.type,
     severity: issue.severity,
     title: issue.title,
