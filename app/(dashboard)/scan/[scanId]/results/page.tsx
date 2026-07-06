@@ -1,12 +1,13 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { eq } from "drizzle-orm";
+import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
-import { isNotNull } from "drizzle-orm";
+import { isNotNull, inArray } from "drizzle-orm";
+import { changeSnapshots } from "@/lib/db/schema";
 
 import { ResultsView } from "./_components/results-view";
 
@@ -102,6 +103,27 @@ export default async function AuditResultsPage({ params }: Props) {
   const suggestions = allSuggestions.filter((s) => s.status === "pending");
   const pastSuggestions = allSuggestions.filter((s) => s.status !== "pending");
 
+  // Fetch existing pending change_snapshots so the UI reflects already-approved fields on refresh
+  const approvedSnapshots =
+    suggestions.length > 0
+      ? await db
+          .select({
+            suggestionId: changeSnapshots.suggestionId,
+            fieldChanged: changeSnapshots.fieldChanged,
+            snapshotId: changeSnapshots.id,
+          })
+          .from(changeSnapshots)
+          .where(
+            and(
+              inArray(
+                changeSnapshots.suggestionId,
+                suggestions.map((s) => s.id),
+              ),
+              eq(changeSnapshots.status, "pending"),
+            ),
+          )
+      : [];
+
   return (
     <ResultsView
       scanId={scanId}
@@ -116,6 +138,7 @@ export default async function AuditResultsPage({ params }: Props) {
       ignoredIssues={ignoredIssues}
       suggestions={suggestions}
       pastSuggestions={pastSuggestions}
+      approvedSnapshots={approvedSnapshots}
     />
   );
 }

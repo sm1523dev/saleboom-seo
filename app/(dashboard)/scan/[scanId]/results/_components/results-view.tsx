@@ -5,6 +5,8 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ignoreSuggestions, unignoreSuggestions } from "@/app/actions/suggestions.actions";
+import { approveSuggestionField, unapproveField } from "@/app/actions/changes.actions";
+import type { CmsField } from "@/lib/cms/types";
 import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -42,6 +44,12 @@ type Suggestion = {
   h1: string | null;
 };
 
+type ApprovedSnapshot = {
+  suggestionId: string | null;
+  fieldChanged: string;
+  snapshotId: string;
+};
+
 type Props = {
   scanId: string;
   websiteName: string;
@@ -55,6 +63,7 @@ type Props = {
   ignoredIssues: Issue[];
   suggestions: Suggestion[];
   pastSuggestions: Suggestion[];
+  approvedSnapshots: ApprovedSnapshot[];
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -104,6 +113,7 @@ export function ResultsView({
   ignoredIssues,
   suggestions,
   pastSuggestions,
+  approvedSnapshots,
 }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Severity | null>(null);
@@ -270,7 +280,7 @@ export function ResultsView({
 
       {/* AI Suggestions */}
       {(suggestions.length > 0 || pastSuggestions.length > 0) && (
-        <AiSuggestionsSection suggestions={suggestions} pastSuggestions={pastSuggestions} />
+        <AiSuggestionsSection suggestions={suggestions} pastSuggestions={pastSuggestions} approvedSnapshots={approvedSnapshots} />
       )}
 
       {/* Issue list */}
@@ -517,10 +527,10 @@ export function ResultsView({
   );
 }
 
-const FIELDS: { key: "metaTitle" | "metaDescription" | "h1"; currentKey: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; label: string; hint: string }[] = [
-  { key: "metaTitle", currentKey: "currentMetaTitle", label: "Page Title", hint: "Shown as the headline in Google search results" },
-  { key: "metaDescription", currentKey: "currentMetaDescription", label: "Page Description", hint: "The short summary shown under the title in Google results" },
-  { key: "h1", currentKey: "currentH1", label: "Main Heading", hint: "The primary heading visitors see when they land on the page" },
+const FIELDS: { key: "metaTitle" | "metaDescription" | "h1"; currentKey: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; label: string; hint: string; fieldId: CmsField }[] = [
+  { key: "metaTitle", currentKey: "currentMetaTitle", label: "Page Title", hint: "50–60 chars", fieldId: "meta_title" },
+  { key: "metaDescription", currentKey: "currentMetaDescription", label: "Page Description", hint: "150–160 chars", fieldId: "meta_description" },
+  { key: "h1", currentKey: "currentH1", label: "Main Heading", hint: "Primary on-page heading", fieldId: "h1" },
 ];
 
 function CopyButton({ text }: { text: string }) {
@@ -544,86 +554,106 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: Suggestion[]; pastSuggestions: Suggestion[] }) {
+const CHAR_LIMITS: Record<CmsField, { min: number; max: number }> = {
+  meta_title: { min: 50, max: 60 },
+  meta_description: { min: 150, max: 160 },
+  h1: { min: 0, max: 70 },
+};
+
+function CharCount({ text, field }: { text: string; field: CmsField }) {
+  const len = text.length;
+  const { min, max } = CHAR_LIMITS[field];
+  const inRange = len >= min && len <= max;
+  const over = len > max;
+  return (
+    <span className={cn("font-mono text-xs", inRange ? "text-green-400" : over ? "text-red-400" : "text-yellow-400")}>
+      {len}/{max}
+    </span>
+  );
+}
+
+function AiSuggestionsSection({
+  suggestions,
+  pastSuggestions,
+  approvedSnapshots,
+}: {
+  suggestions: Suggestion[];
+  pastSuggestions: Suggestion[];
+  approvedSnapshots: ApprovedSnapshot[];
+}) {
   const [open, setOpen] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
-  const [isPending, startTransition] = useTransition();
-  const [showCmsPrompt, setShowCmsPrompt] = useState(false);
   const [showIgnored, setShowIgnored] = useState(false);
   const [isUnignoring, startUnignoreTransition] = useTransition();
   const router = useRouter();
 
-  function toggleSelect(id: string) {
-    setSelected((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
+  // Track per-suggestion per-field state: "idle" | "approved" | "skipped"
+  type FieldState = "idle" | "approved" | "skipped";
+  const [fieldStates, setFieldStates] = useState<Record<string, Record<string, FieldState>>>(() => {
+    const initial: Record<string, Record<string, FieldState>> = {};
+    for (const s of suggestions) {
+      initial[s.id] = { meta_title: "idle", meta_description: "idle", h1: "idle" };
+    }
+    // Restore approvals from server
+    for (const snap of approvedSnapshots) {
+      if (snap.suggestionId && initial[snap.suggestionId]) {
+        initial[snap.suggestionId][snap.fieldChanged] = "approved";
+      }
+    }
+    return initial;
+  });
+
+  const [pendingFields, setPendingFields] = useState<Set<string>>(new Set());
+
+  async function handleApproveField(suggestionId: string, field: CmsField) {
+    const key = `${suggestionId}:${field}`;
+    setPendingFields((p) => new Set(p).add(key));
+    try {
+      await approveSuggestionField(suggestionId, field);
+      setFieldStates((prev) => ({
+        ...prev,
+        [suggestionId]: { ...prev[suggestionId], [field]: "approved" },
+      }));
+    } finally {
+      setPendingFields((p) => { const next = new Set(p); next.delete(key); return next; });
+    }
   }
 
-  function toggleAll() {
-    if (selected.size === suggestions.length) setSelected(new Set());
-    else setSelected(new Set(suggestions.map((s) => s.id)));
+  async function handleUnapproveField(suggestionId: string, field: CmsField) {
+    const key = `${suggestionId}:${field}`;
+    setPendingFields((p) => new Set(p).add(key));
+    try {
+      await unapproveField(suggestionId, field);
+      setFieldStates((prev) => ({
+        ...prev,
+        [suggestionId]: { ...prev[suggestionId], [field]: "idle" },
+      }));
+    } finally {
+      setPendingFields((p) => { const next = new Set(p); next.delete(key); return next; });
+    }
   }
 
-  function handleApply() {
-    setShowCmsPrompt(true);
+  function handleSkipField(suggestionId: string, field: CmsField) {
+    setFieldStates((prev) => ({
+      ...prev,
+      [suggestionId]: { ...prev[suggestionId], [field]: "skipped" },
+    }));
   }
 
-  function handleIgnoreSelected() {
-    const ids = selected.size > 0 ? Array.from(selected) : suggestions.map((s) => s.id);
-    startTransition(async () => {
-      await ignoreSuggestions(ids);
-      setSelected(new Set());
-      router.refresh();
-    });
+  function handleUnskipField(suggestionId: string, field: CmsField) {
+    setFieldStates((prev) => ({
+      ...prev,
+      [suggestionId]: { ...prev[suggestionId], [field]: "idle" },
+    }));
   }
 
-  const applyLabel = selected.size > 0
-    ? `Apply ${selected.size} suggestion${selected.size !== 1 ? "s" : ""}`
-    : `Apply all ${suggestions.length} suggestions`;
+  function countApprovedFields(suggestionId: string) {
+    return Object.values(fieldStates[suggestionId] ?? {}).filter((s) => s === "approved").length;
+  }
 
-  const ignoreLabel = selected.size > 0
-    ? `Ignore ${selected.size} selected`
-    : "Ignore all";
+  if (suggestions.length === 0 && pastSuggestions.length === 0) return null;
 
   return (
     <section aria-label="AI-generated page improvements" className="space-y-3">
-      {/* CMS prompt popup */}
-      {showCmsPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
-          >
-            <h3 className="font-semibold">Connect your CMS to apply</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              One-click apply is coming soon. Connect your CMS (WordPress, Shopify, Webflow)
-              and we'll push these fixes directly to your site — no copy-paste needed.
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowCmsPrompt(false)}
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
-              >
-                Got it
-              </button>
-              <button
-                type="button"
-                disabled
-                className="flex-1 cursor-not-allowed rounded-lg bg-primary/40 px-4 py-2 text-sm font-medium text-primary-foreground"
-              >
-                Connect CMS — Coming soon
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Active suggestions */}
       {suggestions.length > 0 && (
         <>
           <button
@@ -634,13 +664,13 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
           >
             <div>
               <span className="font-semibold">
-                Suggested Page Improvements
+                AI-Suggested Improvements
                 <span className="ml-2 text-xs font-normal text-muted-foreground">
                   {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
                 </span>
               </span>
               <p className="mt-0.5 text-xs text-muted-foreground">
-                See current content vs AI suggestion — select pages to apply or skip
+                Review each field, approve to queue for CMS push or skip to dismiss
               </p>
             </div>
             <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
@@ -658,91 +688,114 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
                 className="overflow-hidden"
               >
                 <div className="space-y-3">
-                  {/* Bulk actions bar */}
-                  <div className="flex items-center justify-between gap-3 rounded-lg border border-border bg-muted/40 px-3 py-2">
-                    <label className="flex cursor-pointer items-center gap-2 text-xs text-muted-foreground">
-                      <input
-                        type="checkbox"
-                        checked={selected.size === suggestions.length && suggestions.length > 0}
-                        onChange={toggleAll}
-                        className="rounded"
-                        aria-label="Select all suggestions"
-                      />
-                      {selected.size > 0 ? `${selected.size} selected` : "Select all"}
-                    </label>
-                    <div className="flex gap-2">
-                      <button
-                        type="button"
-                        onClick={handleIgnoreSelected}
-                        disabled={isPending}
-                        className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-                      >
-                        {ignoreLabel}
-                      </button>
-                      <button
-                        type="button"
-                        onClick={handleApply}
-                        disabled={suggestions.length === 0}
-                        title="CMS connection required — coming soon"
-                        className="btn-press rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
-                      >
-                        {applyLabel}
-                      </button>
-                    </div>
-                  </div>
+                  {suggestions.map((s) => {
+                    const states = fieldStates[s.id] ?? {};
+                    const approvedCount = countApprovedFields(s.id);
+                    return (
+                      <div key={s.id} className="rounded-xl border border-border bg-card p-4">
+                        <div className="mb-4 flex items-center justify-between gap-2">
+                          <p className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</p>
+                          {approvedCount > 0 && (
+                            <span className="shrink-0 rounded-full bg-green-500/10 px-2 py-0.5 text-xs text-green-400">
+                              {approvedCount} approved
+                            </span>
+                          )}
+                        </div>
+                        <div className="space-y-5">
+                          {FIELDS.map(({ key, currentKey, label, hint, fieldId }) => {
+                            const suggested = s[key];
+                            if (!suggested) return null;
+                            const current = s[currentKey];
+                            const fieldState = states[fieldId] ?? "idle";
+                            const isPendingField = pendingFields.has(`${s.id}:${fieldId}`);
 
-                  {/* Suggestion cards */}
-                  {suggestions.map((s) => (
-                    <div
-                      key={s.id}
-                      className={cn(
-                        "rounded-xl border bg-card p-4 transition-colors",
-                        selected.has(s.id) ? "border-primary/40 bg-primary/5" : "border-border"
-                      )}
-                    >
-                      <label className="mb-4 flex cursor-pointer items-center gap-2">
-                        <input
-                          type="checkbox"
-                          checked={selected.has(s.id)}
-                          onChange={() => toggleSelect(s.id)}
-                          className="rounded"
-                        />
-                        <span className="truncate font-mono text-xs text-muted-foreground">{s.pageUrl}</span>
-                      </label>
-                      <div className="space-y-5">
-                        {FIELDS.map(({ key, currentKey, label, hint }) => {
-                          const suggested = s[key];
-                          if (!suggested) return null;
-                          const current = s[currentKey];
-                          return (
-                            <div key={key}>
-                              <div className="mb-2 flex items-baseline gap-2">
-                                <span className="text-xs font-medium">{label}</span>
-                                <span className="text-xs text-muted-foreground">{hint}</span>
-                              </div>
-                              <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                <div>
-                                  <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
-                                  <div className="rounded-lg border border-border bg-muted/30 px-3 py-2 min-h-[2.5rem]">
-                                    {current
-                                      ? <p className="text-sm text-muted-foreground">{current}</p>
-                                      : <p className="text-sm italic text-muted-foreground/50">Not set</p>}
+                            return (
+                              <div
+                                key={key}
+                                className={cn(
+                                  "rounded-lg border p-3 transition-colors",
+                                  fieldState === "approved" && "border-green-500/20 bg-green-500/5",
+                                  fieldState === "skipped" && "border-border/50 opacity-50",
+                                  fieldState === "idle" && "border-border",
+                                )}
+                              >
+                                <div className="mb-2 flex items-center justify-between gap-2">
+                                  <div className="flex items-baseline gap-2">
+                                    <span className="text-xs font-medium">{label}</span>
+                                    <span className="text-xs text-muted-foreground">{hint}</span>
+                                  </div>
+                                  {fieldState === "approved" && (
+                                    <span className="flex items-center gap-1 text-xs text-green-400">
+                                      ✓ Approved
+                                      <button
+                                        type="button"
+                                        onClick={() => handleUnapproveField(s.id, fieldId)}
+                                        disabled={isPendingField}
+                                        className="ml-1 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                                        aria-label={`Unapprove ${label}`}
+                                      >
+                                        undo
+                                      </button>
+                                    </span>
+                                  )}
+                                  {fieldState === "skipped" && (
+                                    <button
+                                      type="button"
+                                      onClick={() => handleUnskipField(s.id, fieldId)}
+                                      className="text-xs text-muted-foreground hover:text-foreground"
+                                    >
+                                      Un-skip
+                                    </button>
+                                  )}
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
+                                  <div>
+                                    <p className="mb-1 text-xs font-medium text-muted-foreground">Current</p>
+                                    <div className="min-h-[2.5rem] rounded-lg border border-border bg-muted/30 px-3 py-2">
+                                      {current
+                                        ? <p className="text-sm text-muted-foreground">{current}</p>
+                                        : <p className="text-sm italic text-muted-foreground/50">Not set</p>}
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <div className="mb-1 flex items-center justify-between">
+                                      <p className="text-xs font-medium text-primary">AI Suggestion</p>
+                                      <CharCount text={suggested} field={fieldId} />
+                                    </div>
+                                    <div className="flex min-h-[2.5rem] items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2">
+                                      <p className="flex-1 text-sm">{suggested}</p>
+                                      <CopyButton text={suggested} />
+                                    </div>
                                   </div>
                                 </div>
-                                <div>
-                                  <p className="mb-1 text-xs font-medium text-primary">AI Suggestion</p>
-                                  <div className="flex items-start gap-2 rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 min-h-[2.5rem]">
-                                    <p className="flex-1 text-sm">{suggested}</p>
-                                    <CopyButton text={suggested} />
+
+                                {fieldState === "idle" && (
+                                  <div className="mt-2 flex justify-end gap-2">
+                                    <button
+                                      type="button"
+                                      onClick={() => handleSkipField(s.id, fieldId)}
+                                      className="rounded-md border border-border px-3 py-1 text-xs text-muted-foreground transition-colors hover:text-foreground"
+                                    >
+                                      Skip
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => handleApproveField(s.id, fieldId)}
+                                      disabled={isPendingField}
+                                      className="btn-press rounded-md bg-primary px-3 py-1 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
+                                    >
+                                      {isPendingField ? "Approving…" : "Approve"}
+                                    </button>
                                   </div>
-                                </div>
+                                )}
                               </div>
-                            </div>
-                          );
-                        })}
+                            );
+                          })}
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               </motion.div>
             )}
@@ -750,13 +803,13 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
         </>
       )}
 
-      {/* Ignored suggestions toggle */}
+      {/* Ignored suggestions */}
       {pastSuggestions.length > 0 && (
         <div>
           <button
             type="button"
             onClick={() => setShowIgnored((o) => !o)}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            className="text-xs text-muted-foreground transition-colors hover:text-foreground"
           >
             {showIgnored ? "Hide" : "Show"} ignored ({pastSuggestions.length})
           </button>
@@ -767,7 +820,7 @@ function AiSuggestionsSection({ suggestions, pastSuggestions }: { suggestions: S
                 animate={{ opacity: 1, height: "auto" }}
                 exit={{ opacity: 0, height: 0 }}
                 transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
-                className="mt-3 overflow-hidden space-y-3"
+                className="mt-3 space-y-3 overflow-hidden"
               >
                 {pastSuggestions.map((s) => (
                   <div key={s.id} className="rounded-xl border border-border bg-card p-4 opacity-60">
