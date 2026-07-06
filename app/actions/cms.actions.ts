@@ -77,6 +77,56 @@ export async function disconnectCms(websiteId: string, cmsType: CmsType): Promis
     .where(and(eq(cmsConnections.websiteId, websiteId), eq(cmsConnections.cmsType, cmsType)));
 }
 
+export async function connectShopify(
+  websiteId: string,
+  storeUrl: string,
+  accessToken: string,
+): Promise<{ success: boolean; error?: string; connectedAs?: string }> {
+  await getServerSession();
+  const { ShopifyAdapter } = await import("@/lib/cms/providers/shopify");
+  const creds = { storeUrl, accessToken };
+  const validation = await new ShopifyAdapter().validate(creds);
+  if (!validation.valid) return { success: false, error: validation.error };
+
+  const storageKey = await storeCredentials(websiteId, "shopify", creds);
+  const userLogin = validation.userLogin ?? storeUrl;
+
+  await db
+    .insert(cmsConnections)
+    .values({ websiteId, cmsType: "shopify", credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date() })
+    .onConflictDoUpdate({
+      target: [cmsConnections.websiteId, cmsConnections.cmsType],
+      set: { credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date(), updatedAt: new Date() },
+    });
+
+  return { success: true, connectedAs: userLogin };
+}
+
+export async function connectWebflow(
+  websiteId: string,
+  apiToken: string,
+  collectionId: string,
+): Promise<{ success: boolean; error?: string; connectedAs?: string }> {
+  await getServerSession();
+  const { WebflowAdapter } = await import("@/lib/cms/providers/webflow");
+  const creds = { apiToken, collectionId };
+  const validation = await new WebflowAdapter().validate(creds);
+  if (!validation.valid) return { success: false, error: validation.error };
+
+  const storageKey = await storeCredentials(websiteId, "webflow", creds);
+  const userLogin = validation.userLogin ?? "Webflow";
+
+  await db
+    .insert(cmsConnections)
+    .values({ websiteId, cmsType: "webflow", credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date() })
+    .onConflictDoUpdate({
+      target: [cmsConnections.websiteId, cmsConnections.cmsType],
+      set: { credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date(), updatedAt: new Date() },
+    });
+
+  return { success: true, connectedAs: userLogin };
+}
+
 export async function loadCmsCredentials(websiteId: string, cmsType: CmsType) {
   await getServerSession();
   return loadCredentials(websiteId, cmsType);

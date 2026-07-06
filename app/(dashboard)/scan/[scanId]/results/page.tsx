@@ -127,6 +127,7 @@ export default async function AuditResultsPage({ params }: Props) {
   return (
     <ResultsView
       scanId={scanId}
+      websiteId={scan.websiteId}
       websiteName={website?.name ?? "Unknown"}
       websiteUrl={website?.url ?? ""}
       completedAt={scan.completedAt?.toISOString() ?? null}

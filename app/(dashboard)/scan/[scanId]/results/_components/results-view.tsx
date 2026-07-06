@@ -52,6 +52,7 @@ type ApprovedSnapshot = {
 
 type Props = {
   scanId: string;
+  websiteId: string;
   websiteName: string;
   websiteUrl: string;
   completedAt: string | null;
@@ -102,6 +103,7 @@ const SEVERITY_CONFIG: Record<
 
 export function ResultsView({
   scanId,
+  websiteId,
   websiteName,
   websiteUrl,
   completedAt,
@@ -293,18 +295,22 @@ export function ResultsView({
               animate={{ opacity: 1, scale: 1 }}
               className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
             >
-              <h3 className="font-semibold">Connect your CMS to auto-fix</h3>
+              <h3 className="font-semibold">Connect your CMS to push fixes</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Quick fixes can be applied directly to your website with one click — once your CMS is connected.
-                WordPress, Shopify, and Webflow support coming soon.
+                Quick fixes can be applied directly to your website with one click once your CMS is connected.
+                Supports WordPress, Shopify, and Webflow.
               </p>
               <div className="mt-5 flex gap-3">
                 <button type="button" onClick={() => setShowIssueCmsPrompt(false)} className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent">
-                  Got it
+                  Not now
                 </button>
-                <button type="button" disabled className="flex-1 cursor-not-allowed rounded-lg bg-primary/40 px-4 py-2 text-sm font-medium text-primary-foreground">
-                  Connect CMS — Coming soon
-                </button>
+                <Link
+                  href={`/website/${websiteId}/cms`}
+                  onClick={() => setShowIssueCmsPrompt(false)}
+                  className="btn-press flex-1 rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                >
+                  Connect CMS →
+                </Link>
               </div>
             </motion.div>
           </div>
