@@ -25,6 +25,14 @@ spec:
       labels:
         app: nextjs
     spec:
+      initContainers:
+        - name: db-migrate
+          image: ghcr.io/sm1523dev/saleboomseo-worker:latest
+          imagePullPolicy: IfNotPresent
+          command: ["./node_modules/.bin/drizzle-kit", "push", "--force"]
+          envFrom:
+            - secretRef:
+                name: saleboomseo-secrets
       containers:
         - name: nextjs
           image: ghcr.io/sm1523dev/saleboomseo:latest
