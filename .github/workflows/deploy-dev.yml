@@ -73,6 +73,8 @@ jobs:
       packages: read
 
     steps:
+      - uses: actions/checkout@v4
+
       - name: Pull app image into k3s
         run: |
           sudo k3s ctr images pull \
@@ -84,6 +86,12 @@ jobs:
           sudo k3s ctr images pull \
             --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
             ${{ env.IMAGE_WORKER }}:latest
+
+      - name: Run db:push
+        run: |
+          sudo k3s kubectl delete job db-migrate -n saleboomseo --ignore-not-found
+          sudo k3s kubectl apply -f k8s/dev/migrate-job.yaml
+          sudo k3s kubectl wait --for=condition=complete job/db-migrate -n saleboomseo --timeout=120s
 
       - name: Rollout restart
         run: |
