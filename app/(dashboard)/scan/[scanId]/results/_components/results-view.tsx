@@ -336,7 +336,23 @@ export function ResultsView({
               </button>
             )}
             {/* Issue bulk actions */}
-            <div className="flex gap-2">
+            <div className="flex items-center gap-2">
+              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+                <input
+                  type="checkbox"
+                  className="rounded"
+                  checked={selectedIssues.size === filtered.length && filtered.length > 0}
+                  onChange={() => {
+                    if (selectedIssues.size === filtered.length) {
+                      setSelectedIssues(new Set());
+                    } else {
+                      setSelectedIssues(new Set(filtered.map((i) => i.id)));
+                    }
+                  }}
+                  aria-label="Select all issues"
+                />
+                {selectedIssues.size > 0 ? `${selectedIssues.size} selected` : "Select all"}
+              </label>
               <button
                 type="button"
                 onClick={() => {
