@@ -166,3 +166,19 @@ export async function rejectChange(snapshotId: string): Promise<void> {
     .set({ status: "reverted", updatedAt: new Date() })
     .where(and(eq(changeSnapshots.id, snapshotId), eq(changeSnapshots.status, "pending")));
 }
+
+export async function editChangeAfterValue(
+  snapshotId: string,
+  newValue: string,
+): Promise<void> {
+  await getServerSession();
+  if (!newValue.trim()) throw new Error("Value cannot be empty");
+  await db
+    .update(changeSnapshots)
+    .set({
+      afterState: { value: newValue.trim() },
+      status: "pending",
+      updatedAt: new Date(),
+    })
+    .where(and(eq(changeSnapshots.id, snapshotId), eq(changeSnapshots.status, "pending")));
+}

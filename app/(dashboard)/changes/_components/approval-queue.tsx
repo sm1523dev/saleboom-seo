@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { pushChangeTocms, rejectChange } from "@/app/actions/changes.actions";
+import { pushChangeTocms, rejectChange, editChangeAfterValue } from "@/app/actions/changes.actions";
 
 const FIELD_LABELS: Record<string, string> = {
   meta_title: "Page Title",
@@ -37,6 +37,9 @@ export function ApprovalQueue({ items, page, pageSize }: Props) {
   const [itemStates, setItemStates] = useState<Record<string, ItemState>>({});
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editValue, setEditValue] = useState("");
+  const [isSavingEdit, startEditTransition] = useTransition();
   const [isBulkPending, startBulkTransition] = useTransition();
 
   function setItemState(id: string, state: ItemState) {
@@ -109,6 +112,49 @@ export function ApprovalQueue({ items, page, pageSize }: Props) {
 
   return (
     <div className="space-y-4">
+      {/* Inline edit modal */}
+      {editingId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-4 w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          >
+            <h3 className="font-semibold">Edit value</h3>
+            <p className="mt-1 text-xs text-muted-foreground">
+              The edited value will replace the AI suggestion and return to pending status.
+            </p>
+            <textarea
+              value={editValue}
+              onChange={(e) => setEditValue(e.target.value)}
+              rows={3}
+              className="mt-3 w-full rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm outline-none focus:border-primary/50 focus:ring-1 focus:ring-primary/30"
+            />
+            <p className="mt-1 text-right font-mono text-xs text-muted-foreground">{editValue.length} chars</p>
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditingId(null)}
+                className="rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                disabled={isSavingEdit || !editValue.trim()}
+                onClick={() => startEditTransition(async () => {
+                  await editChangeAfterValue(editingId, editValue);
+                  setEditingId(null);
+                  router.refresh();
+                })}
+                className="btn-press rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-50"
+              >
+                {isSavingEdit ? "Saving…" : "Save"}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       {/* Bulk actions bar */}
       {activeItems.some((i) => i.isCmsConnected) && (
         <div className="flex items-center justify-between rounded-lg border border-border bg-muted/40 px-3 py-2">
@@ -218,6 +264,14 @@ export function ApprovalQueue({ items, page, pageSize }: Props) {
                           {isPushing ? "Pushing…" : "Push to CMS"}
                         </button>
                       )}
+                      <button
+                        type="button"
+                        onClick={() => { setEditingId(item.id); setEditValue(item.afterValue); }}
+                        disabled={isPushing}
+                        className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50"
+                      >
+                        Edit
+                      </button>
                       <button
                         type="button"
                         onClick={() => handleReject(item.id)}
