@@ -20,7 +20,9 @@ async function wpFetch(
   options: RequestInit = {},
 ): Promise<Response> {
   const base = normaliseUrl(siteUrl);
-  const res = await fetch(`${base}/wp-json${path}`, {
+  // path must start with /wp/v2/ or /wp/ — prefix it automatically if not already
+  const apiPath = path.startsWith("/wp/") ? path : `/wp/v2${path}`;
+  const res = await fetch(`${base}/wp-json${apiPath}`, {
     ...options,
     headers: {
       "Content-Type": "application/json",
