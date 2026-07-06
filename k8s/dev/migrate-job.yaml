@@ -11,9 +11,9 @@ spec:
       restartPolicy: Never
       containers:
         - name: migrate
-          image: ghcr.io/sm1523dev/saleboomseo:latest
+          image: ghcr.io/sm1523dev/saleboomseo-worker:latest
           imagePullPolicy: IfNotPresent
-          command: ["npx", "drizzle-kit", "push", "--force"]
+          command: ["./node_modules/.bin/drizzle-kit", "push", "--force"]
           envFrom:
             - secretRef:
                 name: saleboomseo-secrets
