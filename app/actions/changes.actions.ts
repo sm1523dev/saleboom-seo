@@ -167,6 +167,75 @@ export async function rejectChange(snapshotId: string): Promise<void> {
     .where(and(eq(changeSnapshots.id, snapshotId), eq(changeSnapshots.status, "pending")));
 }
 
+export async function rollbackChange(
+  snapshotId: string,
+): Promise<{ success: boolean; error?: string }> {
+  await getServerSession();
+
+  const [snapshot] = await db
+    .select()
+    .from(changeSnapshots)
+    .where(eq(changeSnapshots.id, snapshotId))
+    .limit(1);
+
+  if (!snapshot) return { success: false, error: "Change not found" };
+  if (snapshot.status === "rolled_back") return { success: false, error: "already_rolled_back" };
+  if (snapshot.status !== "applied") return { success: false, error: "Only applied changes can be rolled back" };
+
+  // Resolve websiteId through the suggestion
+  let websiteId: string | null = null;
+  if (snapshot.suggestionId) {
+    const [suggestion] = await db
+      .select({ websiteId: aiSuggestions.websiteId })
+      .from(aiSuggestions)
+      .where(eq(aiSuggestions.id, snapshot.suggestionId))
+      .limit(1);
+    websiteId = suggestion?.websiteId ?? null;
+  }
+
+  if (!websiteId) return { success: false, error: "Could not determine website for this change" };
+
+  const [connection] = await db
+    .select()
+    .from(cmsConnections)
+    .where(eq(cmsConnections.websiteId, websiteId))
+    .limit(1);
+
+  if (!connection) return { success: false, error: "No CMS connected — cannot rollback" };
+
+  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow";
+  const credentials = await loadCredentials(websiteId, cmsType);
+  if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
+
+  const beforeState = snapshot.beforeState as { value?: string | null } | null;
+  const beforeValue = beforeState?.value ?? "";
+
+  try {
+    if (cmsType === "wordpress") {
+      const adapter = new WordPressAdapter();
+      await adapter.push(
+        {
+          pageUrl: snapshot.pageUrl,
+          fields: { [snapshot.fieldChanged as CmsField]: beforeValue },
+        },
+        credentials as Parameters<WordPressAdapter["push"]>[1],
+      );
+    } else {
+      return { success: false, error: `${cmsType} rollback not yet implemented` };
+    }
+
+    await db
+      .update(changeSnapshots)
+      .set({ status: "rolled_back", rolledBackAt: new Date(), updatedAt: new Date() })
+      .where(eq(changeSnapshots.id, snapshotId));
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Rollback failed";
+    return { success: false, error: message };
+  }
+}
+
 export async function editChangeAfterValue(
   snapshotId: string,
   newValue: string,
