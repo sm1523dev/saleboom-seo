@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { changeSnapshots, aiSuggestions, cmsConnections } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
@@ -87,6 +87,46 @@ export async function approveSuggestionField(
     .returning({ id: changeSnapshots.id });
 
   return { snapshotId: inserted.id };
+}
+
+export async function approveAllSuggestions(suggestionIds: string[]): Promise<void> {
+  if (suggestionIds.length === 0) return;
+  const session = await getServerSession();
+  const userId = session.user.id as string;
+
+  const suggestions = await db
+    .select()
+    .from(aiSuggestions)
+    .where(inArray(aiSuggestions.id, suggestionIds));
+
+  const rows: (typeof changeSnapshots.$inferInsert)[] = [];
+  for (const s of suggestions) {
+    const fields: Array<{ field: CmsField; before: string | null; after: string }> = [
+      { field: "meta_title", before: s.currentMetaTitle, after: s.metaTitle ?? "" },
+      { field: "meta_description", before: s.currentMetaDescription, after: s.metaDescription ?? "" },
+      { field: "h1", before: s.currentH1, after: s.h1 ?? "" },
+    ];
+    for (const { field, before, after } of fields) {
+      if (!after) continue;
+      rows.push({
+        pageUrl: s.pageUrl,
+        fieldChanged: field,
+        beforeState: { value: before ?? null },
+        afterState: { value: after },
+        suggestionId: s.id,
+        userId,
+        status: "pending",
+      });
+    }
+  }
+
+  if (rows.length === 0) return;
+
+  // Upsert — re-approving existing pending fields is safe
+  await db
+    .insert(changeSnapshots)
+    .values(rows)
+    .onConflictDoNothing();
 }
 
 export async function unapproveField(suggestionId: string, field: CmsField): Promise<void> {

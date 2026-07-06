@@ -5,7 +5,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ignoreSuggestions, unignoreSuggestions } from "@/app/actions/suggestions.actions";
-import { approveSuggestionField, unapproveField } from "@/app/actions/changes.actions";
+import { approveSuggestionField, unapproveField, approveAllSuggestions } from "@/app/actions/changes.actions";
 import type { CmsField } from "@/lib/cms/types";
 import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
 import { Badge } from "@/components/ui/badge";
@@ -357,23 +357,10 @@ export function ResultsView({
                   : `Ignore all`}
               </button>
               {filtered.some((i) => i.fixType === "quick") && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (suggestions.length > 0) {
-                      document.getElementById("ai-suggestions")?.scrollIntoView({ behavior: "smooth" });
-                    } else {
-                      setShowIssueCmsPrompt(true);
-                    }
-                  }}
-                  className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
-                >
-                  {suggestions.length > 0
-                    ? "Review AI fixes ↓"
-                    : selectedIssues.size > 0
-                      ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
-                      : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
-                </button>
+                <BulkFixButton
+                  suggestions={suggestions}
+                  websiteId={websiteId}
+                />
               )}
             </div>
           </div>
@@ -567,6 +554,40 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
+function BulkFixButton({ suggestions, websiteId }: { suggestions: Suggestion[]; websiteId: string }) {
+  const router = useRouter();
+  const [isPending, startTransition] = useTransition();
+
+  if (suggestions.length === 0) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          const el = document.getElementById("ai-suggestions");
+          if (el) el.scrollIntoView({ behavior: "smooth" });
+        }}
+        className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
+      >
+        Fix all quick fixes
+      </button>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={() => startTransition(async () => {
+        await approveAllSuggestions(suggestions.map((s) => s.id));
+        router.push("/changes");
+      })}
+      className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
+    >
+      {isPending ? "Adding to queue…" : `Add all ${suggestions.length} AI fix${suggestions.length !== 1 ? "es" : ""} to queue`}
+    </button>
+  );
+}
+
 const CHAR_LIMITS: Record<CmsField, { min: number; max: number }> = {
   meta_title: { min: 50, max: 60 },
   meta_description: { min: 150, max: 160 },
@@ -597,7 +618,15 @@ function AiSuggestionsSection({
   const [open, setOpen] = useState(false);
   const [showIgnored, setShowIgnored] = useState(false);
   const [isUnignoring, startUnignoreTransition] = useTransition();
+  const [isBulkApproving, startBulkTransition] = useTransition();
   const router = useRouter();
+
+  function handleApproveAll() {
+    startBulkTransition(async () => {
+      await approveAllSuggestions(suggestions.map((s) => s.id));
+      router.push("/changes");
+    });
+  }
 
   // Track per-suggestion per-field state: "idle" | "approved" | "skipped"
   type FieldState = "idle" | "approved" | "skipped";
@@ -669,27 +698,37 @@ function AiSuggestionsSection({
     <section id="ai-suggestions" aria-label="AI-generated page improvements" className="space-y-3">
       {suggestions.length > 0 && (
         <>
-          <button
-            type="button"
-            onClick={() => setOpen((o) => !o)}
-            className="flex w-full items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
-            aria-expanded={open}
-          >
-            <div>
-              <span className="font-semibold">
-                AI-Suggested Improvements
-                <span className="ml-2 text-xs font-normal text-muted-foreground">
-                  {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setOpen((o) => !o)}
+              className="flex flex-1 items-center justify-between rounded-xl border border-border bg-card px-4 py-3 text-left transition-colors hover:bg-accent"
+              aria-expanded={open}
+            >
+              <div>
+                <span className="font-semibold">
+                  AI-Suggested Improvements
+                  <span className="ml-2 text-xs font-normal text-muted-foreground">
+                    {suggestions.length} page{suggestions.length !== 1 ? "s" : ""}
+                  </span>
                 </span>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Approve fields to add to CMS queue, or approve all at once
+                </p>
+              </div>
+              <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
+                ▾
               </span>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Review each field, approve to queue for CMS push or skip to dismiss
-              </p>
-            </div>
-            <span className={cn("ml-4 shrink-0 text-muted-foreground transition-transform duration-200", open && "rotate-180")} aria-hidden="true">
-              ▾
-            </span>
-          </button>
+            </button>
+            <button
+              type="button"
+              onClick={handleApproveAll}
+              disabled={isBulkApproving}
+              className="btn-press shrink-0 rounded-xl border border-primary/50 bg-primary/10 px-4 py-3 text-xs font-semibold text-primary transition-colors hover:bg-primary/20 disabled:opacity-50"
+            >
+              {isBulkApproving ? "Adding…" : "Approve all →"}
+            </button>
+          </div>
 
           <AnimatePresence initial={false}>
             {open && (
