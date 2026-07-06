@@ -12,13 +12,15 @@ function createProvider(): AIProvider {
       return new (require("./providers/anthropic").AnthropicAIProvider)();
     case "ollama":
       return new (require("./providers/ollama").OllamaAIProvider)();
+    case "nim":
+      return new (require("./providers/nim").NimAIProvider)();
     case "groq":
       return new (require("./providers/groq").GroqAIProvider)();
     case "mock":
       return new (require("./providers/mock").MockAIProvider)();
     default:
       throw new Error(
-        `Unknown AI_PROVIDER: "${name}". Valid: azure, openai, anthropic, ollama, groq, mock`
+        `Unknown AI_PROVIDER: "${name}". Valid: azure, nim, openai, anthropic, ollama, groq, mock`
       );
   }
 }
