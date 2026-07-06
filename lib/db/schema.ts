@@ -137,7 +137,10 @@ export const cmsConnections = pgTable(
     connectedAt: timestamp("connected_at", { withTimezone: true }),
     ...timestamps,
   },
-  (t) => [index("cms_connections_website_id_idx").on(t.websiteId)],
+  (t) => [
+    index("cms_connections_website_id_idx").on(t.websiteId),
+    uniqueIndex("cms_connections_website_cms_type_idx").on(t.websiteId, t.cmsType),
+  ],
 );
 
 export const changeSnapshots = pgTable(

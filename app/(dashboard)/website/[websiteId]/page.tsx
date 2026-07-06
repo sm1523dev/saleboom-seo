@@ -205,9 +205,17 @@ export default async function WebsiteDetailPage({ params }: Props) {
           <h1 className="text-2xl font-semibold tracking-tight">{site.name}</h1>
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">{site.url}</p>
         </div>
-        <Link href="/scan" className="btn-press shrink-0 rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
-          Re-scan
-        </Link>
+        <div className="flex shrink-0 items-center gap-2">
+          <Link
+            href={`/website/${websiteId}/cms`}
+            className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
+          >
+            CMS
+          </Link>
+          <Link href="/scan" className="btn-press rounded-lg bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90">
+            Re-scan
+          </Link>
+        </div>
       </header>
 
       {runningScan && <ScanProgressBanner scanId={runningScan.id} />}
