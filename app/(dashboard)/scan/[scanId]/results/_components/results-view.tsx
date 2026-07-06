@@ -359,13 +359,20 @@ export function ResultsView({
               {filtered.some((i) => i.fixType === "quick") && (
                 <button
                   type="button"
-                  onClick={() => setShowIssueCmsPrompt(true)}
-                  title="CMS connection required — coming soon"
+                  onClick={() => {
+                    if (suggestions.length > 0) {
+                      document.getElementById("ai-suggestions")?.scrollIntoView({ behavior: "smooth" });
+                    } else {
+                      setShowIssueCmsPrompt(true);
+                    }
+                  }}
                   className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
                 >
-                  {selectedIssues.size > 0
-                    ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
-                    : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
+                  {suggestions.length > 0
+                    ? "Review AI fixes ↓"
+                    : selectedIssues.size > 0
+                      ? `Fix ${selectedIssues.size} issue${selectedIssues.size !== 1 ? "s" : ""}`
+                      : `Fix all ${filtered.filter((i) => i.fixType === "quick").length} quick fixes`}
                 </button>
               )}
             </div>
@@ -659,7 +666,7 @@ function AiSuggestionsSection({
   if (suggestions.length === 0 && pastSuggestions.length === 0) return null;
 
   return (
-    <section aria-label="AI-generated page improvements" className="space-y-3">
+    <section id="ai-suggestions" aria-label="AI-generated page improvements" className="space-y-3">
       {suggestions.length > 0 && (
         <>
           <button
