@@ -1,0 +1,99 @@
+name: Deploy — Azure
+
+on:
+  push:
+    branches: [main]
+
+# Guard: only runs when pushed to SaleBoomSEO/SEO_Integration.
+# This file also lives in the Pi repo but must not run there.
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_APP: ghcr.io/sm1523dev/saleboomseo
+  IMAGE_WORKER: ghcr.io/sm1523dev/saleboomseo-worker
+
+jobs:
+  build:
+    if: github.repository == 'SaleBoomSEO/SEO_Integration'
+    name: Build & Push AMD64 Images
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push app image (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_APP }}:prod
+            ${{ env.IMAGE_APP }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Build and push worker image (amd64)
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile.worker
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ env.IMAGE_WORKER }}:prod
+            ${{ env.IMAGE_WORKER }}:${{ github.sha }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    if: github.repository == 'SaleBoomSEO/SEO_Integration'
+    name: Deploy to Azure Container Apps
+    runs-on: ubuntu-latest
+    needs: build
+    # environment:
+    #   name: production
+
+    steps:
+      # Uncomment when Azure Container Apps are provisioned.
+      # Required secrets: AZURE_CLIENT_ID, AZURE_TENANT_ID, AZURE_SUBSCRIPTION_ID,
+      #                   AZURE_RESOURCE_GROUP, AZURE_CONTAINER_APP_NAME,
+      #                   AZURE_CONTAINER_APP_WORKER_NAME
+      #
+      # - name: Azure login (OIDC)
+      #   uses: azure/login@v2
+      #   with:
+      #     client-id: ${{ secrets.AZURE_CLIENT_ID }}
+      #     tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+      #     subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+      #
+      # - name: Deploy app to Azure Container Apps
+      #   run: |
+      #     az containerapp update \
+      #       --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+      #       --name "${{ secrets.AZURE_CONTAINER_APP_NAME }}" \
+      #       --image "${{ env.IMAGE_APP }}:${{ github.sha }}"
+      #
+      # - name: Deploy worker to Azure Container Apps
+      #   run: |
+      #     az containerapp update \
+      #       --resource-group "${{ secrets.AZURE_RESOURCE_GROUP }}" \
+      #       --name "${{ secrets.AZURE_CONTAINER_APP_WORKER_NAME }}" \
+      #       --image "${{ env.IMAGE_WORKER }}:${{ github.sha }}"
+
+      - name: Done
+        run: echo "Images pushed to GHCR — configure Azure secrets when Container Apps are provisioned."

@@ -3,6 +3,7 @@ name: Deploy — Pi
 on:
   push:
     branches: [main]
+  workflow_dispatch:
 
 # Guard: only runs when pushed to sm1523dev/saleboom-seo.
 # This file also lives in the Azure repo but must not run there.
