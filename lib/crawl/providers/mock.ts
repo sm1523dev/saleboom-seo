@@ -1,4 +1,4 @@
-import type { CrawlProvider } from "../types";
+import type { CrawlProvider, OnCrawlProgress } from "../types";
 import type { PageResult, CrawlResult } from "../types";
 
 const MOCK_MARKDOWN = `
@@ -32,9 +32,10 @@ export class MockCrawlProvider implements CrawlProvider {
     };
   }
 
-  async crawlSite(url: string, opts?: { limit?: number }): Promise<CrawlResult> {
+  async crawlSite(url: string, opts?: { limit?: number }, onProgress?: OnCrawlProgress): Promise<CrawlResult> {
     console.log("[crawl:mock] crawlSite →", url, { limit: opts?.limit ?? 100 });
     const page = await this.scrapeUrl(url);
+    if (onProgress) await onProgress({ completed: 1, total: 1 }).catch(() => {});
     return {
       jobId: "mock-job-id",
       total: 1,

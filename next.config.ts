@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   // selects them. Exclude from the Next.js bundle so unused providers don't cause
   // "module not found" errors at build time.
   serverExternalPackages: [
+    "@opentelemetry/sdk-node",
+    "@opentelemetry/sdk-trace-node",
+    "@opentelemetry/exporter-trace-otlp-http",
+    "@opentelemetry/auto-instrumentations-node",
     "@aws-sdk/client-sqs",
     "@aws-sdk/client-sesv2",
     "@azure/storage-blob",

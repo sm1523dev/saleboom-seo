@@ -47,6 +47,8 @@ type Props = {
   websiteName: string;
   websiteUrl: string;
   completedAt: string | null;
+  pagesScanned: number | null;
+  totalPages: number | null;
   score: number;
   fixCounts: { quick: number; major: number };
   issues: Issue[];
@@ -94,6 +96,8 @@ export function ResultsView({
   websiteName,
   websiteUrl,
   completedAt,
+  pagesScanned,
+  totalPages,
   score,
   fixCounts,
   issues,
@@ -110,17 +114,16 @@ export function ResultsView({
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
   const [isUnignoringIssues, startUnignoreIssuesTransition] = useTransition();
 
+  const fixFiltered = issues.filter((i) => !fixFilter || i.fixType === fixFilter);
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
-      acc[s] = issues.filter((i) => i.severity === s).length;
+      acc[s] = fixFiltered.filter((i) => i.severity === s).length;
       return acc;
     },
     { critical: 0, high: 0, medium: 0, low: 0, info: 0 }
   );
 
-  const filtered = issues
-    .filter((i) => !filter || i.severity === filter)
-    .filter((i) => !fixFilter || i.fixType === fixFilter);
+  const filtered = fixFiltered.filter((i) => !filter || i.severity === filter);
 
   const formattedDate = completedAt
     ? new Intl.DateTimeFormat("en", {
@@ -140,11 +143,15 @@ export function ResultsView({
             </h1>
             <p className="mt-1 text-sm text-muted-foreground">
               {websiteUrl || websiteName}
-              {formattedDate && (
-                <span className="ml-2 text-border">·</span>
-              )}
-              {formattedDate && (
-                <span className="ml-2">{formattedDate}</span>
+              {formattedDate && <span className="ml-2 text-border">·</span>}
+              {formattedDate && <span className="ml-2">{formattedDate}</span>}
+              {pagesScanned != null && (
+                <>
+                  <span className="ml-2 text-border">·</span>
+                  <span className="ml-2 font-mono">
+                    {pagesScanned}{totalPages && totalPages > pagesScanned ? `/${totalPages}` : ""} pages scanned
+                  </span>
+                </>
               )}
             </p>
           </div>

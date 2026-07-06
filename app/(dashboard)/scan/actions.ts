@@ -8,6 +8,7 @@ import { queueProvider } from "@/lib/queue";
 import { getServerSession } from "@/lib/auth-utils";
 import { parseWebsiteUrl } from "@/lib/form-validation";
 import { seedDefaultQueries } from "@/lib/aeo/seed-providers";
+import { recordEvent } from "@/lib/metrics";
 
 export type ScanActionState = { error: string } | null;
 
@@ -60,6 +61,7 @@ export async function startScanAction(
   await Promise.all([
     queueProvider.enqueue("scan", { scanId: scan.id, websiteId, url }),
     queueProvider.enqueue("aeo-scan", { websiteId }),
+    recordEvent("scan.triggered", undefined, { scanId: scan.id, websiteId }),
   ]);
 
   redirect(`/scan/${scan.id}`);

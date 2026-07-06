@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { motion } from "motion/react";
 
@@ -8,13 +8,23 @@ type Props = {
   scanId: string;
   initialStatus: string;
   websiteId: string;
+  initialPagesScanned?: number;
+  initialTotalPages?: number;
 };
 
 const POLL_INTERVAL = 3000;
 
-export function ScanPoller({ scanId, initialStatus, websiteId }: Props) {
+export function ScanPoller({
+  scanId,
+  initialStatus,
+  websiteId,
+  initialPagesScanned = 0,
+  initialTotalPages = 0,
+}: Props) {
   const router = useRouter();
   const statusRef = useRef(initialStatus);
+  const [pagesScanned, setPagesScanned] = useState(initialPagesScanned);
+  const [totalPages, setTotalPages] = useState(initialTotalPages);
 
   useEffect(() => {
     if (statusRef.current === "completed" || statusRef.current === "failed") return;
@@ -25,6 +35,9 @@ export function ScanPoller({ scanId, initialStatus, websiteId }: Props) {
         if (!res.ok) return;
         const data = await res.json();
         statusRef.current = data.status;
+
+        if (data.pagesScanned > 0) setPagesScanned(data.pagesScanned);
+        if (data.totalPages > 0) setTotalPages(data.totalPages);
 
         if (data.status === "completed") {
           router.push(`/website/${websiteId}`);
@@ -38,7 +51,7 @@ export function ScanPoller({ scanId, initialStatus, websiteId }: Props) {
 
     const id = setInterval(poll, POLL_INTERVAL);
     return () => clearInterval(id);
-  }, [scanId, router]);
+  }, [scanId, router, websiteId]);
 
   const isActive = initialStatus === "pending" || initialStatus === "running";
   if (!isActive) return null;
@@ -54,6 +67,17 @@ export function ScanPoller({ scanId, initialStatus, websiteId }: Props) {
         />
         <span className="relative inline-flex h-4 w-4 rounded-full bg-primary" />
       </div>
+
+      {/* Live page counter */}
+      {totalPages > 0 ? (
+        <p className="font-mono text-sm font-medium text-primary">
+          {pagesScanned} / {totalPages} pages scanned
+        </p>
+      ) : pagesScanned > 0 ? (
+        <p className="font-mono text-sm font-medium text-primary">
+          {pagesScanned} pages scanned…
+        </p>
+      ) : null}
 
       {/* Skeleton bars */}
       <div className="mt-2 w-full max-w-xs space-y-2">

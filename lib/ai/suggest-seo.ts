@@ -1,5 +1,6 @@
 import { aiProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
+import { withSpan } from "@/lib/telemetry";
 import { SeoSuggestionsSchema, type SeoSuggestions } from "./schemas/seo-suggestions";
 import type { ParsedPage } from "@/lib/seo-rules/types";
 
@@ -21,12 +22,22 @@ export async function generateSeoSuggestion(
   const prompt = buildPrompt(page);
 
   try {
-    const suggestion = await aiProvider.generateStructured(SeoSuggestionsSchema, prompt, {
-      system:
-        "You are an expert SEO copywriter. Given a web page's current metadata and content, " +
-        "return improved meta title, meta description, and H1. " +
-        "Be specific, factual, and keyword-focused. Never use vague filler phrases.",
-    });
+    const suggestion = await withSpan(
+      "ai.generateStructured",
+      {
+        "ai.provider": process.env.AI_PROVIDER ?? "mock",
+        "ai.task": "seo-suggestion",
+        "scan.id": scanId,
+        "page.url": page.url,
+      },
+      () =>
+        aiProvider.generateStructured(SeoSuggestionsSchema, prompt, {
+          system:
+            "You are an expert SEO copywriter. Given a web page's current metadata and content, " +
+            "return improved meta title, meta description, and H1. " +
+            "Be specific, factual, and keyword-focused. Never use vague filler phrases.",
+        })
+    );
 
     const latencyMs = Math.round(performance.now() - start);
 

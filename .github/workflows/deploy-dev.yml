@@ -1,8 +1,11 @@
-name: Deploy — Pi Dev
+name: Deploy — Pi
 
 on:
   push:
-    branches: [dev]
+    branches: ["**"]
+
+# Guard: only runs when pushed to sm1523dev/saleboom-seo.
+# This file also lives in the Azure repo but must not run there.
 
 env:
   REGISTRY: ghcr.io
@@ -11,13 +14,12 @@ env:
 
 jobs:
   build:
-    name: Build & Push Images
+    if: github.repository == 'sm1523dev/saleboom-seo'
+    name: Build & Push ARM64 Images
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
-    outputs:
-      sha: ${{ github.sha }}
 
     steps:
       - uses: actions/checkout@v4
@@ -35,7 +37,7 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push Next.js app
+      - name: Build and push app image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -48,7 +50,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Build and push worker
+      - name: Build and push worker image
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -62,18 +64,28 @@ jobs:
           cache-to: type=gha,mode=max
 
   deploy:
+    if: github.repository == 'sm1523dev/saleboom-seo'
     name: Deploy to Pi
-    runs-on: self-hosted
+    runs-on: [self-hosted, linux, arm64]
     needs: build
+    permissions:
+      packages: read
 
     steps:
-      - name: Pull images into k3s
+      - name: Pull app image into k3s
         run: |
-          sudo k3s ctr images pull ${{ env.IMAGE_APP }}:latest
-          sudo k3s ctr images pull ${{ env.IMAGE_WORKER }}:latest
+          sudo k3s ctr images pull \
+            --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            ${{ env.IMAGE_APP }}:latest
+
+      - name: Pull worker image into k3s
+        run: |
+          sudo k3s ctr images pull \
+            --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
+            ${{ env.IMAGE_WORKER }}:latest
 
       - name: Rollout restart
         run: |
-          kubectl rollout restart deployment/nextjs deployment/worker -n saleboomseo
-          kubectl rollout status deployment/nextjs -n saleboomseo --timeout=120s
-          kubectl rollout status deployment/worker -n saleboomseo --timeout=120s
+          sudo k3s kubectl rollout restart deployment/nextjs deployment/worker -n saleboomseo
+          sudo k3s kubectl rollout status deployment/nextjs -n saleboomseo --timeout=120s
+          sudo k3s kubectl rollout status deployment/worker -n saleboomseo --timeout=120s

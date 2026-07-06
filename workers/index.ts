@@ -1,3 +1,6 @@
+import { initTelemetry } from "@/lib/telemetry/sdk";
+initTelemetry("saleboomseo-worker");
+
 import { queueProvider } from "@/lib/queue";
 import { logger } from "@/lib/logger";
 import { startBullBoard } from "./bull-board";

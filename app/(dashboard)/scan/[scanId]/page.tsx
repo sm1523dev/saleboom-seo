@@ -28,6 +28,8 @@ export default async function ScanStatusPage({ params }: Props) {
       websiteId: scans.websiteId,
       startedAt: scans.startedAt,
       completedAt: scans.completedAt,
+      pagesScanned: scans.pagesScanned,
+      totalPages: scans.totalPages,
     })
     .from(scans)
     .where(eq(scans.id, scanId))
@@ -102,7 +104,13 @@ export default async function ScanStatusPage({ params }: Props) {
           </Link>
         )}
 
-        <ScanPoller scanId={scan.id} initialStatus={scan.status} websiteId={scan.websiteId} />
+        <ScanPoller
+          scanId={scan.id}
+          initialStatus={scan.status}
+          websiteId={scan.websiteId}
+          initialPagesScanned={scan.pagesScanned ?? 0}
+          initialTotalPages={scan.totalPages ?? 0}
+        />
       </section>
 
       <div className="flex gap-3 text-sm">

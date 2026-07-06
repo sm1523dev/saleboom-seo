@@ -9,6 +9,7 @@ import { computeSeoScore, scoreColorClass, scoreGrade } from "@/lib/seo-score";
 import { computeDvsScore } from "@/lib/dvs/score";
 import { TrendChart } from "@/components/shared/trend-chart";
 import { CountUp } from "@/components/animations/count-up";
+import { ScanProgressBanner } from "./_components/scan-progress-banner";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
@@ -183,13 +184,15 @@ export default async function WebsiteDetailPage({ params }: Props) {
     aeo: Math.round(r.aeoScore),
   }));
 
-  // Recent scans
+  // Recent scans (includes running/pending — used for history + in-progress detection)
   const recentScans = await db
     .select({ id: scans.id, status: scans.status, completedAt: scans.completedAt, startedAt: scans.startedAt })
     .from(scans)
     .where(and(eq(scans.websiteId, websiteId), isNull(scans.deletedAt)))
     .orderBy(desc(scans.createdAt))
     .limit(5);
+
+  const runningScan = recentScans.find((s) => s.status === "running" || s.status === "pending");
 
   return (
     <div className="space-y-6">
@@ -206,6 +209,8 @@ export default async function WebsiteDetailPage({ params }: Props) {
           Re-scan
         </Link>
       </header>
+
+      {runningScan && <ScanProgressBanner scanId={runningScan.id} />}
 
       {/* Score cards */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">

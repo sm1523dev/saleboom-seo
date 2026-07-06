@@ -6,6 +6,9 @@ import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
+import { withSpan } from "@/lib/telemetry";
+import { recordEvent } from "@/lib/metrics";
+import { checkAndAlert } from "@/lib/metrics/alerts";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import type { SeoIssue } from "@/lib/seo-rules";
@@ -21,15 +24,36 @@ export async function handleScanJob(
   data: ScanJobData,
   context: JobContext
 ): Promise<void> {
+  return withSpan(
+    "worker.scan",
+    {
+      "job.id": context.jobId,
+      "job.attempt": context.attemptNumber,
+      "scan.id": data.scanId,
+      "website.id": data.websiteId,
+    },
+    (span) => _runScanJob(data, context, span)
+  );
+}
+
+async function _runScanJob(
+  data: ScanJobData,
+  context: JobContext,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  span: any
+): Promise<void> {
   const { scanId, websiteId } = data;
   const log = logger.child({ component: "worker", scanId, websiteId });
 
   log.info("scan started");
+  const jobStart = Date.now();
 
-  await db
-    .update(scans)
-    .set({ status: "running", startedAt: new Date(), updatedAt: new Date() })
-    .where(eq(scans.id, scanId));
+  await withSpan("db.scan.setRunning", { "scan.id": scanId }, () =>
+    db
+      .update(scans)
+      .set({ status: "running", startedAt: new Date(), updatedAt: new Date() })
+      .where(eq(scans.id, scanId))
+  );
 
   try {
     // Resolve URL — prefer from job data, fall back to DB
@@ -60,16 +84,27 @@ export async function handleScanJob(
     log.info("fetched site metadata", { url });
     await context.updateProgress(10);
 
-    // Crawl the site
-    const crawlResult = await crawlProvider.crawlSite(url, { limit: 100 });
+    // Crawl the site — onProgress writes live counts to DB every poll tick
+    const crawlResult = await crawlProvider.crawlSite(url, { limit: 100 }, async ({ completed, total }) => {
+      await db
+        .update(scans)
+        .set({ pagesScanned: completed, totalPages: total, updatedAt: new Date() })
+        .where(eq(scans.id, scanId));
+    });
     log.info("crawl complete", { pages: crawlResult.pages.length });
+    await db
+      .update(scans)
+      .set({ pagesScanned: crawlResult.pages.length, totalPages: crawlResult.total, updatedAt: new Date() })
+      .where(eq(scans.id, scanId));
     await context.updateProgress(60);
 
     // Persist raw crawl data
-    await db
-      .update(scans)
-      .set({ rawCrawl: crawlResult as unknown as Record<string, unknown>, updatedAt: new Date() })
-      .where(eq(scans.id, scanId));
+    await withSpan("db.scan.persistCrawl", { "scan.id": scanId, "crawl.pages": crawlResult.pages.length }, () =>
+      db
+        .update(scans)
+        .set({ rawCrawl: crawlResult as unknown as Record<string, unknown>, updatedAt: new Date() })
+        .where(eq(scans.id, scanId))
+    );
 
     await context.updateProgress(70);
 
@@ -124,14 +159,24 @@ export async function handleScanJob(
 
     await context.updateProgress(95);
 
-    await db
-      .update(scans)
-      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
-      .where(eq(scans.id, scanId));
+    await withSpan("db.scan.setCompleted", { "scan.id": scanId, "issues.count": seoIssues.length }, () =>
+      db
+        .update(scans)
+        .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+        .where(eq(scans.id, scanId))
+    );
 
+    const durationMs = Date.now() - jobStart;
+    const bySeverity = seoIssues.reduce<Record<string, number>>((acc, i) => {
+      acc[`${i.severity}_count`] = (acc[`${i.severity}_count`] ?? 0) + 1;
+      return acc;
+    }, {});
+
+    span.setAttribute("scan.issues_found", seoIssues.length);
     await persistDvsScore(websiteId);
+    await recordEvent("scan.completed", durationMs, { scanId, websiteId, ...bySeverity });
     await context.updateProgress(100);
-    log.info("scan completed", { issues: seoIssues.length });
+    log.info("scan completed", { issues: seoIssues.length, durationMs });
   } catch (err) {
     log.error("scan failed", { error: String(err) });
     captureError(err, { scanId, websiteId });
@@ -139,6 +184,8 @@ export async function handleScanJob(
       .update(scans)
       .set({ status: "failed", updatedAt: new Date() })
       .where(eq(scans.id, scanId));
+    await recordEvent("scan.failed", undefined, { scanId, websiteId, error: String(err) });
+    await checkAndAlert();
     throw err;
   }
 }

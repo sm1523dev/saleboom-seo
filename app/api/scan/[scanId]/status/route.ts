@@ -11,7 +11,12 @@ export async function GET(_req: Request, { params }: Params) {
   const { scanId } = await params;
 
   const [scan] = await db
-    .select({ status: scans.status, completedAt: scans.completedAt })
+    .select({
+      status: scans.status,
+      completedAt: scans.completedAt,
+      pagesScanned: scans.pagesScanned,
+      totalPages: scans.totalPages,
+    })
     .from(scans)
     .where(eq(scans.id, scanId))
     .limit(1);
@@ -21,5 +26,7 @@ export async function GET(_req: Request, { params }: Params) {
   return NextResponse.json({
     status: scan.status,
     completedAt: scan.completedAt?.toISOString() ?? null,
+    pagesScanned: scan.pagesScanned ?? 0,
+    totalPages: scan.totalPages ?? 0,
   });
 }

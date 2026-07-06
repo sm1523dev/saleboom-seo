@@ -29,6 +29,8 @@ export default async function AuditResultsPage({ params }: Props) {
       status: scans.status,
       websiteId: scans.websiteId,
       completedAt: scans.completedAt,
+      pagesScanned: scans.pagesScanned,
+      totalPages: scans.totalPages,
     })
     .from(scans)
     .where(eq(scans.id, scanId))
@@ -106,6 +108,8 @@ export default async function AuditResultsPage({ params }: Props) {
       websiteName={website?.name ?? "Unknown"}
       websiteUrl={website?.url ?? ""}
       completedAt={scan.completedAt?.toISOString() ?? null}
+      pagesScanned={scan.pagesScanned ?? null}
+      totalPages={scan.totalPages ?? null}
       score={score}
       fixCounts={fixCounts}
       issues={scanIssues}

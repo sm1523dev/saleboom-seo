@@ -35,7 +35,14 @@ export type ScrapeOpts = {
   limit?: number;
 };
 
+export type CrawlProgress = {
+  completed: number;
+  total: number;
+};
+
+export type OnCrawlProgress = (progress: CrawlProgress) => Promise<void>;
+
 export interface CrawlProvider {
   scrapeUrl(url: string, opts?: ScrapeOpts): Promise<PageResult>;
-  crawlSite(url: string, opts?: ScrapeOpts): Promise<CrawlResult>;
+  crawlSite(url: string, opts?: ScrapeOpts, onProgress?: OnCrawlProgress): Promise<CrawlResult>;
 }

@@ -93,6 +93,8 @@ export const scans = pgTable(
       .references(() => websites.id, { onDelete: "cascade" }),
     status: scanStatusEnum("status").notNull().default("pending"),
     rawCrawl: jsonb("raw_crawl"),
+    pagesScanned: integer("pages_scanned"),
+    totalPages: integer("total_pages"),
     startedAt: timestamp("started_at", { withTimezone: true }),
     completedAt: timestamp("completed_at", { withTimezone: true }),
     ...timestamps,
@@ -335,6 +337,22 @@ export const dvsScores = pgTable(
   (t) => [
     index("dvs_scores_website_id_idx").on(t.websiteId),
     index("dvs_scores_scored_at_idx").on(t.scoredAt),
+  ],
+);
+
+// Business metrics time-series events
+export const metricsEvents = pgTable(
+  "metrics_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    event: text("event").notNull(),
+    value: real("value"),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("metrics_events_event_idx").on(t.event),
+    index("metrics_events_created_at_idx").on(t.createdAt),
   ],
 );
 
