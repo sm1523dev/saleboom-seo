@@ -91,7 +91,7 @@ jobs:
         run: |
           sudo k3s kubectl delete job db-migrate -n saleboomseo --ignore-not-found
           sudo k3s kubectl apply -f k8s/dev/migrate-job.yaml
-          sudo k3s kubectl wait --for=condition=complete job/db-migrate -n saleboomseo --timeout=120s
+          sudo k3s kubectl wait --for=condition=complete job/db-migrate -n saleboomseo --timeout=180s
 
       - name: Rollout restart
         run: |
