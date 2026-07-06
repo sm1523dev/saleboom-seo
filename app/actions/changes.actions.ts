@@ -4,9 +4,27 @@ import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { changeSnapshots, aiSuggestions, cmsConnections } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
-import type { CmsField } from "@/lib/cms/types";
+import type { CmsField, CmsCredentials } from "@/lib/cms/types";
 import { loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
+import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
+import { WebflowAdapter } from "@/lib/cms/providers/webflow";
+
+async function pushViaCmsAdapter(
+  cmsType: "wordpress" | "shopify" | "webflow",
+  credentials: unknown,
+  payload: { pageUrl: string; fields: Partial<Record<CmsField, string>> },
+): Promise<void> {
+  if (cmsType === "wordpress") {
+    await new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
+  } else if (cmsType === "shopify") {
+    await new ShopifyAdapter().push(payload, credentials as CmsCredentials["shopify"]);
+  } else if (cmsType === "webflow") {
+    await new WebflowAdapter().push(payload, credentials as CmsCredentials["webflow"]);
+  } else {
+    throw new Error(`Unsupported CMS type: ${cmsType}`);
+  }
+}
 
 const FIELD_MAP: Record<CmsField, { current: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; suggested: "metaTitle" | "metaDescription" | "h1" }> = {
   meta_title: { current: "currentMetaTitle", suggested: "metaTitle" },
@@ -124,24 +142,14 @@ export async function pushChangeTocms(
   if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
 
   try {
-    let adapter: WordPressAdapter;
-    if (cmsType === "wordpress") {
-      adapter = new WordPressAdapter();
-    } else {
-      return { success: false, error: `${cmsType} adapter not yet implemented` };
-    }
-
     const afterState = snapshot.afterState as { value?: string } | null;
     const afterValue = afterState?.value;
     if (!afterValue) return { success: false, error: "No value to push" };
 
-    await adapter.push(
-      {
-        pageUrl: snapshot.pageUrl,
-        fields: { [snapshot.fieldChanged as CmsField]: afterValue },
-      },
-      credentials as Parameters<WordPressAdapter["push"]>[1],
-    );
+    await pushViaCmsAdapter(cmsType, credentials, {
+      pageUrl: snapshot.pageUrl,
+      fields: { [snapshot.fieldChanged as CmsField]: afterValue },
+    });
 
     await db
       .update(changeSnapshots)
@@ -211,18 +219,10 @@ export async function rollbackChange(
   const beforeValue = beforeState?.value ?? "";
 
   try {
-    if (cmsType === "wordpress") {
-      const adapter = new WordPressAdapter();
-      await adapter.push(
-        {
-          pageUrl: snapshot.pageUrl,
-          fields: { [snapshot.fieldChanged as CmsField]: beforeValue },
-        },
-        credentials as Parameters<WordPressAdapter["push"]>[1],
-      );
-    } else {
-      return { success: false, error: `${cmsType} rollback not yet implemented` };
-    }
+    await pushViaCmsAdapter(cmsType, credentials, {
+      pageUrl: snapshot.pageUrl,
+      fields: { [snapshot.fieldChanged as CmsField]: beforeValue },
+    });
 
     await db
       .update(changeSnapshots)

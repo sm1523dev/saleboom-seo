@@ -9,7 +9,8 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: "◎" },
   { href: "/scan", label: "New Scan", icon: "⊙" },
   { href: "/aeo", label: "AEO", icon: "⊛" },
-  { href: "/dashboard/reports", label: "Reports", icon: "⊞" },
+  { href: "/changes", label: "CMS Queue", icon: "⊡" },
+  { href: "/changes/history", label: "History", icon: "⊟" },
 ] as const;
 
 type Props = {
@@ -37,7 +38,7 @@ export function SidebarNav({ userName, userEmail }: Props) {
       <nav className="flex-1 p-2" aria-label="Main navigation">
         <ul className="space-y-0.5" role="list">
           {NAV_ITEMS.map((item) => {
-            const isActive = pathname === item.href;
+            const isActive = pathname === item.href || (item.href !== "/dashboard" && pathname.startsWith(item.href + "/"));
             return (
               <li key={item.href}>
                 <Link
