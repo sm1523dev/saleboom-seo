@@ -2,9 +2,11 @@
 
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { changeSnapshots, aiSuggestions } from "@/lib/db/schema";
+import { changeSnapshots, aiSuggestions, cmsConnections } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import type { CmsField } from "@/lib/cms/types";
+import { loadCredentials } from "@/lib/cms/credentials";
+import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 
 const FIELD_MAP: Record<CmsField, { current: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; suggested: "metaTitle" | "metaDescription" | "h1" }> = {
   meta_title: { current: "currentMetaTitle", suggested: "metaTitle" },
@@ -80,4 +82,87 @@ export async function unapproveField(suggestionId: string, field: CmsField): Pro
         eq(changeSnapshots.status, "pending"),
       ),
     );
+}
+
+export async function pushChangeTocms(
+  snapshotId: string,
+): Promise<{ success: boolean; error?: string }> {
+  await getServerSession();
+
+  const [snapshot] = await db
+    .select()
+    .from(changeSnapshots)
+    .where(eq(changeSnapshots.id, snapshotId))
+    .limit(1);
+
+  if (!snapshot) return { success: false, error: "Change not found" };
+  if (snapshot.status !== "pending") return { success: false, error: "Change is not pending" };
+
+  // Resolve websiteId through the suggestion
+  let websiteId: string | null = null;
+  if (snapshot.suggestionId) {
+    const [suggestion] = await db
+      .select({ websiteId: aiSuggestions.websiteId })
+      .from(aiSuggestions)
+      .where(eq(aiSuggestions.id, snapshot.suggestionId))
+      .limit(1);
+    websiteId = suggestion?.websiteId ?? null;
+  }
+
+  if (!websiteId) return { success: false, error: "Could not determine website for this change" };
+
+  const [connection] = await db
+    .select()
+    .from(cmsConnections)
+    .where(eq(cmsConnections.websiteId, websiteId))
+    .limit(1);
+
+  if (!connection) return { success: false, error: "No CMS connected for this website" };
+
+  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow";
+  const credentials = await loadCredentials(websiteId, cmsType);
+  if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
+
+  try {
+    let adapter: WordPressAdapter;
+    if (cmsType === "wordpress") {
+      adapter = new WordPressAdapter();
+    } else {
+      return { success: false, error: `${cmsType} adapter not yet implemented` };
+    }
+
+    const afterState = snapshot.afterState as { value?: string } | null;
+    const afterValue = afterState?.value;
+    if (!afterValue) return { success: false, error: "No value to push" };
+
+    await adapter.push(
+      {
+        pageUrl: snapshot.pageUrl,
+        fields: { [snapshot.fieldChanged as CmsField]: afterValue },
+      },
+      credentials as Parameters<WordPressAdapter["push"]>[1],
+    );
+
+    await db
+      .update(changeSnapshots)
+      .set({ status: "applied", cmsConnectionId: connection.id, appliedAt: new Date(), updatedAt: new Date() })
+      .where(eq(changeSnapshots.id, snapshotId));
+
+    return { success: true };
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    await db
+      .update(changeSnapshots)
+      .set({ status: "failed", updatedAt: new Date() })
+      .where(eq(changeSnapshots.id, snapshotId));
+    return { success: false, error: message };
+  }
+}
+
+export async function rejectChange(snapshotId: string): Promise<void> {
+  await getServerSession();
+  await db
+    .update(changeSnapshots)
+    .set({ status: "reverted", updatedAt: new Date() })
+    .where(and(eq(changeSnapshots.id, snapshotId), eq(changeSnapshots.status, "pending")));
 }
