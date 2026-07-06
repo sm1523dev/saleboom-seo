@@ -30,6 +30,9 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 
+# Create storage directory for local credential files (writable by nextjs user)
+RUN mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
+
 USER nextjs
 EXPOSE 3000
 ENV PORT=3000
