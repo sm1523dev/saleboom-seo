@@ -10,6 +10,7 @@ import type { SeoIssue } from "@/lib/seo-rules";
  */
 
 const QUICK_FIX_TYPES = new Set([
+  // Meta — AI generates and Yoast/CMS pushes
   "meta-title-missing",
   "meta-title-too-short",
   "meta-title-too-long",
@@ -18,14 +19,16 @@ const QUICK_FIX_TYPES = new Set([
   "meta-description-too-long",
   "h1-missing",
   "h1-too-long",
+  // Open Graph — Yoast sets og: from meta title/desc when pushed
   "og-title-missing",
   "og-description-missing",
-  "og-image-missing",
   "twitter-card-missing",
+  // Images — AI generates alt text from context
   "images-missing-alt",
   "images-empty-alt",
-  "lang-missing",
-  "charset-missing",
+  // og-image-missing → needs image URL, Major Fix
+  // lang-missing → HTML tag attribute, theme-level, Major Fix
+  // charset-missing → HTML tag attribute, theme-level, Major Fix
 ]);
 
 export type FixType = "quick" | "major";

@@ -196,6 +196,14 @@ export async function pushChangeTocms(
       .set({ status: "applied", cmsConnectionId: connection.id, appliedAt: new Date(), updatedAt: new Date() })
       .where(eq(changeSnapshots.id, snapshotId));
 
+    // Mark the parent AI suggestion as applied so it no longer shows in the pending list
+    if (snapshot.suggestionId) {
+      await db
+        .update(aiSuggestions)
+        .set({ status: "applied", appliedAt: new Date(), updatedAt: new Date() })
+        .where(eq(aiSuggestions.id, snapshot.suggestionId));
+    }
+
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
