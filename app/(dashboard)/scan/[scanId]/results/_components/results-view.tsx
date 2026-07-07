@@ -378,6 +378,7 @@ export function ResultsView({
                 <BulkFixButton
                   selectedIssues={selectedIssues}
                   allQuickIssues={filtered.filter((i) => i.fixType === "quick")}
+                  websiteId={websiteId}
                 />
               )}
             </div>
@@ -572,9 +573,10 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BulkFixButton({ selectedIssues, allQuickIssues }: { selectedIssues: Set<string>; allQuickIssues: Issue[] }) {
+function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selectedIssues: Set<string>; allQuickIssues: Issue[]; websiteId: string }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
+  const [showNoCmsPrompt, setShowNoCmsPrompt] = useState(false);
 
   const targetIds = selectedIssues.size > 0
     ? Array.from(selectedIssues).filter((id) => allQuickIssues.some((i) => i.id === id && i.fixType === "quick"))
@@ -582,22 +584,62 @@ function BulkFixButton({ selectedIssues, allQuickIssues }: { selectedIssues: Set
 
   if (targetIds.length === 0) return null;
 
+  const label = isPending
+    ? "Generating fixes…"
+    : selectedIssues.size > 0
+      ? `Fix ${targetIds.length} selected`
+      : `Fix all ${targetIds.length} quick fixes`;
+
   return (
-    <button
-      type="button"
-      disabled={isPending}
-      onClick={() => startTransition(async () => {
-        await generateAndQueueIssueFixes(targetIds);
-        router.push("/changes");
-      })}
-      className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
-    >
-      {isPending
-        ? "Generating fixes…"
-        : selectedIssues.size > 0
-          ? `Fix ${targetIds.length} selected`
-          : `Fix all ${targetIds.length} quick fixes`}
-    </button>
+    <>
+      {showNoCmsPrompt && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
+          >
+            <h3 className="font-semibold">Connect your CMS first</h3>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Connect WordPress, Shopify, or Webflow so AI-generated fixes can be pushed directly to your site.
+            </p>
+            <div className="mt-5 flex gap-3">
+              <button
+                type="button"
+                onClick={() => setShowNoCmsPrompt(false)}
+                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => router.push(`/website/${websiteId}/cms`)}
+                className="btn-press flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              >
+                Connect CMS →
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+      <button
+        type="button"
+        disabled={isPending}
+        onClick={() => startTransition(async () => {
+          const { getCmsConnection } = await import("@/app/actions/cms.actions");
+          const conn = await getCmsConnection(websiteId);
+          if (!conn.connected) {
+            setShowNoCmsPrompt(true);
+            return;
+          }
+          await generateAndQueueIssueFixes(targetIds);
+          router.push("/changes");
+        })}
+        className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
+      >
+        {label}
+      </button>
+    </>
   );
 }
 
