@@ -52,43 +52,43 @@ export async function generateAndQueueIssueFixes(
     .where(inArray(issues.id, issueIds));
 
   const fixes: IssueFix[] = [];
-  const failedCount = { count: 0 };
+  let failed = 0;
 
-  await Promise.allSettled(
-    rows.map(async (issue) => {
-      if (!issue.pageUrl) { failedCount.count++; return; }
-      const mapping = ISSUE_FIX_MAP[issue.type];
-      if (!mapping) { failedCount.count++; return; }
+  const processIssue = async (issue: typeof rows[0]) => {
+    if (!issue.pageUrl) { failed++; return; }
+    const mapping = ISSUE_FIX_MAP[issue.type];
+    if (!mapping) { failed++; return; }
+    try {
+      const prompt = mapping.buildPrompt({
+        title: issue.title,
+        description: issue.description,
+        pageUrl: issue.pageUrl,
+      });
+      const result = await aiProvider.generateText(prompt, {
+        system: "You are an SEO expert. Reply with ONLY the requested text value — no explanations, no quotes, no labels. Be direct and concise.",
+        maxTokens: 2000,
+      });
+      const value = result.trim();
+      if (!value) { failed++; return; }
+      fixes.push({
+        issueId: issue.id,
+        pageUrl: issue.pageUrl,
+        field: mapping.field,
+        beforeValue: null,
+        afterValue: value,
+      });
+    } catch {
+      failed++;
+    }
+  };
 
-      try {
-        const prompt = mapping.buildPrompt({
-          title: issue.title,
-          description: issue.description,
-          pageUrl: issue.pageUrl,
-        });
+  // Process in batches of 5 to avoid overwhelming the AI provider
+  const BATCH = 5;
+  for (let i = 0; i < rows.length; i += BATCH) {
+    await Promise.allSettled(rows.slice(i, i + BATCH).map(processIssue));
+  }
 
-        const result = await aiProvider.generateText(prompt, {
-          system: "You are an SEO expert. Reply with ONLY the requested text value — no explanations, no quotes, no labels.",
-          maxTokens: 200,
-        });
-
-        const value = result.trim();
-        if (!value) { failedCount.count++; return; }
-
-        fixes.push({
-          issueId: issue.id,
-          pageUrl: issue.pageUrl,
-          field: mapping.field,
-          beforeValue: null,
-          afterValue: value,
-        });
-      } catch {
-        failedCount.count++;
-      }
-    }),
-  );
-
-  if (fixes.length === 0) return { queued: 0, failed: failedCount.count };
+  if (fixes.length === 0) return { queued: 0, failed };
 
   await db.insert(changeSnapshots).values(
     fixes.map((f) => ({
@@ -108,5 +108,5 @@ export async function generateAndQueueIssueFixes(
     .set({ updatedAt: new Date() })
     .where(inArray(issues.id, fixes.map((f) => f.issueId)));
 
-  return { queued: fixes.length, failed: failedCount.count };
+  return { queued: fixes.length, failed };
 }
