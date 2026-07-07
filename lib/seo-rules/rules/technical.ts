@@ -140,7 +140,7 @@ const sitemapNotInRobotsRule: SiteRule = (ctx) => {
         severity: "low",
         title: "Sitemap not referenced in robots.txt",
         description: `${ctx.baseUrl}/robots.txt does not reference the sitemap via a Sitemap: directive. Adding it helps all crawlers discover the sitemap automatically.`,
-        fixType: "quick",
+        fixType: "major",
       },
     ];
   }
