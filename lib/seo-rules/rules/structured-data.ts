@@ -48,7 +48,7 @@ const structuredDataPageRules: PageRule[] = [
             severity: "high",
             title: "Malformed JSON-LD structured data",
             description: `${p.url} has ${p.jsonLdParseErrors} JSON-LD block${p.jsonLdParseErrors > 1 ? "s" : ""} with parse errors. Invalid JSON is silently ignored by search engines, losing all structured data benefits.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]
@@ -66,7 +66,7 @@ const structuredDataPageRules: PageRule[] = [
         severity: "high",
         title: "JSON-LD block missing @type",
         description: `${p.url} has ${missingType.length} JSON-LD block${missingType.length > 1 ? "s" : ""} without an @type property. Typeless JSON-LD is not recognized by search engines.`,
-        fixType: "quick",
+        fixType: "major",
         pageUrl: p.url,
       },
     ];
@@ -85,7 +85,7 @@ const structuredDataPageRules: PageRule[] = [
           severity: "medium",
           title: "Homepage missing WebSite schema",
           description: `${p.url} is the homepage but has no WebSite JSON-LD schema. WebSite schema enables sitelinks search box and brand recognition in SERPs.`,
-          fixType: "quick",
+          fixType: "major",
           pageUrl: p.url,
         },
       ];
@@ -107,7 +107,7 @@ const structuredDataPageRules: PageRule[] = [
           severity: "medium",
           title: "Article schema missing author",
           description: `${p.url} has ${type} JSON-LD without an author field. Google requires author for Article rich results.`,
-          fixType: "quick",
+          fixType: "major",
           pageUrl: p.url,
         });
       }
@@ -129,7 +129,7 @@ const structuredDataPageRules: PageRule[] = [
           severity: "medium",
           title: "Article schema missing datePublished",
           description: `${p.url} has ${type} JSON-LD without a datePublished field. Publication dates improve freshness signals in search results.`,
-          fixType: "quick",
+          fixType: "major",
           pageUrl: p.url,
         });
       }
@@ -160,7 +160,7 @@ const structuredDataPageRules: PageRule[] = [
             severity: "medium",
             title: "FAQPage schema missing acceptedAnswer on some questions",
             description: `${p.url} has FAQPage JSON-LD but ${missing.length} question${missing.length > 1 ? "s" : ""} lack an acceptedAnswer. Google requires acceptedAnswer to display FAQ rich results.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ];

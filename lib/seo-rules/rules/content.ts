@@ -51,7 +51,7 @@ const contentPageRules: PageRule[] = [
         severity: "medium",
         title: "Images missing width/height attributes",
         description: `${p.url} has ${missing.length} image${missing.length > 1 ? "s" : ""} without explicit width and height. This causes Cumulative Layout Shift (CLS), hurting Core Web Vitals scores.`,
-        fixType: "quick",
+        fixType: "major",
         pageUrl: p.url,
       },
     ];
@@ -145,7 +145,7 @@ const contentPageRules: PageRule[] = [
             severity: "medium",
             title: "External links open in new tab without noopener",
             description: `${p.url} has ${p.blankTargetLinksNoRel.length} link${p.blankTargetLinksNoRel.length > 1 ? "s" : ""} with target="_blank" but no rel="noopener noreferrer". This exposes users to reverse tabnapping attacks.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]
@@ -160,7 +160,7 @@ const contentPageRules: PageRule[] = [
             severity: "high",
             title: "Mixed content (HTTP resources on HTTPS page)",
             description: `${p.url} loads ${p.mixedContentSrcs.length} resource${p.mixedContentSrcs.length > 1 ? "s" : ""} over HTTP while the page is served over HTTPS. Browsers block or warn about mixed content.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]

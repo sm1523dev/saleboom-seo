@@ -247,7 +247,7 @@ const metaPageRules: PageRule[] = [
             severity: "low",
             title: "Open Graph image missing",
             description: `${p.url} is missing <meta property="og:image">. Social shares without an image receive significantly fewer clicks.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]
@@ -277,7 +277,7 @@ const metaPageRules: PageRule[] = [
             severity: "critical",
             title: "Viewport meta tag missing",
             description: `${p.url} has no <meta name="viewport"> tag. Pages without viewport configuration fail Google's mobile-friendly test and may rank lower on mobile.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]
@@ -292,7 +292,7 @@ const metaPageRules: PageRule[] = [
             severity: "medium",
             title: "HTML lang attribute missing",
             description: `${p.url} has no lang attribute on the <html> element. Screen readers and search engines use it to determine the page language.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]
@@ -307,7 +307,7 @@ const metaPageRules: PageRule[] = [
             severity: "medium",
             title: "Charset declaration missing",
             description: `${p.url} has no <meta charset="..."> tag. Without a charset declaration, browsers may misinterpret character encoding, causing display issues.`,
-            fixType: "quick",
+            fixType: "major",
             pageUrl: p.url,
           },
         ]

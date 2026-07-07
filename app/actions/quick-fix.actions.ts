@@ -30,6 +30,13 @@ const ISSUE_FIX_MAP: Record<string, { field: CmsField; buildPrompt: (issue: { ti
   "twitter-card-missing": { field: "meta_title", buildPrompt: (i) => `Write a Twitter card title for: ${i.pageUrl}. Issue: ${i.title}.` },
   "images-missing-alt": { field: "h1", buildPrompt: (i) => `Write a descriptive alt text for an image on this page: ${i.pageUrl}. Issue: ${i.title}. ${i.description ?? ""}` },
   "images-empty-alt": { field: "h1", buildPrompt: (i) => `Write a descriptive alt text for an image on this page: ${i.pageUrl}. Issue: ${i.title}. ${i.description ?? ""}` },
+  "canonical-missing": { field: "meta_title", buildPrompt: (i) => `This page is missing a canonical URL tag. Write a unique, keyword-focused meta title (50-60 chars) for: ${i.pageUrl}.` },
+  "duplicate-meta-title": { field: "meta_title", buildPrompt: (i) => `This page has a duplicate meta title shared with other pages. Write a UNIQUE, page-specific meta title (50-60 chars) for: ${i.pageUrl}. ${i.description ?? ""}` },
+  "duplicate-meta-description": { field: "meta_description", buildPrompt: (i) => `This page has a duplicate meta description. Write a UNIQUE meta description (140-160 chars) for: ${i.pageUrl}. ${i.description ?? ""}` },
+  "duplicate-h1": { field: "h1", buildPrompt: (i) => `This page has a duplicate H1 shared with other pages. Write a UNIQUE H1 heading for: ${i.pageUrl}. ${i.description ?? ""}` },
+  "h1-title-identical-sitewide": { field: "h1", buildPrompt: (i) => `This page's H1 matches its meta title exactly. Write a distinct H1 (different from the meta title) for: ${i.pageUrl}.` },
+  "h1-matches-title": { field: "h1", buildPrompt: (i) => `This page's H1 is identical to its meta title. Write a distinct, content-focused H1 heading for: ${i.pageUrl}. ${i.description ?? ""}` },
+  "duplicate-og-title": { field: "meta_title", buildPrompt: (i) => `This page's Open Graph title is duplicated across pages. Write a UNIQUE og:title (50-60 chars) for: ${i.pageUrl}. ${i.description ?? ""}` },
 };
 
 export async function generateAndQueueIssueFixes(
