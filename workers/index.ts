@@ -7,6 +7,7 @@ import { startBullBoard } from "./bull-board";
 import { handleScanJob } from "./handlers/scan.handler";
 import { handleRescanJob } from "./handlers/rescan.handler";
 import { handleAeoJob } from "./handlers/aeo.handler";
+import { handleDigestJob } from "./handlers/digest.handler";
 import { seedGlobalProviders } from "@/lib/aeo/seed-providers";
 
 const log = logger.child({ component: "worker" });
@@ -14,12 +15,14 @@ const log = logger.child({ component: "worker" });
 queueProvider.registerHandler("scan", handleScanJob);
 queueProvider.registerHandler("rescan", handleRescanJob);
 queueProvider.registerHandler("aeo-scan", handleAeoJob);
+queueProvider.registerHandler("digest", handleDigestJob);
 
 async function main() {
   await queueProvider.start();
   await seedGlobalProviders();
   await queueProvider.schedule("rescan", "0 0 * * 0");
   await queueProvider.schedule("aeo-scan", "0 3 * * *");
+  await queueProvider.schedule("digest", "0 8 * * 1");
   startBullBoard();
   log.info("started — listening for jobs");
 

@@ -1,6 +1,6 @@
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, aeoProviders, aeoQueries, aeoMentions, aeoCitations, aeoScores } from "@/lib/db/schema";
+import { websites, aeoProviders, aeoQueries, aeoMentions, aeoCitations, aeoScores, userAlerts } from "@/lib/db/schema";
 import { queryAeoProvider } from "@/lib/aeo/query-engine";
 import { parseMention, extractCitations } from "@/lib/aeo/mention-parser";
 import { computeAeoScore } from "@/lib/aeo/score";
@@ -154,14 +154,71 @@ export async function handleAeoJob(
       ragQueriesRun,
     });
 
+    const currentSignal1Rate = successfulQueries > 0 ? mentionsFound / successfulQueries : 0;
+
     await db.insert(aeoScores).values({
       websiteId,
       scoredAt: new Date(),
-      signal1Rate: successfulQueries > 0 ? mentionsFound / successfulQueries : 0,
+      signal1Rate: currentSignal1Rate,
       signal2Index: 0,
       signal3Rate: ragQueriesRun > 0 ? citationsFound / ragQueriesRun : 0,
       compositeScore: score,
     });
+
+    // Alert detection: compare against previous score
+    const [prevAeoScore] = await db
+      .select({ signal1Rate: aeoScores.signal1Rate, compositeScore: aeoScores.compositeScore })
+      .from(aeoScores)
+      .where(eq(aeoScores.websiteId, websiteId))
+      .orderBy(desc(aeoScores.scoredAt))
+      .offset(1)
+      .limit(1);
+
+    if (prevAeoScore) {
+      const drop = prevAeoScore.signal1Rate - currentSignal1Rate;
+      if (drop >= 0.15) {
+        const [siteOwner] = await db
+          .select({ userId: websites.userId })
+          .from(websites)
+          .where(eq(websites.id, websiteId))
+          .limit(1);
+
+        if (siteOwner) {
+          await db.insert(userAlerts).values({
+            userId: siteOwner.userId,
+            websiteId,
+            type: "aeo_mention_drop",
+            message: `Brand mention rate dropped by ${Math.round(drop * 100)}% on ${website.name}`,
+            metadata: {
+              previousRate: prevAeoScore.signal1Rate,
+              currentRate: currentSignal1Rate,
+              drop,
+            },
+          });
+        }
+      }
+
+      // Alert: negative sentiment spike (>40% of mentions are negative)
+      const negativeMentions = mentionRows.filter((m) => m.sentiment === "negative").length;
+      const negativeRate = mentionRows.length > 0 ? negativeMentions / mentionRows.length : 0;
+      if (negativeRate > 0.4 && prevAeoScore.compositeScore > 0) {
+        const [siteOwner] = await db
+          .select({ userId: websites.userId })
+          .from(websites)
+          .where(eq(websites.id, websiteId))
+          .limit(1);
+
+        if (siteOwner) {
+          await db.insert(userAlerts).values({
+            userId: siteOwner.userId,
+            websiteId,
+            type: "aeo_sentiment_spike",
+            message: `${Math.round(negativeRate * 100)}% of AI mentions are now negative for ${website.name}`,
+            metadata: { negativeRate, negativeMentions, total: mentionRows.length },
+          });
+        }
+      }
+    }
 
     await context.updateProgress(100);
     log.info("aeo scan completed", { mentionsFound, citationsFound, score });

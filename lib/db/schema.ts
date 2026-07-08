@@ -379,6 +379,35 @@ export const metricsEvents = pgTable(
   ],
 );
 
+export const alertTypeEnum = pgEnum("alert_type", [
+  "aeo_mention_drop",
+  "aeo_sentiment_spike",
+  "scan_failed",
+]);
+
+export const userAlerts = pgTable(
+  "user_alerts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => users.id, { onDelete: "cascade" }),
+    websiteId: uuid("website_id")
+      .notNull()
+      .references(() => websites.id, { onDelete: "cascade" }),
+    type: alertTypeEnum("type").notNull(),
+    message: text("message").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown>>(),
+    readAt: timestamp("read_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (t) => [
+    index("user_alerts_user_id_idx").on(t.userId),
+    index("user_alerts_website_id_idx").on(t.websiteId),
+    index("user_alerts_read_at_idx").on(t.readAt),
+  ],
+);
+
 // Composite AEO score snapshot — one row per website per run
 export const aeoScores = pgTable(
   "aeo_scores",

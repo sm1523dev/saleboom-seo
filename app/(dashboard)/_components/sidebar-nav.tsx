@@ -9,6 +9,7 @@ const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: "◎" },
   { href: "/scan", label: "New Scan", icon: "⊙" },
   { href: "/aeo", label: "AEO", icon: "⊛" },
+  { href: "/alerts", label: "Alerts", icon: "⊘" },
   { href: "/changes", label: "CMS Queue", icon: "⊡" },
   { href: "/changes/history", label: "History", icon: "⊟" },
 ] as const;
@@ -23,9 +24,10 @@ type Props = {
   userName: string | null;
   userEmail: string;
   isAdmin?: boolean;
+  unreadAlerts?: number;
 };
 
-export function SidebarNav({ userName, userEmail, isAdmin }: Props) {
+export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: Props) {
   const pathname = usePathname();
 
   return (
@@ -71,6 +73,11 @@ export function SidebarNav({ userName, userEmail, isAdmin }: Props) {
                     {item.icon}
                   </span>
                   {item.label}
+                  {item.href === "/alerts" && unreadAlerts > 0 && (
+                    <span className="ml-auto rounded-full bg-primary px-1.5 py-0.5 font-mono text-[10px] font-bold text-primary-foreground">
+                      {unreadAlerts > 99 ? "99+" : unreadAlerts}
+                    </span>
+                  )}
                 </Link>
               </li>
             );

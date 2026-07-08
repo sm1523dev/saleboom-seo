@@ -2,7 +2,7 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans } from "@/lib/db/schema";
+import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import type { CmsField, CmsCredentials } from "@/lib/cms/types";
 import { loadCredentials } from "@/lib/cms/credentials";
@@ -218,6 +218,25 @@ export async function pushChangeTocms(
         .where(eq(aiSuggestions.id, snapshot.suggestionId));
     }
 
+    // Fire-and-forget email — non-blocking, never throws to user
+    try {
+      const [userRecord] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, snapshot.userId!))
+        .limit(1);
+      if (userRecord?.email) {
+        const { notificationProvider } = await import("@/lib/notifications");
+        const { pushSuccessTemplate } = await import("@/lib/notifications/email-templates");
+        const tmpl = pushSuccessTemplate({
+          pageUrl: snapshot.pageUrl,
+          fieldChanged: snapshot.fieldChanged,
+          afterValue: afterValue,
+        });
+        void notificationProvider.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
+      }
+    } catch { /* non-critical */ }
+
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
@@ -225,6 +244,26 @@ export async function pushChangeTocms(
       .update(changeSnapshots)
       .set({ status: "failed", updatedAt: new Date() })
       .where(eq(changeSnapshots.id, snapshotId));
+
+    // Fire-and-forget failure email — non-blocking, never throws to user
+    try {
+      const [userRecord] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, snapshot.userId!))
+        .limit(1);
+      if (userRecord?.email) {
+        const { notificationProvider } = await import("@/lib/notifications");
+        const { pushFailureTemplate } = await import("@/lib/notifications/email-templates");
+        const tmpl = pushFailureTemplate({
+          pageUrl: snapshot.pageUrl,
+          fieldChanged: snapshot.fieldChanged,
+          error: message,
+        });
+        void notificationProvider.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
+      }
+    } catch { /* non-critical */ }
+
     return { success: false, error: message };
   }
 }
@@ -280,6 +319,25 @@ export async function rollbackChange(
       .update(changeSnapshots)
       .set({ status: "rolled_back", rolledBackAt: new Date(), updatedAt: new Date() })
       .where(eq(changeSnapshots.id, snapshotId));
+
+    // Fire-and-forget email — non-blocking, never throws to user
+    try {
+      const [userRecord] = await db
+        .select({ email: users.email })
+        .from(users)
+        .where(eq(users.id, snapshot.userId!))
+        .limit(1);
+      if (userRecord?.email) {
+        const { notificationProvider } = await import("@/lib/notifications");
+        const { rollbackTemplate } = await import("@/lib/notifications/email-templates");
+        const tmpl = rollbackTemplate({
+          pageUrl: snapshot.pageUrl,
+          fieldChanged: snapshot.fieldChanged,
+          beforeValue: beforeState?.value ?? null,
+        });
+        void notificationProvider.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
+      }
+    } catch { /* non-critical */ }
 
     return { success: true };
   } catch (err) {
