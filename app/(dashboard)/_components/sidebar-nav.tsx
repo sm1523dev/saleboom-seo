@@ -13,12 +13,19 @@ const NAV_ITEMS = [
   { href: "/changes/history", label: "History", icon: "⊟" },
 ] as const;
 
+const ADMIN_NAV_ITEMS = [
+  { href: "/admin/stats", label: "System Stats", icon: "⊞" },
+  { href: "/admin/users", label: "Users", icon: "⊕" },
+  { href: "/admin/providers", label: "Providers", icon: "⊗" },
+] as const;
+
 type Props = {
   userName: string | null;
   userEmail: string;
+  isAdmin?: boolean;
 };
 
-export function SidebarNav({ userName, userEmail }: Props) {
+export function SidebarNav({ userName, userEmail, isAdmin }: Props) {
   const pathname = usePathname();
 
   return (
@@ -69,6 +76,46 @@ export function SidebarNav({ userName, userEmail }: Props) {
             );
           })}
         </ul>
+        {isAdmin && (
+          <div className="mt-4">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              Admin
+            </p>
+            <ul className="space-y-0.5" role="list">
+              {ADMIN_NAV_ITEMS.map((item) => {
+                const isActive = pathname.startsWith(item.href);
+                return (
+                  <li key={item.href}>
+                    <Link
+                      href={item.href}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                        "border-l-2 transition-colors duration-150",
+                        isActive
+                          ? "border-primary bg-accent text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "font-mono text-base transition-colors duration-150",
+                          isActive
+                            ? "text-primary"
+                            : "text-muted-foreground group-hover:text-primary"
+                        )}
+                      >
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
       </nav>
 
       {/* User footer */}

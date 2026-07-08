@@ -45,6 +45,15 @@ function buildProviders() {
         );
         if (!valid) return null;
 
+        // Bootstrap: auto-promote to admin if email matches ADMIN_BOOTSTRAP_EMAIL
+        if (
+          process.env.ADMIN_BOOTSTRAP_EMAIL &&
+          user.email.toLowerCase() === process.env.ADMIN_BOOTSTRAP_EMAIL.toLowerCase() &&
+          user.role !== "admin"
+        ) {
+          await db.update(users).set({ role: "admin" }).where(eq(users.id, user.id));
+        }
+
         return { id: user.id, email: user.email, name: user.name ?? undefined };
       },
     }),

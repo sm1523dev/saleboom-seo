@@ -24,6 +24,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
       <SidebarNav
         userName={user?.name ?? null}
         userEmail={user?.email ?? session.user.email}
+        isAdmin={session.user.role === "admin"}
       />
       <main className="flex-1 overflow-auto p-6">{children}</main>
     </div>
