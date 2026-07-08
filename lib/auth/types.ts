@@ -4,6 +4,7 @@ export type AuthUser = {
   name?: string;
   image?: string;
   tenantId?: string;
+  role: "admin" | "user";
 };
 
 export type AuthSession = {

@@ -60,6 +60,8 @@ export const aeoSentimentEnum = pgEnum("aeo_sentiment", [
   "negative",
 ]);
 
+export const userRoleEnum = pgEnum("user_role", ["admin", "user"]);
+
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: varchar("email", { length: 320 }).notNull().unique(),
@@ -67,6 +69,7 @@ export const users = pgTable("users", {
   tenantId: varchar("tenant_id", { length: 255 }),
   avatarUrl: text("avatar_url"),
   passwordHash: varchar("password_hash", { length: 255 }),
+  role: userRoleEnum("role").notNull().default("user"),
   ...timestamps,
 });
 

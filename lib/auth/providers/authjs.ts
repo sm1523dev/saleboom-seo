@@ -16,6 +16,7 @@ declare module "next-auth" {
     user: {
       id: string;
       tenantId?: string;
+      role: "admin" | "user";
     } & DefaultSession["user"];
   }
 }
@@ -123,9 +124,18 @@ const { handlers, auth, signIn: nextAuthSignIn, signOut: nextAuthSignOut } = Nex
             })
             .returning({ id: users.id });
           token.id = dbUser.id;
+          // Social logins always receive the default role; admin must be set directly in DB
+          token.role = "user";
           if (profile && "tid" in profile) token.tenantId = profile.tid as string;
         } else {
           token.id = user.id;
+          // Fetch the persisted role so it survives role changes without re-login
+          const [dbUser] = await db
+            .select({ role: users.role })
+            .from(users)
+            .where(eq(users.id, user.id as string))
+            .limit(1);
+          token.role = dbUser?.role ?? "user";
         }
       }
       return token;
@@ -133,6 +143,7 @@ const { handlers, auth, signIn: nextAuthSignIn, signOut: nextAuthSignOut } = Nex
     session({ session, token }) {
       if (session.user) {
         session.user.id = token.id as string;
+        session.user.role = token.role as "admin" | "user";
         if (token.tenantId) session.user.tenantId = token.tenantId as string;
       }
       return session;
@@ -151,6 +162,7 @@ export class AuthJsProvider implements AuthProvider {
         name: session.user.name ?? undefined,
         image: session.user.image ?? undefined,
         tenantId: session.user.tenantId,
+        role: session.user.role ?? "user",
       },
       expiresAt: session.expires,
     };
@@ -177,7 +189,7 @@ export class AuthJsProvider implements AuthProvider {
   // auth middleware pattern mandated by NextAuth v5. next/server is unavoidable here.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   getMiddleware(): any {
-    const PROTECTED = ["/dashboard", "/scan", "/website", "/seo", "/aeo"];
+    const PROTECTED = ["/dashboard", "/scan", "/website", "/seo", "/aeo", "/admin"];
     const AUTH_PAGES = ["/", "/sign-in", "/sign-up"];
     return auth(async (request: NextRequest & { auth: unknown }) => {
       const { NextResponse } = await import("next/server");
@@ -188,6 +200,15 @@ export class AuthJsProvider implements AuthProvider {
         const signInUrl = new URL("/sign-in", request.url);
         signInUrl.searchParams.set("callbackUrl", pathname + search);
         return NextResponse.redirect(signInUrl);
+      }
+
+      // Admin-only routes — authenticated but non-admin users get redirected
+      const isAdminRoute = pathname.startsWith("/admin");
+      if (isAdminRoute && request.auth) {
+        const sessionRole = (request.auth as { user?: { role?: string } }).user?.role;
+        if (sessionRole !== "admin") {
+          return NextResponse.redirect(new URL("/dashboard", request.url));
+        }
       }
 
       // Logged-in users visiting public/auth pages → send to dashboard

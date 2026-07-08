@@ -10,6 +10,7 @@ export const dynamic = "force-dynamic";
 export async function GET(): Promise<NextResponse> {
   const session = await authProvider.getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  if (session.user.role !== "admin") return NextResponse.json({ error: "Forbidden" }, { status: 403 });
 
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);

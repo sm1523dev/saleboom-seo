@@ -5,6 +5,7 @@ const MOCK_SESSION: AuthSession = {
     id: "00000000-0000-0000-0000-000000000001",
     email: "dev@saleboom.com",
     name: "Dev User",
+    role: "admin" as const,
   },
   expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString(),
 };
