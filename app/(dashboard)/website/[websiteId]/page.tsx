@@ -206,6 +206,14 @@ export default async function WebsiteDetailPage({ params }: Props) {
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">{site.url}</p>
         </div>
         <div className="flex shrink-0 items-center gap-2">
+          <a
+            href={`/api/reports/${websiteId}/pdf`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            Download Report
+          </a>
           <Link
             href={`/website/${websiteId}/cms`}
             className="rounded-lg border border-border px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:border-primary/50 hover:text-foreground"
