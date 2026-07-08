@@ -225,7 +225,9 @@ export function ApprovalQueue({ items }: Props) {
                               <div>
                                 <p className="mb-1 text-xs text-muted-foreground">Current</p>
                                 <div className="min-h-[2rem] rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
-                                  {item.beforeValue ?? <em className="opacity-50">Not set</em>}
+                                  {item.beforeValue
+                                    ? item.beforeValue
+                                    : <em className="opacity-50 text-xs">Not set (was missing)</em>}
                                 </div>
                               </div>
                               <div>

@@ -2,7 +2,7 @@
 
 import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { issues, changeSnapshots } from "@/lib/db/schema";
+import { issues, changeSnapshots, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { aiProvider } from "@/lib/ai";
 import type { CmsField } from "@/lib/cms/types";
@@ -63,6 +63,27 @@ export async function generateAndQueueIssueFixes(
     );
   const alreadyQueued = new Set(existingSnapshots.map((s) => s.issueId).filter(Boolean) as string[]);
 
+  // Fetch current page values from aiSuggestions so we can show before/after
+  const pageUrls = [...new Set(rows.map((r) => r.pageUrl).filter(Boolean) as string[])];
+  const currentValueRows = pageUrls.length > 0
+    ? await db
+        .select({
+          pageUrl: aiSuggestions.pageUrl,
+          currentMetaTitle: aiSuggestions.currentMetaTitle,
+          currentMetaDescription: aiSuggestions.currentMetaDescription,
+          currentH1: aiSuggestions.currentH1,
+        })
+        .from(aiSuggestions)
+        .where(inArray(aiSuggestions.pageUrl, pageUrls))
+    : [];
+  const currentValues = new Map(currentValueRows.map((r) => [r.pageUrl, r]));
+
+  const FIELD_TO_CURRENT: Record<CmsField, "currentMetaTitle" | "currentMetaDescription" | "currentH1"> = {
+    meta_title: "currentMetaTitle",
+    meta_description: "currentMetaDescription",
+    h1: "currentH1",
+  };
+
   const fixes: IssueFix[] = [];
   let failed = 0;
 
@@ -71,6 +92,11 @@ export async function generateAndQueueIssueFixes(
     if (alreadyQueued.has(issue.id)) return; // skip already-queued
     const mapping = ISSUE_FIX_MAP[issue.type];
     if (!mapping) { failed++; return; }
+
+    // Get current value for this page/field to store as beforeValue
+    const pageCurrent = currentValues.get(issue.pageUrl);
+    const beforeValue = pageCurrent?.[FIELD_TO_CURRENT[mapping.field]] ?? null;
+
     try {
       const prompt = mapping.buildPrompt({
         title: issue.title,
@@ -87,7 +113,7 @@ export async function generateAndQueueIssueFixes(
         issueId: issue.id,
         pageUrl: issue.pageUrl,
         field: mapping.field,
-        beforeValue: null,
+        beforeValue,
         afterValue: value,
       });
     } catch {
