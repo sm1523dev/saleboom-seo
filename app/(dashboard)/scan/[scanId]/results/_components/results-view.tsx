@@ -577,6 +577,8 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [showNoCmsPrompt, setShowNoCmsPrompt] = useState(false);
+  const [generating, setGenerating] = useState(false);
+  const [totalGenerating, setTotalGenerating] = useState(0);
 
   const targetIds = selectedIssues.size > 0
     ? Array.from(selectedIssues).filter((id) => allQuickIssues.some((i) => i.id === id && i.fixType === "quick"))
@@ -584,14 +586,34 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
 
   if (targetIds.length === 0) return null;
 
-  const label = isPending
-    ? "Generating fixes…"
-    : selectedIssues.size > 0
-      ? `Fix ${targetIds.length} selected`
-      : `Fix all ${targetIds.length} quick fixes`;
+  const label = selectedIssues.size > 0
+    ? `Fix ${targetIds.length} selected`
+    : `Fix all ${targetIds.length} quick fixes`;
 
   return (
     <>
+      {/* Generating overlay */}
+      {generating && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-8 text-center shadow-2xl"
+          >
+            <motion.div
+              animate={{ rotate: 360 }}
+              transition={{ duration: 1.5, repeat: Infinity, ease: "linear" }}
+              className="mx-auto mb-4 h-10 w-10 rounded-full border-2 border-primary/20 border-t-primary"
+            />
+            <p className="font-semibold">Generating AI fixes…</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Processing {totalGenerating} issue{totalGenerating !== 1 ? "s" : ""} — please wait
+            </p>
+            <p className="mt-3 text-xs text-muted-foreground">You'll be redirected to the queue when ready</p>
+          </motion.div>
+        </div>
+      )}
+
       {showNoCmsPrompt && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
           <motion.div
@@ -624,7 +646,7 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
       )}
       <button
         type="button"
-        disabled={isPending}
+        disabled={isPending || generating}
         onClick={() => startTransition(async () => {
           const { getCmsConnection } = await import("@/app/actions/cms.actions");
           const conn = await getCmsConnection(websiteId);
@@ -632,7 +654,10 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
             setShowNoCmsPrompt(true);
             return;
           }
+          setTotalGenerating(targetIds.length);
+          setGenerating(true);
           await generateAndQueueIssueFixes(targetIds);
+          setGenerating(false);
           router.push("/changes");
         })}
         className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"

@@ -1,6 +1,6 @@
 "use server";
 
-import { inArray, eq } from "drizzle-orm";
+import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { issues, changeSnapshots } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
@@ -51,11 +51,24 @@ export async function generateAndQueueIssueFixes(
     .from(issues)
     .where(inArray(issues.id, issueIds));
 
+  // Skip issues that already have a pending/applied snapshot to prevent duplicates
+  const existingSnapshots = await db
+    .select({ issueId: changeSnapshots.issueId })
+    .from(changeSnapshots)
+    .where(
+      and(
+        inArray(changeSnapshots.issueId, issueIds),
+        inArray(changeSnapshots.status, ["pending", "applied"]),
+      ),
+    );
+  const alreadyQueued = new Set(existingSnapshots.map((s) => s.issueId).filter(Boolean) as string[]);
+
   const fixes: IssueFix[] = [];
   let failed = 0;
 
   const processIssue = async (issue: typeof rows[0]) => {
     if (!issue.pageUrl) { failed++; return; }
+    if (alreadyQueued.has(issue.id)) return; // skip already-queued
     const mapping = ISSUE_FIX_MAP[issue.type];
     if (!mapping) { failed++; return; }
     try {

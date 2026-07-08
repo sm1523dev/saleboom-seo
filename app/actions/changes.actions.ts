@@ -2,13 +2,37 @@
 
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { changeSnapshots, aiSuggestions, cmsConnections } from "@/lib/db/schema";
+import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import type { CmsField, CmsCredentials } from "@/lib/cms/types";
 import { loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
 import { WebflowAdapter } from "@/lib/cms/providers/webflow";
+
+async function resolveWebsiteId(snapshot: {
+  suggestionId: string | null;
+  issueId: string | null;
+}): Promise<string | null> {
+  if (snapshot.suggestionId) {
+    const [s] = await db
+      .select({ websiteId: aiSuggestions.websiteId })
+      .from(aiSuggestions)
+      .where(eq(aiSuggestions.id, snapshot.suggestionId))
+      .limit(1);
+    if (s?.websiteId) return s.websiteId;
+  }
+  if (snapshot.issueId) {
+    const [r] = await db
+      .select({ websiteId: scans.websiteId })
+      .from(issues)
+      .innerJoin(scans, eq(issues.scanId, scans.id))
+      .where(eq(issues.id, snapshot.issueId))
+      .limit(1);
+    if (r?.websiteId) return r.websiteId;
+  }
+  return null;
+}
 
 async function pushViaCmsAdapter(
   cmsType: "wordpress" | "shopify" | "webflow",
@@ -156,17 +180,7 @@ export async function pushChangeTocms(
   if (!snapshot) return { success: false, error: "Change not found" };
   if (snapshot.status !== "pending") return { success: false, error: "Change is not pending" };
 
-  // Resolve websiteId through the suggestion
-  let websiteId: string | null = null;
-  if (snapshot.suggestionId) {
-    const [suggestion] = await db
-      .select({ websiteId: aiSuggestions.websiteId })
-      .from(aiSuggestions)
-      .where(eq(aiSuggestions.id, snapshot.suggestionId))
-      .limit(1);
-    websiteId = suggestion?.websiteId ?? null;
-  }
-
+  const websiteId = await resolveWebsiteId(snapshot);
   if (!websiteId) return { success: false, error: "Could not determine website for this change" };
 
   const [connection] = await db
@@ -238,17 +252,7 @@ export async function rollbackChange(
   if (snapshot.status === "rolled_back") return { success: false, error: "already_rolled_back" };
   if (snapshot.status !== "applied") return { success: false, error: "Only applied changes can be rolled back" };
 
-  // Resolve websiteId through the suggestion
-  let websiteId: string | null = null;
-  if (snapshot.suggestionId) {
-    const [suggestion] = await db
-      .select({ websiteId: aiSuggestions.websiteId })
-      .from(aiSuggestions)
-      .where(eq(aiSuggestions.id, snapshot.suggestionId))
-      .limit(1);
-    websiteId = suggestion?.websiteId ?? null;
-  }
-
+  const websiteId = await resolveWebsiteId(snapshot);
   if (!websiteId) return { success: false, error: "Could not determine website for this change" };
 
   const [connection] = await db
