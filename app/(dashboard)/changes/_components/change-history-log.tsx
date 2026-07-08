@@ -172,71 +172,66 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
       </div>
 
       {/* Log rows */}
-      <div className="overflow-hidden rounded-xl border border-border">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-border bg-muted/40">
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Field</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Page URL</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">CMS</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Status</th>
-              <th className="px-4 py-2.5 text-left text-xs font-medium text-muted-foreground">Date</th>
-              <th className="px-4 py-2.5 text-right text-xs font-medium text-muted-foreground">Action</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border">
-            {items.map((item) => {
-              const rbState = rollbackStates[item.id] ?? "idle";
-              const statusCfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.reverted;
-              const timestamp = item.appliedAt ?? item.createdAt;
+      <div className="space-y-2">
+        {items.map((item) => {
+          const rbState = rollbackStates[item.id] ?? "idle";
+          const statusCfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.reverted;
+          const timestamp = item.appliedAt ?? item.createdAt;
 
-              return (
-                <tr key={item.id} className="transition-colors hover:bg-muted/20">
-                  <td className="px-4 py-3 text-xs font-medium">
+          return (
+            <div key={item.id} className="rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/10">
+              {/* Header row */}
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="rounded-md border border-border bg-muted/40 px-2 py-0.5 text-xs font-medium">
                     {FIELD_LABELS[item.fieldChanged] ?? item.fieldChanged}
-                  </td>
-                  <td className="max-w-[200px] px-4 py-3">
-                    <p className="truncate font-mono text-xs text-muted-foreground" title={item.pageUrl}>
-                      {item.pageUrl}
-                    </p>
-                  </td>
-                  <td className="px-4 py-3 text-xs capitalize text-muted-foreground">{item.cmsType}</td>
-                  <td className="px-4 py-3">
-                    <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
-                      {statusCfg.label}
-                    </span>
-                    {rbState === "error" && rollbackErrors[item.id] && (
-                      <p className="mt-0.5 text-xs text-red-400">{rollbackErrors[item.id]}</p>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-xs text-muted-foreground">
+                  </span>
+                  <span className="text-xs capitalize text-muted-foreground">{item.cmsType}</span>
+                  <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
+                    {statusCfg.label}
+                  </span>
+                  <span className="text-xs text-muted-foreground">
                     {new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "short" }).format(new Date(timestamp))}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {item.status === "applied" && rbState === "idle" && (
-                      <button
-                        type="button"
-                        onClick={() => handleRollback(item.id)}
-                        className="rounded-md border border-yellow-500/30 px-2.5 py-1 text-xs text-yellow-400 transition-colors hover:bg-yellow-500/10"
-                      >
-                        Rollback
-                      </button>
-                    )}
-                    {rbState === "rolling" && (
-                      <span className="text-xs text-muted-foreground">Rolling back…</span>
-                    )}
-                    {rbState === "done" && (
-                      <span className="text-xs text-green-400">Done</span>
-                    )}
-                    {item.status === "rolled_back" && (
-                      <span className="text-xs text-muted-foreground" title="Already rolled back">—</span>
-                    )}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
+                  </span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {item.status === "applied" && rbState === "idle" && (
+                    <button type="button" onClick={() => handleRollback(item.id)}
+                      className="rounded-md border border-yellow-500/30 px-2.5 py-1 text-xs text-yellow-400 hover:bg-yellow-500/10">
+                      Rollback
+                    </button>
+                  )}
+                  {rbState === "rolling" && <span className="text-xs text-muted-foreground">Rolling back…</span>}
+                  {rbState === "done" && <span className="text-xs text-green-400">Done</span>}
+                  {rbState === "error" && <span className="text-xs text-red-400">{rollbackErrors[item.id]}</span>}
+                </div>
+              </div>
+
+              {/* Page URL */}
+              <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground" title={item.pageUrl}>
+                {item.pageUrl}
+              </p>
+
+              {/* Before → After */}
+              <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                <div>
+                  <p className="mb-1 text-xs text-muted-foreground">Before</p>
+                  <div className="min-h-[2rem] rounded-lg border border-border bg-muted/30 px-3 py-2 text-sm text-muted-foreground">
+                    {item.beforeValue
+                      ? item.beforeValue
+                      : <span className="italic opacity-60">Not set (missing)</span>}
+                  </div>
+                </div>
+                <div>
+                  <p className="mb-1 text-xs text-primary">After (AI fix)</p>
+                  <div className="min-h-[2rem] rounded-lg border border-primary/20 bg-primary/5 px-3 py-2 text-sm">
+                    {item.afterValue}
+                  </div>
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
 
       {/* Pagination */}

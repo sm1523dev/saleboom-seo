@@ -108,8 +108,44 @@ async function _runScanJob(
 
     await context.updateProgress(70);
 
+    // Filter out system/non-content URLs before SEO analysis so they don't
+    // inflate issue counts or lower scores — these pages are never indexed by
+    // Google and never cited by AI models.
+    const SYSTEM_PATH_PATTERNS = [
+      /^\/wp-login\.php/,
+      /^\/wp-admin/,
+      /^\/wp-cron\.php/,
+      /^\/xmlrpc\.php/,
+      /^\/wp-includes\//,
+      /^\/feed\//,
+      /[?&]feed=/,
+      /^\/wp-sitemap/,
+      /\/wp-sitemap.*\.xml/,
+      /\/sitemap.*\.xml/,
+      /^\/author\//,
+      /^\/tag\//,
+      /^\/wp-json\//,
+    ];
+
+    const contentPages = crawlResult.pages.filter((p) => {
+      try {
+        const path = new URL(p.url).pathname + new URL(p.url).search;
+        return !SYSTEM_PATH_PATTERNS.some((re) => re.test(path));
+      } catch {
+        return true;
+      }
+    });
+
+    log.info("system pages filtered", {
+      before: crawlResult.pages.length,
+      after: contentPages.length,
+      filtered: crawlResult.pages.length - contentPages.length,
+    });
+
+    const filteredCrawlResult = { ...crawlResult, pages: contentPages };
+
     // Run SEO rules engine
-    const siteCtx = buildSiteContext(crawlResult, {
+    const siteCtx = buildSiteContext(filteredCrawlResult, {
       baseUrl,
       robotsTxtContent,
       sitemapUrls,
