@@ -64,6 +64,8 @@ type Props = {
   fixCounts: { quick: number; major: number };
   issues: Issue[];
   ignoredIssues: Issue[];
+  queuedIssueIds: string[];
+  fixedIssueIds: string[];
   suggestions: Suggestion[];
   pastSuggestions: Suggestion[];
   approvedSnapshots: ApprovedSnapshot[];
@@ -115,6 +117,8 @@ export function ResultsView({
   fixCounts,
   issues,
   ignoredIssues,
+  queuedIssueIds,
+  fixedIssueIds,
   suggestions,
   pastSuggestions,
   approvedSnapshots,
@@ -123,12 +127,19 @@ export function ResultsView({
   const [filter, setFilter] = useState<Severity | null>(null);
   const [fixFilter, setFixFilter] = useState<"quick" | "major" | null>(null);
   const [selectedIssues, setSelectedIssues] = useState<Set<string>>(new Set());
+
+  const queuedSet = new Set(queuedIssueIds);
+  const fixedSet = new Set(fixedIssueIds);
   const [showIssueCmsPrompt, setShowIssueCmsPrompt] = useState(false);
   const [isIgnoringIssues, startIgnoreIssuesTransition] = useTransition();
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
+  const [showQueuedIssues, setShowQueuedIssues] = useState(false);
+  const [showFixedIssues, setShowFixedIssues] = useState(false);
   const [isUnignoringIssues, startUnignoreIssuesTransition] = useTransition();
 
-  const fixFiltered = issues.filter((i) => !fixFilter || i.fixType === fixFilter);
+  // Active = not queued, not fixed, not ignored
+  const activeIssues = issues.filter((i) => !queuedSet.has(i.id) && !fixedSet.has(i.id));
+  const fixFiltered = activeIssues.filter((i) => !fixFilter || i.fixType === fixFilter);
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
       acc[s] = fixFiltered.filter((i) => i.severity === s).length;
@@ -138,6 +149,9 @@ export function ResultsView({
   );
 
   const filtered = fixFiltered.filter((i) => !filter || i.severity === filter);
+
+  const queuedIssues = issues.filter((i) => queuedSet.has(i.id));
+  const resolvedIssues = issues.filter((i) => fixedSet.has(i.id));
 
   const formattedDate = completedAt
     ? new Intl.DateTimeFormat("en", {
@@ -324,7 +338,7 @@ export function ResultsView({
               ? `${SEVERITY_CONFIG[filter].label} Issues (${filtered.length})`
               : fixFilter
                 ? `${fixFilter === "quick" ? "Quick Fix" : "Major Fix"} Issues (${filtered.length})`
-                : `All Issues (${issues.length})`}
+                : `All Issues (${activeIssues.length})`}
           </h2>
           <div className="flex flex-wrap items-center gap-2">
             {(filter || fixFilter) && (
@@ -375,7 +389,7 @@ export function ResultsView({
             {filtered.some((i) => i.fixType === "quick") && (
               <BulkFixButton
                 selectedIssues={selectedIssues}
-                allQuickIssues={filtered.filter((i) => i.fixType === "quick")}
+                allQuickIssues={filtered.filter((i) => i.fixType === "quick" && !queuedSet.has(i.id) && !fixedSet.has(i.id))}
                 websiteId={websiteId}
               />
             )}
@@ -523,6 +537,126 @@ export function ResultsView({
                               >
                                 Un-ignore
                               </button>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* In Queue */}
+      {queuedIssues.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowQueuedIssues((o) => !o)}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="inline-block h-2 w-2 rounded-full bg-primary/60" aria-hidden="true" />
+            {showQueuedIssues ? "Hide" : "Show"} in queue ({queuedIssues.length})
+          </button>
+          <AnimatePresence initial={false}>
+            {showQueuedIssues && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="mt-3 overflow-hidden"
+              >
+                <div className="overflow-x-auto rounded-xl border border-primary/20 bg-card opacity-80">
+                  <Table className="min-w-[500px]">
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-xs">Severity</TableHead>
+                        <TableHead className="text-xs">Issue</TableHead>
+                        <TableHead className="w-24 text-xs">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {queuedIssues.map((issue) => {
+                        const cfg = SEVERITY_CONFIG[issue.severity as Severity];
+                        return (
+                          <TableRow key={issue.id} className="border-border align-top">
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={cn("text-xs font-medium", cfg?.className)}>
+                                {cfg?.label ?? issue.severity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <p className="text-sm font-medium">{issue.title}</p>
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground/60">{issue.type}</p>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className="border-primary/30 bg-primary/10 text-primary text-xs">
+                                In Queue
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        );
+                      })}
+                    </TableBody>
+                  </Table>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+        </div>
+      )}
+
+      {/* Fixed */}
+      {resolvedIssues.length > 0 && (
+        <div>
+          <button
+            type="button"
+            onClick={() => setShowFixedIssues((o) => !o)}
+            className="flex items-center gap-2 text-xs text-muted-foreground hover:text-foreground transition-colors"
+          >
+            <span className="inline-block h-2 w-2 rounded-full bg-green-400" aria-hidden="true" />
+            {showFixedIssues ? "Hide" : "Show"} fixed ({resolvedIssues.length})
+          </button>
+          <AnimatePresence initial={false}>
+            {showFixedIssues && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
+                className="mt-3 overflow-hidden"
+              >
+                <div className="overflow-x-auto rounded-xl border border-green-500/20 bg-card opacity-70">
+                  <Table className="min-w-[500px]">
+                    <TableHeader>
+                      <TableRow className="border-border hover:bg-transparent">
+                        <TableHead className="text-xs">Severity</TableHead>
+                        <TableHead className="text-xs">Issue</TableHead>
+                        <TableHead className="w-24 text-xs">Status</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {resolvedIssues.map((issue) => {
+                        const cfg = SEVERITY_CONFIG[issue.severity as Severity];
+                        return (
+                          <TableRow key={issue.id} className="border-border align-top">
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className={cn("text-xs font-medium", cfg?.className)}>
+                                {cfg?.label ?? issue.severity}
+                              </Badge>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <p className="text-sm font-medium line-through text-muted-foreground">{issue.title}</p>
+                              <p className="mt-0.5 font-mono text-xs text-muted-foreground/60">{issue.type}</p>
+                            </TableCell>
+                            <TableCell className="py-3">
+                              <Badge variant="outline" className="border-green-500/30 bg-green-500/10 text-green-400 text-xs">
+                                Fixed
+                              </Badge>
                             </TableCell>
                           </TableRow>
                         );

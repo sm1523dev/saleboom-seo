@@ -1,13 +1,12 @@
 import type { Metadata } from "next";
 import { notFound } from "next/navigation";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions, changeSnapshots } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
-import { isNotNull, inArray } from "drizzle-orm";
-import { changeSnapshots } from "@/lib/db/schema";
+import { ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
 
 import { ResultsView } from "./_components/results-view";
 
@@ -75,16 +74,69 @@ export default async function AuditResultsPage({ params }: Props) {
       description: issues.description,
       fixType: issues.fixType,
       ignoredAt: issues.ignoredAt,
+      resolvedAt: issues.resolvedAt,
     })
     .from(issues)
     .where(eq(issues.scanId, scanId))
     .orderBy(issues.severity, issues.type);
 
-  const scanIssues = allIssues.filter((i) => !i.ignoredAt);
-  const ignoredIssues = allIssues.filter((i) => !!i.ignoredAt);
+  const scanIssues = allIssues.filter((i) => !i.ignoredAt && !i.resolvedAt);
+  const ignoredIssues = allIssues.filter((i) => !!i.ignoredAt && !i.resolvedAt);
 
-  const score = computeSeoScore(scanIssues);
-  const fixCounts = countByFixType(scanIssues);
+  // Fetch changeSnapshot statuses for issues in this scan
+  const issueIds = allIssues.map((i) => i.id);
+  const issueSnapshots = issueIds.length > 0
+    ? await db
+        .select({ issueId: changeSnapshots.issueId, status: changeSnapshots.status })
+        .from(changeSnapshots)
+        .where(
+          and(
+            inArray(changeSnapshots.issueId, issueIds),
+            inArray(changeSnapshots.status, ["pending", "applied"]),
+          ),
+        )
+    : [];
+
+  const queuedIssueIds = new Set(
+    issueSnapshots.filter((s) => s.status === "pending").map((s) => s.issueId as string),
+  );
+  // Mutable — we add to it when cross-referencing applied page/field combos below
+  const fixedIssueIds = new Set(
+    issueSnapshots.filter((s) => s.status === "applied").map((s) => s.issueId as string),
+  );
+
+  // Cross-reference applied snapshots: if (pageUrl, field) was previously applied,
+  // treat new scan issues for the same page+field as already fixed.
+  const pageUrls = [...new Set(scanIssues.map((i) => i.pageUrl).filter(Boolean) as string[])];
+  const appliedPageFields = new Set<string>();
+  if (pageUrls.length > 0) {
+    const appliedRows = await db
+      .select({ pageUrl: changeSnapshots.pageUrl, fieldChanged: changeSnapshots.fieldChanged })
+      .from(changeSnapshots)
+      .where(
+        and(
+          inArray(changeSnapshots.pageUrl, pageUrls),
+          eq(changeSnapshots.status, "applied"),
+        ),
+      );
+    for (const r of appliedRows) {
+      appliedPageFields.add(`${r.pageUrl}:${r.fieldChanged}`);
+    }
+  }
+
+  // Auto-resolve new scan issues if their page+field was already applied
+  for (const issue of scanIssues) {
+    if (!issue.resolvedAt && issue.pageUrl) {
+      const field = ISSUE_TYPE_TO_FIELD[issue.type];
+      if (field && appliedPageFields.has(`${issue.pageUrl}:${field}`)) {
+        fixedIssueIds.add(issue.id);
+      }
+    }
+  }
+
+  const activeIssues = scanIssues.filter((i) => !queuedIssueIds.has(i.id) && !fixedIssueIds.has(i.id));
+  const score = computeSeoScore(activeIssues);
+  const fixCounts = countByFixType(activeIssues);
 
   const allSuggestions = await db
     .select({
@@ -138,6 +190,8 @@ export default async function AuditResultsPage({ params }: Props) {
       fixCounts={fixCounts}
       issues={scanIssues}
       ignoredIssues={ignoredIssues}
+      queuedIssueIds={Array.from(queuedIssueIds)}
+      fixedIssueIds={Array.from(fixedIssueIds)}
       suggestions={suggestions}
       pastSuggestions={pastSuggestions}
       approvedSnapshots={approvedSnapshots}

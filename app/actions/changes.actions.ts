@@ -218,6 +218,14 @@ export async function pushChangeTocms(
         .where(eq(aiSuggestions.id, snapshot.suggestionId));
     }
 
+    // Mark the linked issue as resolved so it doesn't appear in active issues on next render
+    if (snapshot.issueId) {
+      await db
+        .update(issues)
+        .set({ resolvedAt: new Date(), updatedAt: new Date() })
+        .where(eq(issues.id, snapshot.issueId));
+    }
+
     // Fire-and-forget email — non-blocking, never throws to user
     try {
       const [userRecord] = await db

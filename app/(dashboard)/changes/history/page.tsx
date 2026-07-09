@@ -19,14 +19,16 @@ type Props = {
 export default async function ChangeHistoryPage({ searchParams }: Props) {
   const { page, cmsType, status } = await searchParams;
   const pageNum = Math.max(1, parseInt(page ?? "1", 10));
-  await getServerSession();
 
   const statusFilter = status && ["applied", "rolled_back"].includes(status) ? status : undefined;
   const cmsTypeFilter = cmsType && ["wordpress", "shopify", "webflow"].includes(cmsType) ? cmsType : undefined;
 
+  const session = await getServerSession();
+
   const conditions = [
     isNull(changeSnapshots.deletedAt),
     inArray(changeSnapshots.status, ["applied", "rolled_back", "failed", "reverted"]),
+    eq(changeSnapshots.userId, session.user.id as string),
   ];
 
   const records = await db

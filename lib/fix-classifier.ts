@@ -33,6 +33,31 @@ const QUICK_FIX_TYPES = new Set([
 
 export type FixType = "quick" | "major";
 
+// Maps issue type → the CMS field that fixing it would change.
+// Used to cross-reference applied snapshots when suppressing already-fixed issues.
+export const ISSUE_TYPE_TO_FIELD: Record<string, "meta_title" | "meta_description" | "h1"> = {
+  "meta-title-missing": "meta_title",
+  "meta-title-too-short": "meta_title",
+  "meta-title-too-long": "meta_title",
+  "og-title-missing": "meta_title",
+  "twitter-card-missing": "meta_title",
+  "canonical-missing": "meta_title",
+  "duplicate-meta-title": "meta_title",
+  "duplicate-og-title": "meta_title",
+  "h1-title-identical-sitewide": "meta_title",
+  "meta-description-missing": "meta_description",
+  "meta-description-too-short": "meta_description",
+  "meta-description-too-long": "meta_description",
+  "og-description-missing": "meta_description",
+  "duplicate-meta-description": "meta_description",
+  "h1-missing": "h1",
+  "h1-too-long": "h1",
+  "h1-matches-title": "h1",
+  "duplicate-h1": "h1",
+  "images-missing-alt": "h1",
+  "images-empty-alt": "h1",
+};
+
 export function classifyFix(issueType: string): FixType {
   return QUICK_FIX_TYPES.has(issueType) ? "quick" : "major";
 }
