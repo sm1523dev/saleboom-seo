@@ -148,7 +148,7 @@ export function CmsConnectForm({ websiteId, initialState }: Props) {
         {/* Shopify fields */}
         {cmsType === "shopify" && (
           <>
-            <Field id="shopify-url" label="Shopify store URL" type="url" required placeholder="https://yourstore.myshopify.com" value={shopifyUrl} onChange={setShopifyUrl} />
+            <Field id="shopify-url" label="Shopify store URL" type="url" required placeholder="https://yourstore.myshopify.com" value={shopifyUrl} onChange={setShopifyUrl} hint="Use your .myshopify.com URL, e.g. https://seo-test-1qwtfiyp.myshopify.com — not the admin.shopify.com URL" />
             <Field
               id="shopify-token"
               label="Admin API access token"

@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import type { LinkOpportunity } from "@/app/actions/internal-links.actions";
+import type { LinkOpportunity } from "@/lib/internal-links/analyzer";
 import { cn } from "@/lib/utils";
 
 type Props = {

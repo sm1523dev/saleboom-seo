@@ -6,6 +6,16 @@ type ShopifyCreds = CmsCredentials["shopify"];
 
 const MAX_RETRIES = 3;
 
+function normalizeStoreUrl(storeUrl: string): string {
+  const raw = storeUrl.trim().replace(/\/$/, "");
+  // Accept admin.shopify.com/store/<handle> → convert to <handle>.myshopify.com
+  const adminMatch = raw.match(/admin\.shopify\.com\/store\/([^/?#]+)/);
+  if (adminMatch) return `https://${adminMatch[1]}.myshopify.com`;
+  // Accept bare handle (no dots) → append .myshopify.com
+  if (!raw.includes(".")) return `https://${raw}.myshopify.com`;
+  return raw.startsWith("http") ? raw : `https://${raw}`;
+}
+
 async function shopifyGraphQL(
   storeUrl: string,
   accessToken: string,
@@ -13,8 +23,8 @@ async function shopifyGraphQL(
   variables: Record<string, unknown>,
   attempt = 0,
 ): Promise<{ data?: Record<string, unknown>; errors?: Array<{ message: string }> }> {
-  const base = storeUrl.trim().replace(/\/$/, "");
-  const endpoint = `${base.startsWith("http") ? base : `https://${base}`}/admin/api/2024-01/graphql.json`;
+  const base = normalizeStoreUrl(storeUrl);
+  const endpoint = `${base}/admin/api/2024-01/graphql.json`;
 
   const res = await fetch(endpoint, {
     method: "POST",
@@ -117,7 +127,9 @@ export class ShopifyAdapter implements CmsAdapter<"shopify"> {
       return { valid: true, userLogin: name ?? creds.storeUrl };
     } catch (err) {
       if (err instanceof CmsAuthError) return { valid: false, error: "Invalid access token" };
-      return { valid: false, error: "Could not reach Shopify store" };
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Shopify validate] error:", msg);
+      return { valid: false, error: `Could not reach Shopify store: ${msg}` };
     }
   }
 
