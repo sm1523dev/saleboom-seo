@@ -6,8 +6,6 @@ import { websites, scans } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { findLinkOpportunities, type LinkOpportunity, type PageData } from "@/lib/internal-links/analyzer";
 
-export type { LinkOpportunity };
-
 export async function getInternalLinkOpportunities(
   websiteId: string,
 ): Promise<LinkOpportunity[] | { error: string }> {
