@@ -71,11 +71,10 @@ const DEPRECATED_PROVIDER_NAMES = [
 ];
 
 export async function seedGlobalProviders(): Promise<void> {
-  // Disable stale/renamed providers so they don't run in background AEO jobs
+  // Delete stale/renamed providers — they are gone from the active config
   if (DEPRECATED_PROVIDER_NAMES.length > 0) {
     await db
-      .update(aeoProviders)
-      .set({ enabled: false })
+      .delete(aeoProviders)
       .where(inArray(aeoProviders.displayName, [...DEPRECATED_PROVIDER_NAMES]));
   }
 

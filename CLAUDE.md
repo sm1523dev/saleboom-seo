@@ -29,7 +29,7 @@ When working on any task in this project, always use available tools proactively
 
 **Standing constraints (all sessions, all weeks):**
 - `floci-az` is the Azure deployment/management tool — do not install it; user provides it
-- Firecrawl is self-hosted locally at `localhost:3002` — use `FIRECRAWL_API_URL` env var
+- Firecrawl is the **cloud service** (`https://api.firecrawl.dev`) — set `FIRECRAWL_API_KEY` only; do NOT set `FIRECRAWL_API_URL`
 - ORM: Drizzle ORM (not Prisma)
 - Auth: NextAuth v5 (Auth.js) with Microsoft Entra ID only
 - Azure infra: Azure Queue Storage + Azure Functions (Node.js v4 model)

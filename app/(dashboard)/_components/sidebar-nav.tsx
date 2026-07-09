@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { signOutAction } from "@/app/(dashboard)/profile/actions";
 
-const NAV_ITEMS = [
+export const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: "◎" },
   { href: "/scan", label: "New Scan", icon: "⊙" },
   { href: "/aeo", label: "AEO", icon: "⊛" },
@@ -14,35 +14,33 @@ const NAV_ITEMS = [
   { href: "/changes/history", label: "History", icon: "⊟" },
 ] as const;
 
-const ADMIN_NAV_ITEMS = [
+export const ADMIN_NAV_ITEMS = [
   { href: "/admin/stats", label: "System Stats", icon: "⊞" },
   { href: "/admin/users", label: "Users", icon: "⊕" },
   { href: "/admin/providers", label: "Providers", icon: "⊗" },
+  { href: "/admin/requests", label: "Requests", icon: "⊜" },
 ] as const;
 
-type Props = {
+export type SidebarProps = {
   userName: string | null;
   userEmail: string;
   isAdmin?: boolean;
   unreadAlerts?: number;
+  pendingRequests?: number;
 };
 
-export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: Props) {
+export function NavContent({
+  userName,
+  userEmail,
+  isAdmin,
+  unreadAlerts = 0,
+  pendingRequests = 0,
+  onNavigate,
+}: SidebarProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
 
   return (
-    <aside
-      className="flex w-56 shrink-0 flex-col border-r border-border bg-card"
-      aria-label="Dashboard navigation"
-    >
-      {/* Logo */}
-      <div className="flex h-14 items-center border-b border-border px-4">
-        <span className="text-sm font-semibold">
-          <span className="text-gradient">SaleBoom</span>{" "}
-          <span className="text-muted-foreground">SEO</span>
-        </span>
-      </div>
-
+    <>
       {/* Nav */}
       <nav className="flex-1 p-2" aria-label="Main navigation">
         <ul className="space-y-0.5" role="list">
@@ -52,6 +50,7 @@ export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: P
               <li key={item.href}>
                 <Link
                   href={item.href}
+                  onClick={onNavigate}
                   aria-current={isActive ? "page" : undefined}
                   className={cn(
                     "group flex items-center gap-3 rounded-md px-3 py-2 text-sm",
@@ -95,6 +94,7 @@ export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: P
                   <li key={item.href}>
                     <Link
                       href={item.href}
+                      onClick={onNavigate}
                       aria-current={isActive ? "page" : undefined}
                       className={cn(
                         "group flex items-center gap-3 rounded-md px-3 py-2 text-sm",
@@ -116,6 +116,11 @@ export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: P
                         {item.icon}
                       </span>
                       {item.label}
+                      {item.href === "/admin/requests" && pendingRequests > 0 && (
+                        <span className="ml-auto rounded-full bg-yellow-500/20 px-1.5 py-0.5 font-mono text-[10px] font-bold text-yellow-400">
+                          {pendingRequests}
+                        </span>
+                      )}
                     </Link>
                   </li>
                 );
@@ -129,6 +134,7 @@ export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: P
       <div className="border-t border-border p-3 space-y-1">
         <Link
           href="/profile"
+          onClick={onNavigate}
           className={cn(
             "flex items-center gap-3 rounded-md px-3 py-2 text-sm transition-colors duration-150",
             "border-l-2",
@@ -164,6 +170,25 @@ export function SidebarNav({ userName, userEmail, isAdmin, unreadAlerts = 0 }: P
           </button>
         </form>
       </div>
+    </>
+  );
+}
+
+export function SidebarNav(props: SidebarProps) {
+  return (
+    <aside
+      className="hidden md:flex w-56 shrink-0 flex-col border-r border-border bg-card"
+      aria-label="Dashboard navigation"
+    >
+      {/* Logo */}
+      <div className="flex h-14 items-center border-b border-border px-4">
+        <span className="text-sm font-semibold">
+          <span className="text-gradient">SaleBoom</span>{" "}
+          <span className="text-muted-foreground">SEO</span>
+        </span>
+      </div>
+
+      <NavContent {...props} />
     </aside>
   );
 }

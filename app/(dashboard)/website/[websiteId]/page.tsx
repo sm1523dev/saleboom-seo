@@ -197,7 +197,7 @@ export default async function WebsiteDetailPage({ params }: Props) {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <header className="flex items-start justify-between gap-4">
+      <header className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <Link href="/dashboard" className="mb-1 inline-block text-xs text-muted-foreground hover:text-foreground transition-colors">
             ← All websites
@@ -205,7 +205,7 @@ export default async function WebsiteDetailPage({ params }: Props) {
           <h1 className="text-2xl font-semibold tracking-tight">{site.name}</h1>
           <p className="mt-0.5 font-mono text-xs text-muted-foreground">{site.url}</p>
         </div>
-        <div className="flex shrink-0 items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <a
             href={`/api/reports/${websiteId}/pdf`}
             target="_blank"
@@ -349,7 +349,7 @@ export default async function WebsiteDetailPage({ params }: Props) {
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
@@ -374,7 +374,7 @@ export default async function WebsiteDetailPage({ params }: Props) {
       {citationsWithName.length > 0 && (
         <section>
           <h2 className="mb-3 text-sm font-semibold">AI Citations</h2>
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
             <Table>
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">

@@ -4,7 +4,7 @@ import { inArray, eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { issues, changeSnapshots, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
-import { aiProvider } from "@/lib/ai";
+import { getAiProvider } from "@/lib/ai";
 import type { CmsField } from "@/lib/cms/types";
 
 type IssueFix = {
@@ -103,7 +103,7 @@ export async function generateAndQueueIssueFixes(
         description: issue.description,
         pageUrl: issue.pageUrl,
       });
-      const result = await aiProvider.generateText(prompt, {
+      const result = await (await getAiProvider()).generateText(prompt, {
         system: "You are an SEO expert. Reply with ONLY the requested text value — no explanations, no quotes, no labels. Be direct and concise.",
         maxTokens: 2000,
       });

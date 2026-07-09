@@ -6,6 +6,7 @@ export type AeoProvider = {
   providerType: AeoProviderType;
   endpointUrl: string | null;
   apiKeyEnvVar: string | null;
+  encryptedKeyBlob: string | null;
   model: string;
 };
 

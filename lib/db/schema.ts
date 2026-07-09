@@ -21,6 +21,44 @@ const timestamps = {
   deletedAt: timestamp("deleted_at", { withTimezone: true }),
 };
 
+export const infraProviderTypeEnum = pgEnum("infra_provider_type", [
+  "ai", "crawl", "queue", "storage", "notifications",
+]);
+
+export const infraSwitchModeEnum = pgEnum("infra_switch_mode", [
+  "runtime", "restart", "redeploy",
+]);
+
+export const infraProviders = pgTable("infra_providers", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  type: infraProviderTypeEnum("type").notNull().unique(),
+  name: varchar("name", { length: 50 }).notNull(),
+  config: jsonb("config").$type<Record<string, string>>().default({}),
+  encryptedKeyBlob: text("encrypted_key_blob"),
+  switchMode: infraSwitchModeEnum("switch_mode").notNull().default("runtime"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const providerRequestStatusEnum = pgEnum("provider_request_status", [
+  "pending", "in_progress", "rejected", "ready",
+]);
+
+export const providerRequests = pgTable(
+  "provider_requests",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    type: infraProviderTypeEnum("type").notNull(),
+    providerName: varchar("provider_name", { length: 100 }).notNull(),
+    reason: text("reason"),
+    requestedBy: uuid("requested_by").notNull().references(() => users.id, { onDelete: "cascade" }),
+    developerEmail: text("developer_email"),
+    adminNote: text("admin_note"),
+    status: providerRequestStatusEnum("status").notNull().default("pending"),
+    ...timestamps,
+  },
+  (t) => [index("provider_requests_status_idx").on(t.status)],
+);
+
 export const scanStatusEnum = pgEnum("scan_status", [
   "pending",
   "running",
@@ -240,6 +278,7 @@ export const aeoProviders = pgTable(
     endpointUrl: text("endpoint_url"),
     // "env:GROQ_API_KEY" — resolved at query time from env vars
     apiKeyEnvVar: varchar("api_key_env_var", { length: 100 }),
+    encryptedKeyBlob: text("encrypted_key_blob"),
     model: varchar("model", { length: 100 }).notNull(),
     enabled: boolean("enabled").default(true).notNull(),
     ...timestamps,

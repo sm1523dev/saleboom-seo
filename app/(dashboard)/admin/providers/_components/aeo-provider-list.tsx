@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
-import { toggleAeoProvider, updateAeoProvider } from "@/app/actions/providers.actions";
+import { toggleAeoProvider, updateAeoProvider, deleteAeoProvider, setAeoProviderKey } from "@/app/actions/providers.actions";
 
 type AeoProvider = {
   id: string;
@@ -10,6 +10,7 @@ type AeoProvider = {
   providerType: string;
   endpointUrl: string | null;
   apiKeyEnvVar: string | null;
+  encryptedKeyBlob: string | null;
   model: string;
   enabled: boolean;
 };
@@ -31,7 +32,12 @@ function ProviderTypeBadge({ type }: { type: string }) {
 
 function ProviderRow({ provider }: { provider: AeoProvider }) {
   const [isEditing, setIsEditing] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [showKeyInput, setShowKeyInput] = useState(false);
+  const [keyValue, setKeyValue] = useState("");
+  const [keyStatus, setKeyStatus] = useState<"idle" | "saved" | "error">("idle");
   const [isPending, startTransition] = useTransition();
+  const [keyPending, startKeyTransition] = useTransition();
   const [editForm, setEditForm] = useState<EditFormState>({
     displayName: provider.displayName,
     model: provider.model,
@@ -62,6 +68,26 @@ function ProviderRow({ provider }: { provider: AeoProvider }) {
       } else if (result.error) {
         // eslint-disable-next-line no-console
         console.error("[providers]", result.error);
+      }
+    });
+  }
+
+  function handleDelete() {
+    startTransition(async () => {
+      await deleteAeoProvider(provider.id);
+    });
+  }
+
+  function handleSaveKey() {
+    startKeyTransition(async () => {
+      const result = await setAeoProviderKey(provider.id, keyValue);
+      if (result.success) {
+        setKeyStatus("saved");
+        setKeyValue("");
+        setShowKeyInput(false);
+        setTimeout(() => setKeyStatus("idle"), 2500);
+      } else {
+        setKeyStatus("error");
       }
     });
   }
@@ -178,13 +204,42 @@ function ProviderRow({ provider }: { provider: AeoProvider }) {
         <p className="mt-0.5 font-mono text-xs text-muted-foreground">{provider.model}</p>
       </div>
 
-      {/* Middle: env var */}
-      <div className="hidden shrink-0 lg:block">
-        {provider.apiKeyEnvVar ? (
-          <span className="font-mono text-xs text-muted-foreground">{provider.apiKeyEnvVar}</span>
+      {/* Middle: key status */}
+      <div className="hidden shrink-0 flex-col gap-1 lg:flex">
+        <div className="flex items-center gap-1.5">
+          <span className={`h-1.5 w-1.5 rounded-full ${provider.encryptedKeyBlob ? "bg-emerald-400" : "bg-muted-foreground/30"}`} />
+          <span className="font-mono text-xs text-muted-foreground">
+            {provider.encryptedKeyBlob ? "key stored" : (provider.apiKeyEnvVar ?? "no key")}
+          </span>
+        </div>
+        {showKeyInput ? (
+          <div className="flex items-center gap-1">
+            <input
+              type="password"
+              value={keyValue}
+              onChange={(e) => setKeyValue(e.target.value)}
+              placeholder="Paste key…"
+              className="w-36 rounded border border-border bg-muted/40 px-2 py-0.5 font-mono text-xs text-foreground outline-none focus:border-primary/50"
+            />
+            <button
+              onClick={handleSaveKey}
+              disabled={keyPending || !keyValue.trim()}
+              className="rounded px-2 py-0.5 text-[10px] font-medium text-primary hover:text-primary/80 disabled:opacity-40"
+            >
+              {keyPending ? "…" : "save"}
+            </button>
+            <button onClick={() => setShowKeyInput(false)} className="text-[10px] text-muted-foreground/50 hover:text-muted-foreground">✕</button>
+          </div>
         ) : (
-          <span className="text-xs text-muted-foreground/40">—</span>
+          <button
+            onClick={() => setShowKeyInput(true)}
+            className="text-left text-[10px] text-muted-foreground/40 hover:text-primary"
+          >
+            {provider.encryptedKeyBlob ? "rotate key" : "set key"}
+          </button>
         )}
+        {keyStatus === "saved" && <span className="text-[10px] text-emerald-400">Saved.</span>}
+        {keyStatus === "error" && <span className="text-[10px] text-red-400">Failed.</span>}
       </div>
 
       {/* Right: status + actions */}
@@ -221,6 +276,33 @@ function ProviderRow({ provider }: { provider: AeoProvider }) {
         >
           Edit
         </button>
+
+        {confirmDelete ? (
+          <div className="flex items-center gap-1">
+            <button
+              onClick={handleDelete}
+              disabled={isPending}
+              className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-1 text-xs font-medium text-red-400 transition-colors hover:bg-red-500/20 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              {isPending ? "…" : "Confirm"}
+            </button>
+            <button
+              onClick={() => setConfirmDelete(false)}
+              disabled={isPending}
+              className="rounded-md border border-border bg-muted px-3 py-1 text-xs font-medium text-muted-foreground transition-colors hover:bg-muted/80 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Cancel
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setConfirmDelete(true)}
+            disabled={isPending}
+            className="rounded-md border border-border px-3 py-1 text-xs font-medium text-muted-foreground/60 transition-colors hover:border-red-500/30 hover:text-red-400 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Delete
+          </button>
+        )}
       </div>
     </motion.div>
   );

@@ -11,14 +11,16 @@ export { SdkError as FirecrawlError, JobTimeoutError as FirecrawlTimeoutError };
 export class FirecrawlCrawlProvider implements CrawlProvider {
   private readonly client: Firecrawl;
 
-  constructor() {
-    const timeoutMs = process.env.FIRECRAWL_TIMEOUT_MS
-      ? Number(process.env.FIRECRAWL_TIMEOUT_MS)
-      : 30_000;
+  constructor(apiKey?: string, config?: Record<string, string>) {
+    const timeoutMs = config?.timeoutMs
+      ? Number(config.timeoutMs)
+      : process.env.FIRECRAWL_TIMEOUT_MS
+        ? Number(process.env.FIRECRAWL_TIMEOUT_MS)
+        : 30_000;
 
     this.client = new Firecrawl({
-      apiKey: process.env.FIRECRAWL_API_KEY,
-      apiUrl: process.env.FIRECRAWL_API_URL,
+      apiKey: apiKey ?? process.env.FIRECRAWL_API_KEY,
+      apiUrl: config?.apiUrl ?? process.env.FIRECRAWL_API_URL,
       timeoutMs,
       maxRetries: 3,
       backoffFactor: 2,

@@ -24,7 +24,11 @@ export async function signUpWithCredentials(formData: FormData) {
   if (existing) throw new Error("An account with this email already exists.");
 
   const passwordHash = await hashPassword(password);
-  await db.insert(users).values({ email, name: nameStr, passwordHash });
+  try {
+    await db.insert(users).values({ email, name: nameStr, passwordHash });
+  } catch {
+    throw new Error("Failed to create account. Please try again.");
+  }
 
   const raw = formData.get("callbackUrl");
   const redirectTo = typeof raw === "string" && raw.startsWith("/") ? raw : "/dashboard";

@@ -54,6 +54,15 @@ function ScoreCell({ score, showGrade }: { score: number | null; showGrade?: boo
   );
 }
 
+function ScorePill({ label, score, showGrade }: { label: string; score: number | null; showGrade?: boolean }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-[10px] uppercase tracking-wide text-muted-foreground">{label}</span>
+      <ScoreCell score={score} showGrade={showGrade} />
+    </div>
+  );
+}
+
 function RescanButton({ websiteId }: { websiteId: string }) {
   const [isPending, startTransition] = useTransition();
 
@@ -96,74 +105,117 @@ export function AgencyTable({ websites }: { websites: WebsiteRow[] }) {
   }
 
   return (
-    <div className="card-glow overflow-hidden rounded-xl border border-border bg-card">
-      <table className="w-full text-sm">
-        <thead>
-          <tr className="border-b border-border text-xs text-muted-foreground">
-            <th className="px-4 py-3 text-left font-medium">Website</th>
-            <th className="px-4 py-3 text-center font-medium">DVS™</th>
-            <th className="px-4 py-3 text-center font-medium">SEO</th>
-            <th className="px-4 py-3 text-center font-medium">AEO</th>
-            <th className="px-4 py-3 text-center font-medium">Open Issues</th>
-            <th className="px-4 py-3 text-left font-medium">Last Scan</th>
-            <th className="px-4 py-3 text-right font-medium">Actions</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-border">
-          {websites.map((row) => (
-            <tr key={row.id} className="group transition-colors hover:bg-accent/50">
-              <td className="px-4 py-4">
-                <div className="flex items-center gap-3">
-                  <div
-                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
-                    aria-hidden="true"
-                  >
-                    {row.name.charAt(0).toUpperCase()}
-                  </div>
-                  <div className="min-w-0">
-                    <p className="font-medium">{row.name}</p>
-                    <p className="truncate font-mono text-xs text-muted-foreground max-w-[200px]">
-                      {row.url}
-                    </p>
-                  </div>
-                </div>
-              </td>
-              <td className="px-4 py-4 text-center">
-                <ScoreCell score={row.dvsScore} showGrade />
-              </td>
-              <td className="px-4 py-4 text-center">
-                <ScoreCell score={row.seoScore} />
-              </td>
-              <td className="px-4 py-4 text-center">
-                <ScoreCell score={row.aeoScore} />
-              </td>
-              <td className="px-4 py-4 text-center">
-                {row.openIssues > 0 ? (
-                  <span className="inline-flex items-center justify-center rounded-full bg-red-500/10 px-2 py-0.5 font-mono text-xs font-medium text-red-400">
-                    {row.openIssues}
-                  </span>
-                ) : (
-                  <span className="font-mono text-xs text-muted-foreground">0</span>
-                )}
-              </td>
-              <td className="px-4 py-4 text-xs text-muted-foreground">
-                {row.lastScanAt ? relativeTime(row.lastScanAt) : <span className="italic">Never</span>}
-              </td>
-              <td className="px-4 py-4">
-                <div className="flex items-center justify-end gap-2">
-                  <Link
-                    href={`/website/${row.id}`}
-                    className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
-                  >
-                    View →
-                  </Link>
-                  <RescanButton websiteId={row.id} />
-                </div>
-              </td>
+    <>
+      {/* Desktop table — hidden on mobile */}
+      <div className="card-glow hidden overflow-hidden rounded-xl border border-border bg-card md:block">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-border text-xs text-muted-foreground">
+              <th className="px-4 py-3 text-left font-medium">Website</th>
+              <th className="px-4 py-3 text-center font-medium">DVS™</th>
+              <th className="px-4 py-3 text-center font-medium">SEO</th>
+              <th className="px-4 py-3 text-center font-medium">AEO</th>
+              <th className="px-4 py-3 text-center font-medium">Open Issues</th>
+              <th className="px-4 py-3 text-left font-medium">Last Scan</th>
+              <th className="px-4 py-3 text-right font-medium">Actions</th>
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody className="divide-y divide-border">
+            {websites.map((row) => (
+              <tr key={row.id} className="group transition-colors hover:bg-accent/50">
+                <td className="px-4 py-4">
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
+                      aria-hidden="true"
+                    >
+                      {row.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="min-w-0">
+                      <p className="font-medium">{row.name}</p>
+                      <p className="truncate font-mono text-xs text-muted-foreground max-w-[200px]">
+                        {row.url}
+                      </p>
+                    </div>
+                  </div>
+                </td>
+                <td className="px-4 py-4 text-center">
+                  <ScoreCell score={row.dvsScore} showGrade />
+                </td>
+                <td className="px-4 py-4 text-center">
+                  <ScoreCell score={row.seoScore} />
+                </td>
+                <td className="px-4 py-4 text-center">
+                  <ScoreCell score={row.aeoScore} />
+                </td>
+                <td className="px-4 py-4 text-center">
+                  {row.openIssues > 0 ? (
+                    <span className="inline-flex items-center justify-center rounded-full bg-red-500/10 px-2 py-0.5 font-mono text-xs font-medium text-red-400">
+                      {row.openIssues}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-xs text-muted-foreground">0</span>
+                  )}
+                </td>
+                <td className="px-4 py-4 text-xs text-muted-foreground">
+                  {row.lastScanAt ? relativeTime(row.lastScanAt) : <span className="italic">Never</span>}
+                </td>
+                <td className="px-4 py-4">
+                  <div className="flex items-center justify-end gap-2">
+                    <Link
+                      href={`/website/${row.id}`}
+                      className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100 hover:text-foreground"
+                    >
+                      View →
+                    </Link>
+                    <RescanButton websiteId={row.id} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
+      {/* Mobile card layout — visible only below md */}
+      <div className="space-y-3 md:hidden">
+        {websites.map((row) => (
+          <Link
+            key={row.id}
+            href={`/website/${row.id}`}
+            className="card-glow block rounded-xl border border-border bg-card p-4 transition-colors active:bg-accent/50"
+          >
+            <div className="flex items-center gap-3">
+              <div
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-primary/20 text-sm font-bold text-primary"
+                aria-hidden="true"
+              >
+                {row.name.charAt(0).toUpperCase()}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-sm font-medium">{row.name}</p>
+                <p className="truncate font-mono text-xs text-muted-foreground">
+                  {row.url}
+                </p>
+              </div>
+              {row.openIssues > 0 && (
+                <span className="shrink-0 rounded-full bg-red-500/10 px-2 py-0.5 font-mono text-xs font-medium text-red-400">
+                  {row.openIssues}
+                </span>
+              )}
+            </div>
+
+            <div className="mt-3 flex items-center gap-4 border-t border-border pt-3">
+              <ScorePill label="DVS" score={row.dvsScore} showGrade />
+              <ScorePill label="SEO" score={row.seoScore} />
+              <ScorePill label="AEO" score={row.aeoScore} />
+              <span className="ml-auto text-xs text-muted-foreground">
+                {row.lastScanAt ? relativeTime(row.lastScanAt) : "Never"}
+              </span>
+            </div>
+          </Link>
+        ))}
+      </div>
+    </>
   );
 }

@@ -3,12 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "node --env-file-if-exists=.env scripts/premigrate.mjs && next dev",
     "dev:all": "concurrently --names \"nextjs,worker\" --prefix-colors \"cyan,yellow\" \"npm run dev:nextjs\" \"npm run dev:worker\"",
-    "dev:nextjs": "mkdir -p logs && next dev 2>&1 | tee logs/nextjs.log",
+    "dev:nextjs": "mkdir -p logs && node --env-file-if-exists=.env scripts/premigrate.mjs && next dev 2>&1 | tee logs/nextjs.log",
     "dev:worker": "mkdir -p logs && npx tsx --env-file=.env workers/index.ts 2>&1 | tee logs/worker.log",
     "build": "next build",
-    "start": "next start",
+    "start": "node --env-file-if-exists=.env scripts/premigrate.mjs && next start",
     "lint": "eslint",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
@@ -37,6 +37,7 @@
     "@opentelemetry/sdk-node": "^0.220.0",
     "@opentelemetry/sdk-trace-node": "^2.9.0",
     "@opentelemetry/semantic-conventions": "^1.41.1",
+    "@radix-ui/react-dialog": "^1.1.19",
     "@radix-ui/react-label": "^2.1.10",
     "@radix-ui/react-select": "^2.3.1",
     "@radix-ui/react-separator": "^1.1.10",
@@ -83,5 +84,9 @@
     "tailwindcss": "^4",
     "typescript": "^5",
     "wrangler": "^4.107.0"
+  },
+  "optionalDependencies": {
+    "@azure/identity": "^4.13.1",
+    "@azure/keyvault-keys": "^4.10.2"
   }
 }

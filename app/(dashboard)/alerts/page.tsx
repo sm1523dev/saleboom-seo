@@ -115,7 +115,7 @@ export default async function AlertsPage() {
                         {config.label}
                       </span>
                       <span className="text-[11px] text-muted-foreground">{alert.websiteName}</span>
-                      <span className="ml-auto text-[11px] text-muted-foreground">
+                      <span className="ml-auto shrink-0 text-[11px] text-muted-foreground">
                         {timeAgo(new Date(alert.createdAt))}
                       </span>
                     </div>

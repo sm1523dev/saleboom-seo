@@ -40,6 +40,8 @@ const nextConfig: NextConfig = {
     "@ai-sdk/azure",
     "@sendgrid/mail",
     "twilio",
+    "@azure/keyvault-keys",
+    "@azure/identity",
   ],
 };
 

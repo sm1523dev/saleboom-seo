@@ -159,7 +159,7 @@ export function ApprovalQueue({ items }: Props) {
         return (
           <div key={websiteKey} className="space-y-3">
             {/* Website header */}
-            <div className="flex items-center justify-between gap-4 rounded-xl border border-border bg-muted/30 px-4 py-3">
+            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between rounded-xl border border-border bg-muted/30 px-4 py-3">
               <div className="flex items-center gap-3">
                 <input type="checkbox" className="rounded" checked={allGroupSelected}
                   onChange={() => toggleGroup(groupIds)}
@@ -209,7 +209,7 @@ export function ApprovalQueue({ items }: Props) {
                           state === "error" ? "border-red-500/30" : "border-border",
                           selected.has(item.id) && "border-primary/40 bg-primary/5",
                         )}>
-                        <div className="flex items-start gap-3">
+                        <div className="flex flex-col gap-3 sm:flex-row sm:items-start">
                           <input type="checkbox" className="mt-0.5 rounded"
                             checked={selected.has(item.id)}
                             onChange={() => toggleItem(item.id)}
@@ -241,7 +241,7 @@ export function ApprovalQueue({ items }: Props) {
                               <p className="mt-2 text-xs text-red-400">{errors[item.id]}</p>
                             )}
                           </div>
-                          <div className="flex shrink-0 flex-col gap-1.5">
+                          <div className="flex shrink-0 gap-1.5 sm:flex-col">
                             {item.isCmsConnected && (
                               <button type="button" onClick={() => handlePush(item.id)} disabled={isPushing}
                                 className="btn-press rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">

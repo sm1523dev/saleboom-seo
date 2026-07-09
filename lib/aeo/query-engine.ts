@@ -3,7 +3,11 @@ import type { AeoProvider, QueryResult } from "./types";
 const PERPLEXITY_BASE_URL = "https://api.perplexity.ai";
 const GOOGLE_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/";
 
-function resolveKey(provider: AeoProvider): string {
+async function resolveKey(provider: AeoProvider): Promise<string> {
+  if (provider.encryptedKeyBlob) {
+    const { decryptSecret } = await import("@/lib/secrets");
+    return decryptSecret(provider.encryptedKeyBlob).catch(() => "");
+  }
   return (provider.apiKeyEnvVar ? process.env[provider.apiKeyEnvVar] : undefined) ?? "";
 }
 
@@ -26,14 +30,14 @@ export async function queryAeoProvider(
   provider: AeoProvider,
   prompt: string
 ): Promise<QueryResult> {
-  const apiKey = provider.apiKeyEnvVar ? process.env[provider.apiKeyEnvVar] : undefined;
+  const apiKey = await resolveKey(provider);
   if (!apiKey) return mockResponse(prompt);
 
   const { generateText } = await import("ai");
 
   if (provider.providerType === "anthropic") {
     const { createAnthropic } = await import("@ai-sdk/anthropic");
-    const client = createAnthropic({ apiKey: resolveKey(provider) });
+    const client = createAnthropic({ apiKey });
     const { text } = await generateText({ model: client(provider.model), prompt });
     return { text, citations: [] };
   }
@@ -47,7 +51,7 @@ export async function queryAeoProvider(
         ? GOOGLE_BASE_URL
         : (provider.endpointUrl ?? undefined);
 
-  const openai = createOpenAI({ baseURL, apiKey: resolveKey(provider) });
+  const openai = createOpenAI({ baseURL, apiKey });
   const result = await generateText({ model: openai(provider.model), prompt });
 
   // Perplexity returns source URLs in experimental_providerMetadata

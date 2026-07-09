@@ -1,29 +1,38 @@
 import type { AIProvider } from "./types";
+import { resolveInfraProvider } from "@/lib/providers/resolver";
 
-function createProvider(): AIProvider {
+function createFromEnv(): AIProvider {
   const name = process.env.AI_PROVIDER ?? "mock";
+  return createByName(name, undefined, {});
+}
 
+function createByName(name: string, apiKey: string | undefined, config: Record<string, string>): AIProvider {
   switch (name) {
     case "azure":
-      return new (require("./providers/azure").AzureAIProvider)();
+      return new (require("./providers/azure").AzureAIProvider)(apiKey);
     case "openai":
-      return new (require("./providers/openai").OpenAIProvider)();
+      return new (require("./providers/openai").OpenAIProvider)(apiKey);
     case "anthropic":
-      return new (require("./providers/anthropic").AnthropicAIProvider)();
+      return new (require("./providers/anthropic").AnthropicAIProvider)(apiKey);
     case "ollama":
-      return new (require("./providers/ollama").OllamaAIProvider)();
+      return new (require("./providers/ollama").OllamaAIProvider)(apiKey, config);
     case "nim":
-      return new (require("./providers/nim").NimAIProvider)();
+      return new (require("./providers/nim").NimAIProvider)(apiKey, config);
     case "groq":
-      return new (require("./providers/groq").GroqAIProvider)();
+      return new (require("./providers/groq").GroqAIProvider)(apiKey);
+    case "custom":
+      return new (require("./providers/custom").CustomAIProvider)(apiKey, config);
     case "mock":
       return new (require("./providers/mock").MockAIProvider)();
     default:
-      throw new Error(
-        `Unknown AI_PROVIDER: "${name}". Valid: azure, nim, openai, anthropic, ollama, groq, mock`
-      );
+      throw new Error(`Unknown AI provider: "${name}". Valid: azure, nim, openai, anthropic, ollama, groq, custom, mock`);
   }
 }
 
-export const aiProvider: AIProvider = createProvider();
+export async function getAiProvider(): Promise<AIProvider> {
+  const resolved = await resolveInfraProvider("ai");
+  if (resolved) return createByName(resolved.name, resolved.key, resolved.config);
+  return createFromEnv();
+}
+
 export type { AIProvider, GenerateOpts } from "./types";

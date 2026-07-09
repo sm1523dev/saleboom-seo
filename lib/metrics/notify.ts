@@ -1,4 +1,4 @@
-import { notificationProvider } from "@/lib/notifications";
+import { getNotificationProvider } from "@/lib/notifications";
 
 export async function notifyAlert(message: string): Promise<void> {
   const slackWebhook = process.env.SLACK_ALERT_WEBHOOK;
@@ -22,13 +22,15 @@ export async function notifyAlert(message: string): Promise<void> {
     const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
     if (recipients.length > 0) {
       tasks.push(
-        notificationProvider
-          .sendEmail({
-            to: recipients,
-            subject: "SaleBoom SEO Alert",
-            html: `<p>${message.replace(/\n/g, "<br>")}</p>`,
-            text: message,
-          })
+        getNotificationProvider()
+          .then((p) =>
+            p.sendEmail({
+              to: recipients,
+              subject: "SaleBoom SEO Alert",
+              html: `<p>${message.replace(/\n/g, "<br>")}</p>`,
+              text: message,
+            })
+          )
           .catch(() => {})
       );
     }

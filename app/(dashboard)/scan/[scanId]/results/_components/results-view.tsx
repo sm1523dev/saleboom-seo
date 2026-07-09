@@ -150,7 +150,7 @@ export function ResultsView({
     <div className="flex flex-col gap-8">
       {/* Header */}
       <header>
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">
               Audit Results
@@ -318,7 +318,7 @@ export function ResultsView({
           </div>
         )}
 
-        <div className="mb-3 flex items-center justify-between gap-3">
+        <div className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
           <h2 className="font-semibold">
             {filter
               ? `${SEVERITY_CONFIG[filter].label} Issues (${filtered.length})`
@@ -326,7 +326,7 @@ export function ResultsView({
                 ? `${fixFilter === "quick" ? "Quick Fix" : "Major Fix"} Issues (${filtered.length})`
                 : `All Issues (${issues.length})`}
           </h2>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {(filter || fixFilter) && (
               <button
                 type="button"
@@ -337,51 +337,48 @@ export function ResultsView({
                 Clear filter ×
               </button>
             )}
-            {/* Issue bulk actions */}
-            <div className="flex items-center gap-2">
-              <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-                <input
-                  type="checkbox"
-                  className="rounded"
-                  checked={selectedIssues.size === filtered.length && filtered.length > 0}
-                  onChange={() => {
-                    if (selectedIssues.size === filtered.length) {
-                      setSelectedIssues(new Set());
-                    } else {
-                      setSelectedIssues(new Set(filtered.map((i) => i.id)));
-                    }
-                  }}
-                  aria-label="Select all issues"
-                />
-                {selectedIssues.size > 0 ? `${selectedIssues.size} selected` : "Select all"}
-              </label>
-              <button
-                type="button"
-                onClick={() => {
-                  const ids = selectedIssues.size > 0
-                    ? Array.from(selectedIssues)
-                    : filtered.map((i) => i.id);
-                  startIgnoreIssuesTransition(async () => {
-                    await ignoreIssues(ids);
+            <label className="flex cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+              <input
+                type="checkbox"
+                className="rounded"
+                checked={selectedIssues.size === filtered.length && filtered.length > 0}
+                onChange={() => {
+                  if (selectedIssues.size === filtered.length) {
                     setSelectedIssues(new Set());
-                    router.refresh();
-                  });
+                  } else {
+                    setSelectedIssues(new Set(filtered.map((i) => i.id)));
+                  }
                 }}
-                disabled={isIgnoringIssues}
-                className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
-              >
-                {selectedIssues.size > 0
-                  ? `Ignore ${selectedIssues.size} selected`
-                  : `Ignore all`}
-              </button>
-              {filtered.some((i) => i.fixType === "quick") && (
-                <BulkFixButton
-                  selectedIssues={selectedIssues}
-                  allQuickIssues={filtered.filter((i) => i.fixType === "quick")}
-                  websiteId={websiteId}
-                />
-              )}
-            </div>
+                aria-label="Select all issues"
+              />
+              {selectedIssues.size > 0 ? `${selectedIssues.size} selected` : "Select all"}
+            </label>
+            <button
+              type="button"
+              onClick={() => {
+                const ids = selectedIssues.size > 0
+                  ? Array.from(selectedIssues)
+                  : filtered.map((i) => i.id);
+                startIgnoreIssuesTransition(async () => {
+                  await ignoreIssues(ids);
+                  setSelectedIssues(new Set());
+                  router.refresh();
+                });
+              }}
+              disabled={isIgnoringIssues}
+              className="rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:text-foreground disabled:opacity-50"
+            >
+              {selectedIssues.size > 0
+                ? `Ignore ${selectedIssues.size} selected`
+                : `Ignore all`}
+            </button>
+            {filtered.some((i) => i.fixType === "quick") && (
+              <BulkFixButton
+                selectedIssues={selectedIssues}
+                allQuickIssues={filtered.filter((i) => i.fixType === "quick")}
+                websiteId={websiteId}
+              />
+            )}
           </div>
         </div>
 
@@ -394,8 +391,8 @@ export function ResultsView({
             </p>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-xl border border-border bg-card">
-            <Table>
+          <div className="overflow-x-auto rounded-xl border border-border bg-card">
+            <Table className="min-w-[600px]">
               <TableHeader>
                 <TableRow className="border-border hover:bg-transparent">
                   <TableHead className="w-8 pr-0" />
@@ -491,8 +488,8 @@ export function ResultsView({
                 transition={{ duration: 0.2, ease: [0.23, 1, 0.32, 1] }}
                 className="mt-3 overflow-hidden"
               >
-                <div className="overflow-hidden rounded-xl border border-border bg-card opacity-60">
-                  <Table>
+                <div className="overflow-x-auto rounded-xl border border-border bg-card opacity-60">
+                  <Table className="min-w-[500px]">
                     <TableHeader>
                       <TableRow className="border-border hover:bg-transparent">
                         <TableHead className="text-xs">Severity</TableHead>

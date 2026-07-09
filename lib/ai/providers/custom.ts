@@ -2,23 +2,21 @@ import { generateText, Output } from "ai";
 import type { z } from "zod";
 import type { AIProvider, GenerateOpts } from "../types";
 
-const NIM_BASE_URL = "https://integrate.api.nvidia.com/v1";
-const DEFAULT_MODEL = "openai/gpt-oss-120b";
-
-export class NimAIProvider implements AIProvider {
+// Generic OpenAI-compatible provider — works with any endpoint that speaks the OpenAI API.
+// Covers: OpenRouter, Together AI, Groq, Mistral, any NIM-like or LiteLLM proxy, etc.
+export class CustomAIProvider implements AIProvider {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private readonly openai: any;
   private readonly _model: string;
 
   constructor(apiKey?: string, config?: Record<string, string>) {
-    const key = apiKey ?? process.env.NVIDIA_NIM_API_KEY;
-    if (!key) throw new Error("NVIDIA_NIM_API_KEY is required for AI_PROVIDER=nim");
+    const key = apiKey ?? process.env.CUSTOM_AI_API_KEY;
+    const baseURL = config?.endpointUrl ?? process.env.CUSTOM_AI_ENDPOINT_URL;
+    if (!key) throw new Error("API key required for custom AI provider — set it via admin UI");
+    if (!baseURL) throw new Error("Endpoint URL required for custom AI provider — set it via admin UI");
     const { createOpenAI } = require("@ai-sdk/openai");
-    this.openai = createOpenAI({
-      baseURL: config?.endpointUrl ?? NIM_BASE_URL,
-      apiKey: key,
-    });
-    this._model = config?.model ?? process.env.NIM_MODEL ?? DEFAULT_MODEL;
+    this.openai = createOpenAI({ baseURL, apiKey: key });
+    this._model = config?.model ?? process.env.CUSTOM_AI_MODEL ?? "gpt-4o";
   }
 
   private getModel(override?: string) {

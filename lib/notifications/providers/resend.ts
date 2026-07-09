@@ -4,13 +4,12 @@ export class ResendNotificationProvider implements NotificationProvider {
   private readonly client: import("resend").Resend;
   private readonly defaultFrom: string;
 
-  constructor() {
-    const apiKey = process.env.RESEND_API_KEY;
-    if (!apiKey) throw new Error("RESEND_API_KEY is required for NOTIFICATION_PROVIDER=resend");
-
+  constructor(apiKey?: string, config?: Record<string, string>) {
+    const key = apiKey ?? process.env.RESEND_API_KEY;
+    if (!key) throw new Error("RESEND_API_KEY is required for NOTIFICATION_PROVIDER=resend");
     const { Resend } = require("resend") as typeof import("resend");
-    this.client = new Resend(apiKey);
-    this.defaultFrom = process.env.RESEND_FROM ?? "SaleBoom SEO <noreply@saleboom.com>";
+    this.client = new Resend(key);
+    this.defaultFrom = config?.from ?? process.env.RESEND_FROM ?? "SaleBoom SEO <noreply@saleboom.com>";
   }
 
   async sendEmail(opts: EmailOpts): Promise<void> {

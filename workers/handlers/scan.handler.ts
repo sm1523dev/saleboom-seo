@@ -1,7 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
-import { crawlProvider } from "@/lib/crawl";
+import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { persistDvsScore } from "@/lib/dvs/score";
@@ -85,7 +85,7 @@ async function _runScanJob(
     await context.updateProgress(10);
 
     // Crawl the site — onProgress writes live counts to DB every poll tick
-    const crawlResult = await crawlProvider.crawlSite(url, { limit: 100 }, async ({ completed, total }) => {
+    const crawlResult = await (await getCrawlProvider()).crawlSite(url, { limit: 100 }, async ({ completed, total }) => {
       await db
         .update(scans)
         .set({ pagesScanned: completed, totalPages: total, updatedAt: new Date() })

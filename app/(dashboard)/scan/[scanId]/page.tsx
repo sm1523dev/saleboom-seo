@@ -72,7 +72,7 @@ export default async function ScanStatusPage({ params }: Props) {
           {statusConfig.description}
         </p>
 
-        <dl className="mt-6 grid grid-cols-2 gap-4 text-left sm:grid-cols-3">
+        <dl className="mt-6 grid grid-cols-1 gap-4 text-left sm:grid-cols-3">
           <div className="rounded-lg border border-border bg-muted/40 p-3">
             <dt className="text-xs text-muted-foreground">Status</dt>
             <dd className="mt-0.5 text-sm font-medium capitalize">

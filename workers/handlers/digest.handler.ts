@@ -1,7 +1,7 @@
 import { and, desc, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users, websites, scans, issues, dvsScores } from "@/lib/db/schema";
-import { notificationProvider } from "@/lib/notifications";
+import { getNotificationProvider } from "@/lib/notifications";
 import { digestTemplate } from "@/lib/notifications/email-templates";
 import { logger } from "@/lib/logger";
 import type { JobContext } from "@/lib/queue";
@@ -82,7 +82,7 @@ export async function handleDigestJob(
       );
 
       const tmpl = digestTemplate({ userName: user.name ?? user.email, websites: websiteDigests });
-      await notificationProvider.sendEmail({ to: user.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
+      await (await getNotificationProvider()).sendEmail({ to: user.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
     } catch (err) {
       log.error("digest failed for user", { userId: user.id, error: String(err) });
     }

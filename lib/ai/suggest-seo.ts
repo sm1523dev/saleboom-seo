@@ -1,4 +1,4 @@
-import { aiProvider } from "@/lib/ai";
+import { getAiProvider } from "@/lib/ai";
 import { logger } from "@/lib/logger";
 import { withSpan } from "@/lib/telemetry";
 import { SeoSuggestionsSchema, type SeoSuggestions } from "./schemas/seo-suggestions";
@@ -30,8 +30,8 @@ export async function generateSeoSuggestion(
         "scan.id": scanId,
         "page.url": page.url,
       },
-      () =>
-        aiProvider.generateStructured(SeoSuggestionsSchema, prompt, {
+      async () =>
+        (await getAiProvider()).generateStructured(SeoSuggestionsSchema, prompt, {
           system:
             "You are an expert SEO copywriter. Given a web page's current metadata and content, " +
             "return improved meta title, meta description, and H1. " +
