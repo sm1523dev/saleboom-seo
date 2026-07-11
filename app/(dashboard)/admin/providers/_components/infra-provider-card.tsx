@@ -46,6 +46,7 @@ export function InfraProviderCard({
   const [keyPending, startKeyTransition] = useTransition();
   const [requestPending, startRequestTransition] = useTransition();
   const [keyStatus, setKeyStatus] = useState<"idle" | "saved" | "error">("idle");
+  const [localHasKey, setLocalHasKey] = useState(hasKey);
 
   const isCustom = selectedName === "custom";
   const isNonCompat = type === "ai" && !OPENAI_COMPAT_PROVIDERS.has(selectedName);
@@ -55,8 +56,11 @@ export function InfraProviderCard({
       ? { endpointUrl: customEndpoint.trim(), model: customModel.trim() }
       : {};
     startTransition(async () => {
-      await switchInfraProvider(type, selectedName, providerConfig);
-      setIsEditing(false);
+      const result = await switchInfraProvider(type, selectedName, providerConfig);
+      if (result.success) {
+        setLocalHasKey(false);
+        setIsEditing(false);
+      }
     });
   }
 
@@ -64,6 +68,7 @@ export function InfraProviderCard({
     startKeyTransition(async () => {
       const result = await setInfraProviderKey(type, keyValue);
       if (result.success) {
+        setLocalHasKey(true);
         setKeyStatus("saved");
         setKeyValue("");
         setShowKeyInput(false);
@@ -76,8 +81,11 @@ export function InfraProviderCard({
 
   function handleClearKey() {
     startKeyTransition(async () => {
-      await setInfraProviderKey(type, "");
-      setKeyStatus("idle");
+      const result = await setInfraProviderKey(type, "");
+      if (result.success) {
+        setLocalHasKey(false);
+        setKeyStatus("idle");
+      }
     });
   }
 
@@ -205,19 +213,19 @@ export function InfraProviderCard({
       <div className="mt-3 border-t border-border pt-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${hasKey ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
+            <span className={`h-1.5 w-1.5 rounded-full ${localHasKey ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
             <span className="text-[10px] text-muted-foreground">
-              {hasKey ? "Key stored (encrypted)" : "No key — using env var fallback"}
+              {localHasKey ? "Key stored (encrypted)" : "No key — using env var fallback"}
             </span>
           </div>
           <div className="flex items-center gap-2">
-            {hasKey && (
+            {localHasKey && (
               <button onClick={handleClearKey} disabled={keyPending} className="text-[10px] text-muted-foreground/50 hover:text-red-400 disabled:opacity-40">
                 clear
               </button>
             )}
             <button onClick={() => setShowKeyInput((v) => !v)} className="text-[10px] text-muted-foreground/50 hover:text-primary">
-              {showKeyInput ? "cancel" : hasKey ? "rotate" : "set key"}
+              {showKeyInput ? "cancel" : localHasKey ? "rotate" : "set key"}
             </button>
           </div>
         </div>

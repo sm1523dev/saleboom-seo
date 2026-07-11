@@ -1,11 +1,12 @@
 "use client";
 
+import { useActionState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signInWithCredentials, signInWithProvider } from "../actions";
+import { signInWithCredentials, signInWithProvider, type SignInState } from "../actions";
 
 const PROVIDER_LABELS: Record<string, string> = {
   google: "Google",
@@ -20,6 +21,11 @@ type Props = {
 };
 
 export function SignInCard({ socialProviders, callbackUrl }: Props) {
+  const [state, action, isPending] = useActionState<SignInState, FormData>(
+    signInWithCredentials,
+    null,
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -35,9 +41,14 @@ export function SignInCard({ socialProviders, callbackUrl }: Props) {
           </p>
         </div>
 
-        <form action={signInWithCredentials} className="space-y-4">
+        <form action={action} className="space-y-4">
           {callbackUrl && (
             <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          )}
+          {state?.error && (
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400" role="alert">
+              {state.error}
+            </p>
           )}
           <div className="space-y-2">
             <Label htmlFor="email">Email</Label>
@@ -71,8 +82,8 @@ export function SignInCard({ socialProviders, callbackUrl }: Props) {
               className="input-glow"
             />
           </div>
-          <Button type="submit" className="btn-press w-full" aria-label="Sign in">
-            Sign in
+          <Button type="submit" disabled={isPending} className="btn-press w-full" aria-label="Sign in">
+            {isPending ? "Signing in…" : "Sign in"}
           </Button>
         </form>
 
