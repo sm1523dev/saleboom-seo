@@ -30,6 +30,13 @@ export type SidebarProps = {
   pendingRequests?: number;
 };
 
+const WEBSITE_NAV_ITEMS = [
+  { slug: "", label: "Overview", icon: "⊟" },
+  { slug: "cms", label: "CMS Settings", icon: "⊡" },
+  { slug: "sitemap", label: "Sitemap", icon: "⊞" },
+  { slug: "competitors", label: "Competitors", icon: "⊗" },
+] as const;
+
 export function NavContent({
   userName,
   userEmail,
@@ -39,6 +46,10 @@ export function NavContent({
   onNavigate,
 }: SidebarProps & { onNavigate?: () => void }) {
   const pathname = usePathname();
+
+  // Extract websiteId when navigating within /website/{id}/*
+  const websiteMatch = pathname.match(/^\/website\/([^/]+)/);
+  const activeWebsiteId = websiteMatch?.[1] ?? null;
 
   return (
     <>
@@ -83,6 +94,49 @@ export function NavContent({
             );
           })}
         </ul>
+        {activeWebsiteId && (
+          <div className="mt-4">
+            <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
+              Website
+            </p>
+            <ul className="space-y-0.5" role="list">
+              {WEBSITE_NAV_ITEMS.map((item) => {
+                const href = `/website/${activeWebsiteId}${item.slug ? `/${item.slug}` : ""}`;
+                const isActive = item.slug === ""
+                  ? pathname === href
+                  : pathname === href || pathname.startsWith(`${href}/`);
+                return (
+                  <li key={item.slug}>
+                    <Link
+                      href={href}
+                      onClick={onNavigate}
+                      aria-current={isActive ? "page" : undefined}
+                      className={cn(
+                        "group flex items-center gap-3 rounded-md px-3 py-2 text-sm",
+                        "border-l-2 transition-colors duration-150",
+                        isActive
+                          ? "border-primary bg-accent text-foreground"
+                          : "border-transparent text-muted-foreground hover:bg-accent hover:text-foreground"
+                      )}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={cn(
+                          "font-mono text-base transition-colors duration-150",
+                          isActive ? "text-primary" : "text-muted-foreground group-hover:text-primary"
+                        )}
+                      >
+                        {item.icon}
+                      </span>
+                      {item.label}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
         {isAdmin && (
           <div className="mt-4">
             <p className="px-3 pb-1 text-[10px] font-semibold uppercase tracking-widest text-muted-foreground/60">
