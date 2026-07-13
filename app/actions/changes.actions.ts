@@ -1,5 +1,6 @@
 "use server";
 
+import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans, users } from "@/lib/db/schema";
@@ -245,6 +246,7 @@ export async function pushChangeTocms(
       }
     } catch { /* non-critical */ }
 
+    revalidatePath("/dashboard");
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";

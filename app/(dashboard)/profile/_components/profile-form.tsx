@@ -17,6 +17,7 @@ type Props = {
   email: string;
   isSocialAccount: boolean;
   socialProvider: string | null;
+  createdAt: string | null;
 };
 
 function StatusMessage({ state }: { state: ProfileActionState }) {
@@ -38,7 +39,7 @@ function StatusMessage({ state }: { state: ProfileActionState }) {
   return null;
 }
 
-export function ProfileForm({ name, email, isSocialAccount, socialProvider }: Props) {
+export function ProfileForm({ name, email, isSocialAccount, socialProvider, createdAt }: Props) {
   const [nameState, nameAction, namePending] = useActionState<ProfileActionState, FormData>(
     updateNameAction,
     null
@@ -141,6 +142,22 @@ export function ProfileForm({ name, email, isSocialAccount, socialProvider }: Pr
           </form>
         )}
       </section>
+
+      {/* Account info */}
+      {createdAt && (
+        <section
+          aria-labelledby="account-heading"
+          className="card-glow rounded-xl border border-border bg-card p-6"
+        >
+          <h2 id="account-heading" className="mb-1 font-semibold">Account</h2>
+          <p className="text-sm text-muted-foreground">
+            Member since{" "}
+            <span className="text-foreground">
+              {new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(createdAt))}
+            </span>
+          </p>
+        </section>
+      )}
 
       {/* Password */}
       <section

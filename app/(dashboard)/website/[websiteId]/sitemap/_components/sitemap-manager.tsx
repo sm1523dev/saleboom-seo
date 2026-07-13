@@ -62,14 +62,14 @@ export function SitemapManager({ analysis }: Props) {
             )}
           >
             {tab.label}
-            {tab.id === "missing" && analysis.inCrawlNotSitemap.length > 0 && (
+            {tab.id === "missing" && analysis.inSitemapNotCrawl.length > 0 && (
               <span className="ml-1.5 rounded-full bg-orange-500/20 px-1.5 py-0.5 text-[10px] font-medium text-orange-400">
-                {analysis.inCrawlNotSitemap.length}
+                {analysis.inSitemapNotCrawl.length}
               </span>
             )}
-            {tab.id === "orphaned" && analysis.inSitemapNotCrawl.length > 0 && (
+            {tab.id === "orphaned" && analysis.inCrawlNotSitemap.length > 0 && (
               <span className="ml-1.5 rounded-full bg-yellow-500/20 px-1.5 py-0.5 text-[10px] font-medium text-yellow-400">
-                {analysis.inSitemapNotCrawl.length}
+                {analysis.inCrawlNotSitemap.length}
               </span>
             )}
           </button>
@@ -92,17 +92,17 @@ export function SitemapManager({ analysis }: Props) {
           )}
           {activeTab === "missing" && (
             <UrlListTab
-              urls={analysis.inCrawlNotSitemap}
-              note="These pages were crawled but are not in your sitemap.xml."
-              emptyMessage="All crawled pages are present in your sitemap."
+              urls={analysis.inSitemapNotCrawl}
+              note="These URLs are in your sitemap but were not found during crawl — they may be 404s or inaccessible pages."
+              emptyMessage="All sitemap entries were reachable during the last crawl."
               accent="orange"
             />
           )}
           {activeTab === "orphaned" && (
             <UrlListTab
-              urls={analysis.inSitemapNotCrawl}
-              note="These URLs are in your sitemap but were not found during crawl (possible 404s)."
-              emptyMessage="No orphaned URLs — every sitemap entry was reachable during the last crawl."
+              urls={analysis.inCrawlNotSitemap}
+              note="These pages were crawled but are not in your sitemap.xml — add them or add a noindex tag."
+              emptyMessage="All crawled pages are present in your sitemap."
               accent="yellow"
             />
           )}

@@ -67,6 +67,8 @@ export async function runCompetitorAnalysis(
     return { error: "No AEO providers enabled." };
   }
 
+  const QUERY_TIMEOUT_MS = 30_000;
+
   const results: CompetitorResult[] = await Promise.all(
     domains.map(async (domain) => {
       let mentionCount = 0;
@@ -77,14 +79,17 @@ export async function runCompetitorAnalysis(
         let providerMentions = 0;
         for (const query of queries) {
           try {
-            const response = await queryAeoProvider(provider as import("@/lib/aeo/types").AeoProvider, query.promptText);
+            const response = await Promise.race([
+              queryAeoProvider(provider as import("@/lib/aeo/types").AeoProvider, query.promptText),
+              new Promise<never>((_, rej) => setTimeout(() => rej(new Error("provider timeout")), QUERY_TIMEOUT_MS)),
+            ]);
             const mention = parseMention(response.text, domain);
             if (mention.brandMentioned) {
               mentionCount++;
               providerMentions++;
             }
           } catch {
-            // skip failed queries
+            // skip failed / timed-out queries
           }
         }
         providerResults.push({

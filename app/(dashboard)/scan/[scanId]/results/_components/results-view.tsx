@@ -130,6 +130,7 @@ export function ResultsView({
 
   const queuedSet = new Set(queuedIssueIds);
   const fixedSet = new Set(fixedIssueIds);
+  const [localIgnoredIds, setLocalIgnoredIds] = useState<Set<string>>(new Set());
   const [showIssueCmsPrompt, setShowIssueCmsPrompt] = useState(false);
   const [isIgnoringIssues, startIgnoreIssuesTransition] = useTransition();
   const [showIgnoredIssues, setShowIgnoredIssues] = useState(false);
@@ -137,8 +138,8 @@ export function ResultsView({
   const [showFixedIssues, setShowFixedIssues] = useState(false);
   const [isUnignoringIssues, startUnignoreIssuesTransition] = useTransition();
 
-  // Active = not queued, not fixed, not ignored
-  const activeIssues = issues.filter((i) => !queuedSet.has(i.id) && !fixedSet.has(i.id));
+  // Active = not queued, not fixed, not ignored (locally or from server)
+  const activeIssues = issues.filter((i) => !queuedSet.has(i.id) && !fixedSet.has(i.id) && !localIgnoredIds.has(i.id));
   const fixFiltered = activeIssues.filter((i) => !fixFilter || i.fixType === fixFilter);
   const counts = SEVERITY_ORDER.reduce<Record<Severity, number>>(
     (acc, s) => {
@@ -373,6 +374,7 @@ export function ResultsView({
                 const ids = selectedIssues.size > 0
                   ? Array.from(selectedIssues)
                   : filtered.map((i) => i.id);
+                setLocalIgnoredIds((prev) => new Set([...prev, ...ids]));
                 startIgnoreIssuesTransition(async () => {
                   await ignoreIssues(ids);
                   setSelectedIssues(new Set());
@@ -972,13 +974,27 @@ function AiSuggestionsSection({
                             const fieldState = states[fieldId] ?? "idle";
                             const isPendingField = pendingFields.has(`${s.id}:${fieldId}`);
 
+                            if (fieldState === "skipped") {
+                              return (
+                                <div key={key} className="flex items-center justify-between rounded-lg border border-border/50 bg-muted/20 px-3 py-2">
+                                  <span className="text-xs text-muted-foreground/60 line-through">{label}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleUnskipField(s.id, fieldId)}
+                                    className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+                                  >
+                                    Un-skip
+                                  </button>
+                                </div>
+                              );
+                            }
+
                             return (
                               <div
                                 key={key}
                                 className={cn(
                                   "rounded-lg border p-3 transition-colors",
                                   fieldState === "approved" && "border-green-500/20 bg-green-500/5",
-                                  fieldState === "skipped" && "border-border/50 opacity-50",
                                   fieldState === "idle" && "border-border",
                                 )}
                               >
@@ -1000,15 +1016,6 @@ function AiSuggestionsSection({
                                         undo
                                       </button>
                                     </span>
-                                  )}
-                                  {fieldState === "skipped" && (
-                                    <button
-                                      type="button"
-                                      onClick={() => handleUnskipField(s.id, fieldId)}
-                                      className="text-xs text-muted-foreground hover:text-foreground"
-                                    >
-                                      Un-skip
-                                    </button>
                                   )}
                                 </div>
 

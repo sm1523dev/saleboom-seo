@@ -3,7 +3,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { eq, and, isNull, inArray, sql, desc, gte } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, scans, issues, aeoMentions, aeoProviders, aeoScores, dvsScores, aeoCitations, aiReferrals } from "@/lib/db/schema";
+import { websites, scans, issues, aeoMentions, aeoProviders, aeoScores, dvsScores, aeoCitations, aiReferrals, aeoQueries } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore, scoreColorClass, scoreGrade } from "@/lib/seo-score";
 import { computeDvsScore } from "@/lib/dvs/score";
@@ -184,6 +184,36 @@ export default async function WebsiteDetailPage({ params }: Props) {
     aeo: Math.round(r.aeoScore),
   }));
 
+  // AEO sentiment breakdown (last 30 days)
+  const sentimentRows = providerIds.length > 0
+    ? await db
+        .select({
+          sentiment: aeoMentions.sentiment,
+          count: sql<number>`count(*)::int`,
+        })
+        .from(aeoMentions)
+        .where(and(
+          eq(aeoMentions.websiteId, websiteId),
+          inArray(aeoMentions.providerId, providerIds),
+          gte(aeoMentions.scanDate, cutoff),
+          eq(aeoMentions.brandMentioned, true),
+        ))
+        .groupBy(aeoMentions.sentiment)
+    : [];
+
+  const sentimentMap: Record<string, number> = { positive: 0, neutral: 0, negative: 0 };
+  for (const row of sentimentRows) {
+    if (row.sentiment) sentimentMap[row.sentiment] = row.count;
+  }
+  const totalSentiment = sentimentMap.positive + sentimentMap.neutral + sentimentMap.negative;
+
+  // AEO queries for this website
+  const websiteQueries = await db
+    .select({ id: aeoQueries.id, promptText: aeoQueries.promptText, active: aeoQueries.active })
+    .from(aeoQueries)
+    .where(eq(aeoQueries.websiteId, websiteId))
+    .orderBy(aeoQueries.createdAt);
+
   // Recent scans (includes running/pending — used for history + in-progress detection)
   const recentScans = await db
     .select({ id: scans.id, status: scans.status, completedAt: scans.completedAt, startedAt: scans.startedAt })
@@ -328,6 +358,49 @@ export default async function WebsiteDetailPage({ params }: Props) {
                 )}>
                   {aeoScanRunning ? <span className="animate-pulse text-sm text-muted-foreground">—</span> : p.rate !== null ? `${p.rate}%` : "—"}
                 </p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* AEO sentiment breakdown */}
+      {totalSentiment > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold">
+            Sentiment Breakdown
+            <span className="ml-2 text-xs font-normal text-muted-foreground">among mentions, last 30 days</span>
+          </h2>
+          <div className="grid grid-cols-3 gap-3">
+            {(["positive", "neutral", "negative"] as const).map((s) => {
+              const count = sentimentMap[s];
+              const pct = totalSentiment > 0 ? Math.round((count / totalSentiment) * 100) : 0;
+              const colorClass = s === "positive" ? "text-green-400" : s === "negative" ? "text-red-400" : "text-yellow-400";
+              const borderClass = s === "positive" ? "border-green-500/20 bg-green-500/5" : s === "negative" ? "border-red-500/20 bg-red-500/5" : "border-yellow-500/20 bg-yellow-500/5";
+              return (
+                <div key={s} className={`card-glow flex flex-col items-center rounded-xl border p-4 ${borderClass}`}>
+                  <p className="text-xs font-medium capitalize text-muted-foreground">{s}</p>
+                  <p className={`mt-2 font-mono text-3xl font-bold tabular-nums ${colorClass}`}>{pct}%</p>
+                  <p className="mt-0.5 text-xs text-muted-foreground">{count} mention{count !== 1 ? "s" : ""}</p>
+                </div>
+              );
+            })}
+          </div>
+        </section>
+      )}
+
+      {/* AEO queries */}
+      {websiteQueries.length > 0 && (
+        <section>
+          <h2 className="mb-3 text-sm font-semibold">
+            AEO Queries
+            <span className="ml-2 text-xs font-normal text-muted-foreground">{websiteQueries.filter(q => q.active).length} active</span>
+          </h2>
+          <div className="overflow-hidden rounded-xl border border-border bg-card divide-y divide-border">
+            {websiteQueries.map((q) => (
+              <div key={q.id} className="flex items-start gap-3 px-4 py-3">
+                <span className={cn("mt-0.5 h-2 w-2 shrink-0 rounded-full", q.active ? "bg-emerald-400" : "bg-muted-foreground/30")} aria-hidden="true" />
+                <p className="text-sm text-muted-foreground">{q.promptText}</p>
               </div>
             ))}
           </div>

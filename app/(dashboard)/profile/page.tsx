@@ -19,6 +19,7 @@ export default async function ProfilePage() {
       email: users.email,
       passwordHash: users.passwordHash,
       tenantId: users.tenantId,
+      createdAt: users.createdAt,
     })
     .from(users)
     .where(eq(users.id, session.user.id))
@@ -41,6 +42,7 @@ export default async function ProfilePage() {
         email={user?.email ?? session.user.email}
         isSocialAccount={isSocialAccount}
         socialProvider={socialProvider}
+        createdAt={user?.createdAt?.toISOString() ?? null}
       />
     </div>
   );

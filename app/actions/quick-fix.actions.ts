@@ -1,6 +1,6 @@
 "use server";
 
-import { inArray, eq, and } from "drizzle-orm";
+import { inArray, eq, and, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { issues, changeSnapshots, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
@@ -57,8 +57,9 @@ export async function generateAndQueueIssueFixes(
     .from(changeSnapshots)
     .where(
       and(
+        isNotNull(changeSnapshots.issueId),
         inArray(changeSnapshots.issueId, issueIds),
-        inArray(changeSnapshots.status, ["pending", "applied"]),
+        inArray(changeSnapshots.status, ["pending", "applied", "failed"]),
       ),
     );
   const alreadyQueued = new Set(existingSnapshots.map((s) => s.issueId).filter(Boolean) as string[]);
