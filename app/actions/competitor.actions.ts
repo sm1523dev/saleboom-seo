@@ -67,36 +67,38 @@ export async function runCompetitorAnalysis(
     return { error: "No AEO providers enabled." };
   }
 
-  const QUERY_TIMEOUT_MS = 30_000;
+  const QUERY_TIMEOUT_MS = 25_000;
 
   const results: CompetitorResult[] = await Promise.all(
     domains.map(async (domain) => {
-      let mentionCount = 0;
       const totalQueries = queries.length * providers.length;
-      const providerResults: Array<{ name: string; mentioned: boolean }> = [];
 
-      for (const provider of providers) {
-        let providerMentions = 0;
-        for (const query of queries) {
-          try {
-            const response = await Promise.race([
-              queryAeoProvider(provider as import("@/lib/aeo/types").AeoProvider, query.promptText),
-              new Promise<never>((_, rej) => setTimeout(() => rej(new Error("provider timeout")), QUERY_TIMEOUT_MS)),
-            ]);
-            const mention = parseMention(response.text, domain);
-            if (mention.brandMentioned) {
-              mentionCount++;
-              providerMentions++;
+      // Run all provider × query pairs in parallel so the whole domain
+      // takes at most QUERY_TIMEOUT_MS regardless of pair count.
+      type PairResult = { providerId: string; mentioned: boolean };
+      const pairs: PairResult[] = await Promise.all(
+        providers.flatMap((provider) =>
+          queries.map(async (query): Promise<PairResult> => {
+            try {
+              const response = await Promise.race([
+                queryAeoProvider(provider as import("@/lib/aeo/types").AeoProvider, query.promptText),
+                new Promise<never>((_, rej) => setTimeout(() => rej(new Error("timeout")), QUERY_TIMEOUT_MS)),
+              ]);
+              const mention = parseMention(response.text, domain);
+              return { providerId: provider.id, mentioned: mention.brandMentioned };
+            } catch {
+              return { providerId: provider.id, mentioned: false };
             }
-          } catch {
-            // skip failed / timed-out queries
-          }
-        }
-        providerResults.push({
-          name: provider.displayName,
-          mentioned: providerMentions > 0,
-        });
-      }
+          })
+        )
+      );
+
+      const mentionCount = pairs.filter((p) => p.mentioned).length;
+
+      const providerResults = providers.map((provider) => ({
+        name: provider.displayName,
+        mentioned: pairs.some((p) => p.providerId === provider.id && p.mentioned),
+      }));
 
       return {
         domain,
