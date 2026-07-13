@@ -34,48 +34,44 @@ async function wpFetch(
   return res;
 }
 
-async function resolvePageId(siteUrl: string, pageUrl: string, creds: WpCreds): Promise<string> {
-  const base = normaliseUrl(siteUrl);
-  // Extract path from the page URL and derive slug from the last segment
+type WpResourceType = "pages" | "posts" | "categories" | "tags";
+
+async function resolveResource(
+  siteUrl: string,
+  pageUrl: string,
+  creds: WpCreds,
+): Promise<{ id: string; type: WpResourceType }> {
   let slug: string;
+  let taxonomyHint: "categories" | "tags" | null = null;
+
   try {
     const parsed = new URL(pageUrl);
     const segments = parsed.pathname.replace(/\/$/, "").split("/").filter(Boolean);
     slug = segments[segments.length - 1] ?? "";
+    // Detect taxonomy archives by their URL prefix segments
+    if (segments.includes("category")) taxonomyHint = "categories";
+    else if (segments.includes("tag")) taxonomyHint = "tags";
   } catch {
     slug = pageUrl.replace(/\/$/, "").split("/").pop() ?? "";
   }
 
-  // Try pages first, then posts
-  for (const type of ["pages", "posts"] as const) {
+  // Check the hinted taxonomy type first so category/tag pages resolve correctly
+  const orderedTypes: WpResourceType[] = taxonomyHint
+    ? [taxonomyHint, "pages", "posts", "categories", "tags"]
+    : ["pages", "posts", "categories", "tags"];
+
+  for (const type of orderedTypes) {
     const res = await wpFetch(
       siteUrl,
-      `/${type}?slug=${encodeURIComponent(slug)}&_fields=id,link&per_page=1`,
+      `/${type}?slug=${encodeURIComponent(slug)}&_fields=id&per_page=1`,
       creds,
     );
     if (!res.ok) continue;
-    const data = (await res.json()) as Array<{ id: number; link: string }>;
-    if (data.length > 0) return String(data[0].id);
-  }
-
-  // Last resort: search by link header
-  const res = await wpFetch(siteUrl, `/search?search=${encodeURIComponent(base)}&per_page=1`, creds);
-  if (res.ok) {
     const data = (await res.json()) as Array<{ id: number }>;
-    if (data.length > 0) return String(data[0].id);
+    if (data.length > 0) return { id: String(data[0].id), type };
   }
 
   throw new CmsNotFoundError(pageUrl);
-}
-
-async function determineResourceType(
-  siteUrl: string,
-  pageId: string,
-  creds: WpCreds,
-): Promise<"pages" | "posts"> {
-  const pagesRes = await wpFetch(siteUrl, `/pages/${pageId}?_fields=id`, creds);
-  if (pagesRes.ok) return "pages";
-  return "posts";
 }
 
 export class WordPressAdapter implements CmsAdapter<"wordpress"> {
@@ -92,18 +88,19 @@ export class WordPressAdapter implements CmsAdapter<"wordpress"> {
   }
 
   async push(payload: PushPayload, creds: WpCreds): Promise<PushResult> {
-    const pageId = await resolvePageId(creds.siteUrl, payload.pageUrl, creds);
-    const resourceType = await determineResourceType(creds.siteUrl, pageId, creds);
+    const { id: pageId, type: resourceType } = await resolveResource(creds.siteUrl, payload.pageUrl, creds);
+    const isTaxonomy = resourceType === "categories" || resourceType === "tags";
 
     const body: Record<string, unknown> = {};
     const pushedFields: CmsField[] = [];
 
-    if (payload.fields.h1 !== undefined) {
+    // For taxonomy archives (category/tag), the "title" is the term name — skip H1 push
+    if (payload.fields.h1 !== undefined && !isTaxonomy) {
       body.title = payload.fields.h1;
       pushedFields.push("h1");
     }
 
-    // Yoast SEO meta fields (most common SEO plugin)
+    // Yoast SEO meta fields — work for both posts/pages and taxonomies when Yoast is active
     const meta: Record<string, string> = {};
     if (payload.fields.meta_title !== undefined) {
       meta._yoast_wpseo_title = payload.fields.meta_title;
