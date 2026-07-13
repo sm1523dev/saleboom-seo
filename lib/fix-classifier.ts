@@ -58,14 +58,28 @@ export const ISSUE_TYPE_TO_FIELD: Record<string, "meta_title" | "meta_descriptio
   "images-empty-alt": "h1",
 };
 
-export function classifyFix(issueType: string): FixType {
+// WordPress archive pages (category, tag, author, date, pagination) cannot be
+// updated via the REST API — no CMS plugin exposes them as writable. Downgrade
+// quick fixes on these URLs to major so users know manual action is needed.
+const ARCHIVE_PATTERN = /^\/(category|tag|author|date|page)\//;
+
+export function isArchiveUrl(url: string): boolean {
+  try {
+    return ARCHIVE_PATTERN.test(new URL(url).pathname);
+  } catch {
+    return false;
+  }
+}
+
+export function classifyFix(issueType: string, pageUrl?: string): FixType {
+  if (pageUrl && isArchiveUrl(pageUrl) && QUICK_FIX_TYPES.has(issueType)) return "major";
   return QUICK_FIX_TYPES.has(issueType) ? "quick" : "major";
 }
 
 export function classifyIssues(issues: SeoIssue[]): SeoIssue[] {
   return issues.map((issue) => ({
     ...issue,
-    fixType: issue.fixType ?? classifyFix(issue.type),
+    fixType: issue.fixType ?? classifyFix(issue.type, issue.pageUrl),
   }));
 }
 

@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
+import { isArchiveUrl } from "@/lib/fix-classifier";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
@@ -234,7 +235,11 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<voi
     severity: issue.severity,
     title: issue.title,
     description: issue.description,
-    fixType: issue.fixType,
+    // Archive pages (category/tag/author/date) can't be fixed via REST API —
+    // downgrade quick fixes to major so users know manual action is needed.
+    fixType: issue.fixType === "quick" && issue.pageUrl && isArchiveUrl(issue.pageUrl)
+      ? "major"
+      : issue.fixType,
   }));
 
   // Drizzle insert accepts multiple rows; split into batches to avoid

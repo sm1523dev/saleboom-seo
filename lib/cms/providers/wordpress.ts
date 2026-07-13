@@ -36,6 +36,41 @@ async function wpFetch(
 
 type WpResourceType = "pages" | "posts" | "categories" | "tags";
 
+type SeoPlugin = "yoast" | "rankmath" | "aioseo" | "none";
+
+const PLUGIN_META: Record<SeoPlugin, { title: string | null; description: string | null }> = {
+  yoast:    { title: "_yoast_wpseo_title",  description: "_yoast_wpseo_metadesc" },
+  rankmath: { title: "rank_math_title",      description: "rank_math_description" },
+  aioseo:   { title: "_aioseo_title",        description: "_aioseo_description" },
+  none:     { title: null,                   description: null },
+};
+
+// Cache per siteUrl so we only probe once per process lifetime
+const pluginCache = new Map<string, SeoPlugin>();
+
+async function detectSeoPlugin(siteUrl: string, creds: WpCreds): Promise<SeoPlugin> {
+  const cached = pluginCache.get(siteUrl);
+  if (cached) return cached;
+
+  for (const type of ["posts", "pages"] as const) {
+    const res = await wpFetch(siteUrl, `/${type}?context=edit&per_page=1&_fields=meta`, creds);
+    if (!res.ok) continue;
+    const data = (await res.json()) as Array<{ meta?: Record<string, unknown> }>;
+    const meta = data[0]?.meta;
+    if (!meta) continue;
+    const keys = Object.keys(meta);
+    let plugin: SeoPlugin = "none";
+    if (keys.some((k) => k.startsWith("_yoast_wpseo"))) plugin = "yoast";
+    else if (keys.some((k) => k.startsWith("rank_math"))) plugin = "rankmath";
+    else if (keys.some((k) => k.startsWith("_aioseo"))) plugin = "aioseo";
+    pluginCache.set(siteUrl, plugin);
+    return plugin;
+  }
+
+  pluginCache.set(siteUrl, "none");
+  return "none";
+}
+
 async function resolveResource(
   siteUrl: string,
   pageUrl: string,
@@ -91,25 +126,37 @@ export class WordPressAdapter implements CmsAdapter<"wordpress"> {
     const { id: pageId, type: resourceType } = await resolveResource(creds.siteUrl, payload.pageUrl, creds);
     const isTaxonomy = resourceType === "categories" || resourceType === "tags";
 
+    const plugin = await detectSeoPlugin(creds.siteUrl, creds);
+    const pluginFields = PLUGIN_META[plugin];
+
     const body: Record<string, unknown> = {};
     const pushedFields: CmsField[] = [];
 
-    // For taxonomy archives (category/tag), the "title" is the term name — skip H1 push
+    // H1 — native title field; skip for taxonomy archives (term name != page H1)
     if (payload.fields.h1 !== undefined && !isTaxonomy) {
       body.title = payload.fields.h1;
       pushedFields.push("h1");
     }
 
-    // Yoast SEO meta fields — work for both posts/pages and taxonomies when Yoast is active
+    // SEO meta — write to whichever plugin is active; fall back to native title when no plugin
     const meta: Record<string, string> = {};
+
     if (payload.fields.meta_title !== undefined) {
-      meta._yoast_wpseo_title = payload.fields.meta_title;
-      pushedFields.push("meta_title");
+      if (pluginFields.title) {
+        meta[pluginFields.title] = payload.fields.meta_title;
+        pushedFields.push("meta_title");
+      } else if (!isTaxonomy) {
+        // No SEO plugin — native title is the only option (changes H1 too)
+        body.title = payload.fields.meta_title;
+        pushedFields.push("meta_title");
+      }
     }
-    if (payload.fields.meta_description !== undefined) {
-      meta._yoast_wpseo_metadesc = payload.fields.meta_description;
+
+    if (payload.fields.meta_description !== undefined && pluginFields.description) {
+      meta[pluginFields.description] = payload.fields.meta_description;
       pushedFields.push("meta_description");
     }
+
     if (Object.keys(meta).length > 0) body.meta = meta;
 
     if (Object.keys(body).length === 0) return { success: true, pageId, pushedFields: [] };
