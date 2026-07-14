@@ -1,4 +1,4 @@
-import { eq, and, desc, inArray, gte } from "drizzle-orm";
+import { eq, and, desc, inArray, gte, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, issues, aeoScores, dvsScores } from "@/lib/db/schema";
 import { computeSeoScore } from "@/lib/seo-score";
@@ -20,10 +20,12 @@ export async function persistDvsScore(websiteId: string): Promise<number> {
 
   let seoScore = 0;
   if (latestScan) {
+    // Exclude issues already resolved via CMS push — the penalty is gone,
+    // no need to wait for the next scan to reflect it in the score.
     const scanIssues = await db
       .select({ type: issues.type, severity: issues.severity })
       .from(issues)
-      .where(eq(issues.scanId, latestScan.id));
+      .where(and(eq(issues.scanId, latestScan.id), isNull(issues.resolvedAt)));
     seoScore = computeSeoScore(scanIssues);
   }
 

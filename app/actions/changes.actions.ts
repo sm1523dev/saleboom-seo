@@ -10,6 +10,7 @@ import { loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
 import { WebflowAdapter } from "@/lib/cms/providers/webflow";
+import { persistDvsScore } from "@/lib/dvs/score";
 
 async function resolveWebsiteId(snapshot: {
   suggestionId: string | null;
@@ -211,6 +212,10 @@ export async function pushChangeTocms(
       .set({ status: "applied", cmsConnectionId: connection.id, appliedAt: new Date(), updatedAt: new Date() })
       .where(eq(changeSnapshots.id, snapshotId));
 
+    // Recalculate DVS score immediately — resolved issues are now excluded from
+    // the penalty, so the score improves without waiting for the next scan.
+    void persistDvsScore(websiteId).catch(() => undefined);
+
     // Mark the parent AI suggestion as applied so it no longer shows in the pending list
     if (snapshot.suggestionId) {
       await db
@@ -329,6 +334,9 @@ export async function rollbackChange(
       .update(changeSnapshots)
       .set({ status: "rolled_back", rolledBackAt: new Date(), updatedAt: new Date() })
       .where(eq(changeSnapshots.id, snapshotId));
+
+    // Score goes back down — issue is no longer resolved
+    void persistDvsScore(websiteId).catch(() => undefined);
 
     // Fire-and-forget email — non-blocking, never throws to user
     try {
