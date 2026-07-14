@@ -34,7 +34,8 @@ async function wpFetch(
   return res;
 }
 
-type WpResourceType = "pages" | "posts" | "categories" | "tags";
+// "settings" = WordPress site-level settings (homepage when show_on_front = 'posts')
+type WpResourceType = "pages" | "posts" | "categories" | "tags" | "settings";
 
 type SeoPlugin = "yoast" | "rankmath" | "aioseo" | "none";
 
@@ -78,20 +79,37 @@ async function resolveResource(
 ): Promise<{ id: string; type: WpResourceType }> {
   let slug: string;
   let taxonomyHint: "categories" | "tags" | null = null;
+  let isHomepage = false;
 
   try {
     const parsed = new URL(pageUrl);
-    const segments = parsed.pathname.replace(/\/$/, "").split("/").filter(Boolean);
+    const pathname = parsed.pathname;
+    isHomepage = pathname === "/" || pathname === "";
+    const segments = pathname.replace(/\/$/, "").split("/").filter(Boolean);
     slug = segments[segments.length - 1] ?? "";
-    // Detect taxonomy archives by their URL prefix segments
     if (segments.includes("category")) taxonomyHint = "categories";
     else if (segments.includes("tag")) taxonomyHint = "tags";
   } catch {
     slug = pageUrl.replace(/\/$/, "").split("/").pop() ?? "";
   }
 
-  // Check the hinted taxonomy type first so category/tag pages resolve correctly
-  const orderedTypes: WpResourceType[] = taxonomyHint
+  // Homepage: check WP reading settings to find the correct resource.
+  // Without this, an empty slug query returns a random page and the push
+  // appears to succeed but writes to the wrong content.
+  if (isHomepage) {
+    const settingsRes = await wpFetch(siteUrl, "/settings", creds);
+    if (settingsRes.ok) {
+      const s = (await settingsRes.json()) as { show_on_front?: string; page_on_front?: number };
+      if (s.show_on_front === "page" && s.page_on_front) {
+        // Static front page — resolve by its known ID
+        return { id: String(s.page_on_front), type: "pages" };
+      }
+    }
+    // Blog posts index (or settings unavailable) — title lives in site settings
+    return { id: "settings", type: "settings" };
+  }
+
+  const orderedTypes: Exclude<WpResourceType, "settings">[] = taxonomyHint
     ? [taxonomyHint, "pages", "posts", "categories", "tags"]
     : ["pages", "posts", "categories", "tags"];
 
@@ -125,6 +143,22 @@ export class WordPressAdapter implements CmsAdapter<"wordpress"> {
   async push(payload: PushPayload, creds: WpCreds): Promise<PushResult> {
     const { id: pageId, type: resourceType } = await resolveResource(creds.siteUrl, payload.pageUrl, creds);
     const isTaxonomy = resourceType === "categories" || resourceType === "tags";
+    const isSettings = resourceType === "settings";
+
+    // Homepage (blog-index): title = site name, description = tagline. Written via /wp/v2/settings.
+    if (isSettings) {
+      const body: Record<string, string> = {};
+      const pushedFields: CmsField[] = [];
+      if (payload.fields.meta_title !== undefined) { body.title = payload.fields.meta_title; pushedFields.push("meta_title"); }
+      if (payload.fields.meta_description !== undefined) { body.description = payload.fields.meta_description; pushedFields.push("meta_description"); }
+      if (Object.keys(body).length === 0) return { success: true, pageId: "settings", pushedFields: [] };
+      const res = await wpFetch(creds.siteUrl, "/settings", creds, { method: "POST", body: JSON.stringify(body) });
+      if (!res.ok) {
+        const err = (await res.json().catch(() => ({}))) as { message?: string };
+        throw new Error(err.message ?? `WordPress settings update failed: ${res.status}`);
+      }
+      return { success: true, pageId: "settings", pushedFields };
+    }
 
     const plugin = await detectSeoPlugin(creds.siteUrl, creds);
     const pluginFields = PLUGIN_META[plugin];
@@ -168,7 +202,7 @@ export class WordPressAdapter implements CmsAdapter<"wordpress"> {
 
     if (res.status === 404) throw new CmsNotFoundError(payload.pageUrl);
     if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { message?: string };
+      const err = (await res.json().catch(() => ({}))) as { message?: string };
       throw new Error(err.message ?? `WordPress push failed: ${res.status}`);
     }
 
