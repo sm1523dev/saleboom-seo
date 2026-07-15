@@ -40,16 +40,18 @@ async function pushViaCmsAdapter(
   cmsType: "wordpress" | "shopify" | "webflow",
   credentials: unknown,
   payload: { pageUrl: string; fields: Partial<Record<CmsField, string>> },
-): Promise<void> {
+): Promise<CmsField[]> {
+  let result;
   if (cmsType === "wordpress") {
-    await new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
+    result = await new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
   } else if (cmsType === "shopify") {
-    await new ShopifyAdapter().push(payload, credentials as CmsCredentials["shopify"]);
+    result = await new ShopifyAdapter().push(payload, credentials as CmsCredentials["shopify"]);
   } else if (cmsType === "webflow") {
-    await new WebflowAdapter().push(payload, credentials as CmsCredentials["webflow"]);
+    result = await new WebflowAdapter().push(payload, credentials as CmsCredentials["webflow"]);
   } else {
     throw new Error(`Unsupported CMS type: ${cmsType}`);
   }
+  return result.pushedFields;
 }
 
 const FIELD_MAP: Record<CmsField, { current: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; suggested: "metaTitle" | "metaDescription" | "h1" }> = {
@@ -202,10 +204,26 @@ export async function pushChangeTocms(
     const afterValue = afterState?.value;
     if (!afterValue) return { success: false, error: "No value to push" };
 
-    await pushViaCmsAdapter(cmsType, credentials, {
+    const pushedFields = await pushViaCmsAdapter(cmsType, credentials, {
       pageUrl: snapshot.pageUrl,
       fields: { [snapshot.fieldChanged as CmsField]: afterValue },
     });
+
+    // Verify the adapter actually wrote the requested field. A no-op push
+    // (e.g. meta_description on a site with no SEO plugin) returns an empty
+    // pushedFields list — treat this as a failure so the UI is honest.
+    const fieldWritten = pushedFields.includes(snapshot.fieldChanged as CmsField);
+    if (!fieldWritten) {
+      await db
+        .update(changeSnapshots)
+        .set({ status: "failed", updatedAt: new Date() })
+        .where(eq(changeSnapshots.id, snapshotId));
+      const fieldLabel = snapshot.fieldChanged === "meta_description" ? "meta description" : snapshot.fieldChanged;
+      return {
+        success: false,
+        error: `Could not write ${fieldLabel} — no SEO plugin (Yoast / Rank Math / AIOSEO) is installed on this WordPress site. Install one to push meta fields.`,
+      };
+    }
 
     await db
       .update(changeSnapshots)
@@ -325,10 +343,16 @@ export async function rollbackChange(
   const beforeValue = beforeState?.value ?? "";
 
   try {
-    await pushViaCmsAdapter(cmsType, credentials, {
+    const pushedFields = await pushViaCmsAdapter(cmsType, credentials, {
       pageUrl: snapshot.pageUrl,
       fields: { [snapshot.fieldChanged as CmsField]: beforeValue },
     });
+
+    // If the adapter wrote nothing (e.g. meta_description with no SEO plugin),
+    // the rollback can't restore the original value — surface as an error.
+    if (!pushedFields.includes(snapshot.fieldChanged as CmsField)) {
+      return { success: false, error: "Could not restore — no SEO plugin installed on this WordPress site" };
+    }
 
     await db
       .update(changeSnapshots)

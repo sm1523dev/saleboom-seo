@@ -46,13 +46,7 @@ const PLUGIN_META: Record<SeoPlugin, { title: string | null; description: string
   none:     { title: null,                   description: null },
 };
 
-// Cache per siteUrl so we only probe once per process lifetime
-const pluginCache = new Map<string, SeoPlugin>();
-
 async function detectSeoPlugin(siteUrl: string, creds: WpCreds): Promise<SeoPlugin> {
-  const cached = pluginCache.get(siteUrl);
-  if (cached) return cached;
-
   for (const type of ["posts", "pages"] as const) {
     const res = await wpFetch(siteUrl, `/${type}?context=edit&per_page=1&_fields=meta`, creds);
     if (!res.ok) continue;
@@ -60,15 +54,11 @@ async function detectSeoPlugin(siteUrl: string, creds: WpCreds): Promise<SeoPlug
     const meta = data[0]?.meta;
     if (!meta) continue;
     const keys = Object.keys(meta);
-    let plugin: SeoPlugin = "none";
-    if (keys.some((k) => k.startsWith("_yoast_wpseo"))) plugin = "yoast";
-    else if (keys.some((k) => k.startsWith("rank_math"))) plugin = "rankmath";
-    else if (keys.some((k) => k.startsWith("_aioseo"))) plugin = "aioseo";
-    pluginCache.set(siteUrl, plugin);
-    return plugin;
+    if (keys.some((k) => k.startsWith("_yoast_wpseo"))) return "yoast";
+    if (keys.some((k) => k.startsWith("rank_math"))) return "rankmath";
+    if (keys.some((k) => k.startsWith("_aioseo"))) return "aioseo";
+    return "none";
   }
-
-  pluginCache.set(siteUrl, "none");
   return "none";
 }
 
