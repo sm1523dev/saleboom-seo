@@ -203,6 +203,10 @@ export const changeSnapshots = pgTable(
     appliedAt: timestamp("applied_at", { withTimezone: true }),
     // Set when the change is rolled back
     rolledBackAt: timestamp("rolled_back_at", { withTimezone: true }),
+    // Set after verifying the live page reflects the change
+    verifiedAt: timestamp("verified_at", { withTimezone: true }),
+    liveValue: text("live_value"),
+    verifyError: text("verify_error"),
     // Source: either from an AI suggestion or a manual issue fix
     suggestionId: uuid("suggestion_id").references(() => aiSuggestions.id, {
       onDelete: "set null",

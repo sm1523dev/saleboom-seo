@@ -11,6 +11,7 @@ import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
 import { WebflowAdapter } from "@/lib/cms/providers/webflow";
 import { persistDvsScore } from "@/lib/dvs/score";
+import { verifyLiveField } from "@/lib/cms/verify";
 
 async function resolveWebsiteId(snapshot: {
   suggestionId: string | null;
@@ -386,6 +387,69 @@ export async function rollbackChange(
     const message = err instanceof Error ? err.message : "Rollback failed";
     return { success: false, error: message };
   }
+}
+
+export async function verifyChange(
+  snapshotId: string,
+): Promise<{ matched: boolean; liveValue: string | null; error: string | null }> {
+  await getServerSession();
+
+  const [snapshot] = await db
+    .select({
+      id: changeSnapshots.id,
+      pageUrl: changeSnapshots.pageUrl,
+      fieldChanged: changeSnapshots.fieldChanged,
+      status: changeSnapshots.status,
+      afterState: changeSnapshots.afterState,
+      beforeState: changeSnapshots.beforeState,
+    })
+    .from(changeSnapshots)
+    .where(eq(changeSnapshots.id, snapshotId))
+    .limit(1);
+
+  if (!snapshot || !["applied", "rolled_back"].includes(snapshot.status)) {
+    return { matched: false, liveValue: null, error: "Snapshot not in a verifiable state" };
+  }
+
+  // For rolled_back, the expected live value is the BEFORE value (what was restored).
+  // For applied, it's the AFTER value (what was pushed).
+  const isRolledBack = snapshot.status === "rolled_back";
+  const expectedState = isRolledBack
+    ? (snapshot.beforeState as { value?: string } | null)
+    : (snapshot.afterState as { value?: string } | null);
+  const beforeState = isRolledBack
+    ? (snapshot.afterState as { value?: string } | null)
+    : (snapshot.beforeState as { value?: string } | null);
+
+  const expectedValue = expectedState?.value ?? "";
+  const beforeValue = beforeState?.value ?? null;
+
+  if (!expectedValue) {
+    return { matched: false, liveValue: null, error: "No expected value to check against" };
+  }
+
+  const result = await verifyLiveField(
+    snapshot.pageUrl,
+    snapshot.fieldChanged as CmsField,
+    expectedValue,
+    beforeValue,
+  );
+
+  await db
+    .update(changeSnapshots)
+    .set({
+      verifiedAt: new Date(),
+      liveValue: result.liveValue,
+      verifyError: result.matched ? null : result.error,
+      updatedAt: new Date(),
+    })
+    .where(eq(changeSnapshots.id, snapshotId));
+
+  return {
+    matched: result.matched,
+    liveValue: result.liveValue,
+    error: result.matched ? null : result.error,
+  };
 }
 
 export async function editChangeAfterValue(

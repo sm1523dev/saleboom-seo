@@ -43,6 +43,9 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       rolledBackAt: changeSnapshots.rolledBackAt,
       createdAt: changeSnapshots.createdAt,
       cmsConnectionId: changeSnapshots.cmsConnectionId,
+      verifiedAt: changeSnapshots.verifiedAt,
+      liveValue: changeSnapshots.liveValue,
+      verifyError: changeSnapshots.verifyError,
     })
     .from(changeSnapshots)
     .where(and(...conditions))
@@ -78,6 +81,9 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       appliedAt: r.appliedAt?.toISOString() ?? null,
       rolledBackAt: r.rolledBackAt?.toISOString() ?? null,
       createdAt: r.createdAt.toISOString(),
+      verifiedAt: r.verifiedAt?.toISOString() ?? null,
+      liveValue: r.liveValue ?? null,
+      verifyError: r.verifyError ?? null,
     }));
 
   return (

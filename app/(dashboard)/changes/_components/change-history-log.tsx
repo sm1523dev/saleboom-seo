@@ -5,7 +5,9 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { rollbackChange } from "@/app/actions/changes.actions";
+import { rollbackChange, verifyChange } from "@/app/actions/changes.actions";
+import { VERIFY_ERROR_LABELS } from "@/lib/cms/verify";
+import type { VerifyError } from "@/lib/cms/verify";
 
 const FIELD_LABELS: Record<string, string> = {
   meta_title: "Page Title",
@@ -31,6 +33,9 @@ type HistoryItem = {
   appliedAt: string | null;
   rolledBackAt: string | null;
   createdAt: string;
+  verifiedAt: string | null;
+  liveValue: string | null;
+  verifyError: string | null;
 };
 
 type Props = {
@@ -48,6 +53,9 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
   const [rollbackErrors, setRollbackErrors] = useState<Record<string, string>>({});
   const [confirmId, setConfirmId] = useState<string | null>(null);
   const [isRollingBack, startRollbackTransition] = useTransition();
+  const [verifyStates, setVerifyStates] = useState<Record<string, "idle" | "checking" | "done">>({});
+  const [verifyResults, setVerifyResults] = useState<Record<string, { matched: boolean; liveValue: string | null; error: string | null }>>({});
+  const [, startVerifyTransition] = useTransition();
 
   function buildHref(params: Record<string, string | undefined>) {
     const p = new URLSearchParams(searchParams.toString());
@@ -57,6 +65,15 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
     }
     p.delete("page");
     return `/changes/history?${p.toString()}`;
+  }
+
+  function handleVerify(id: string) {
+    setVerifyStates((prev) => ({ ...prev, [id]: "checking" }));
+    startVerifyTransition(async () => {
+      const result = await verifyChange(id);
+      setVerifyStates((prev) => ({ ...prev, [id]: "done" }));
+      setVerifyResults((prev) => ({ ...prev, [id]: result }));
+    });
   }
 
   function handleRollback(id: string) {
@@ -177,6 +194,12 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
           const rbState = rollbackStates[item.id] ?? "idle";
           const statusCfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.reverted;
           const timestamp = item.appliedAt ?? item.createdAt;
+          const isVerifiable = item.status === "applied" || item.status === "rolled_back";
+          const vState = verifyStates[item.id] ?? "idle";
+          // Merge DB-stored result with in-session result (session wins)
+          const vResult = verifyResults[item.id] ?? (item.verifiedAt
+            ? { matched: !item.verifyError, liveValue: item.liveValue, error: item.verifyError }
+            : null);
 
           return (
             <div key={item.id} className="rounded-xl border border-border bg-card p-4 transition-colors hover:bg-muted/10">
@@ -190,11 +213,29 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                   <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
                     {statusCfg.label}
                   </span>
+                  {/* Verification badge */}
+                  {vResult && (
+                    vResult.matched
+                      ? <span className="rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs text-green-400">
+                          Live ✓
+                        </span>
+                      : <span title={vResult.error ? (VERIFY_ERROR_LABELS[vResult.error as VerifyError] ?? vResult.error) : undefined}
+                          className="cursor-help rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-400">
+                          Not live ⚠
+                        </span>
+                  )}
                   <span className="text-xs text-muted-foreground">
                     {new Intl.DateTimeFormat("en", { dateStyle: "short", timeStyle: "short" }).format(new Date(timestamp))}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
+                  {isVerifiable && vState === "idle" && !vResult && (
+                    <button type="button" onClick={() => handleVerify(item.id)}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground">
+                      Verify
+                    </button>
+                  )}
+                  {vState === "checking" && <span className="text-xs text-muted-foreground">Checking live…</span>}
                   {item.status === "applied" && rbState === "idle" && (
                     <button type="button" onClick={() => handleRollback(item.id)}
                       className="rounded-md border border-yellow-500/30 px-2.5 py-1 text-xs text-yellow-400 hover:bg-yellow-500/10">
@@ -229,6 +270,20 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                   </div>
                 </div>
               </div>
+
+              {/* Verification detail — shown when failed */}
+              {vResult && !vResult.matched && (
+                <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
+                  <p className="text-xs font-medium text-red-400">
+                    {vResult.error ? (VERIFY_ERROR_LABELS[vResult.error as VerifyError] ?? vResult.error) : "Verification failed"}
+                  </p>
+                  {vResult.liveValue && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Live: <span className="font-mono">{vResult.liveValue}</span>
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
