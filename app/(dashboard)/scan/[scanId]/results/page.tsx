@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions, changeSnapshots } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions, changeSnapshots, cmsConnections } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
@@ -58,11 +58,12 @@ export default async function AuditResultsPage({ params }: Props) {
     );
   }
 
-  const [website] = await db
-    .select({ url: websites.url, name: websites.name })
-    .from(websites)
-    .where(eq(websites.id, scan.websiteId))
-    .limit(1);
+  const [[website], [cmsConn]] = await Promise.all([
+    db.select({ url: websites.url, name: websites.name })
+      .from(websites).where(eq(websites.id, scan.websiteId)).limit(1),
+    db.select({ id: cmsConnections.id })
+      .from(cmsConnections).where(eq(cmsConnections.websiteId, scan.websiteId)).limit(1),
+  ]);
 
   const allIssues = await db
     .select({
@@ -195,6 +196,7 @@ export default async function AuditResultsPage({ params }: Props) {
       suggestions={suggestions}
       pastSuggestions={pastSuggestions}
       approvedSnapshots={approvedSnapshots}
+      cmsConnected={!!cmsConn}
     />
   );
 }

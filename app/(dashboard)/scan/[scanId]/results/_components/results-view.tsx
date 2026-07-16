@@ -69,6 +69,7 @@ type Props = {
   suggestions: Suggestion[];
   pastSuggestions: Suggestion[];
   approvedSnapshots: ApprovedSnapshot[];
+  cmsConnected: boolean;
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -122,6 +123,7 @@ export function ResultsView({
   suggestions,
   pastSuggestions,
   approvedSnapshots,
+  cmsConnected,
 }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Severity | null>(null);
@@ -388,11 +390,12 @@ export function ResultsView({
                 ? `Ignore ${selectedIssues.size} selected`
                 : `Ignore all`}
             </button>
-            {filtered.some((i) => i.fixType === "quick") && (
+            {(filtered.some((i) => i.fixType === "quick") || !cmsConnected) && (
               <BulkFixButton
                 selectedIssues={selectedIssues}
                 allQuickIssues={filtered.filter((i) => i.fixType === "quick" && !queuedSet.has(i.id) && !fixedSet.has(i.id))}
                 websiteId={websiteId}
+                cmsConnected={cmsConnected}
               />
             )}
           </div>
@@ -706,12 +709,23 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selectedIssues: Set<string>; allQuickIssues: Issue[]; websiteId: string }) {
+function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, cmsConnected }: { selectedIssues: Set<string>; allQuickIssues: Issue[]; websiteId: string; cmsConnected: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
-  const [showNoCmsPrompt, setShowNoCmsPrompt] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [totalGenerating, setTotalGenerating] = useState(0);
+
+  // No CMS connected — show a direct link to the CMS settings page, no dialog
+  if (!cmsConnected) {
+    return (
+      <Link
+        href={`/website/${websiteId}/cms`}
+        className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
+      >
+        Connect CMS to apply fixes
+      </Link>
+    );
+  }
 
   const targetIds = selectedIssues.size > 0
     ? Array.from(selectedIssues).filter((id) => allQuickIssues.some((i) => i.id === id && i.fixType === "quick"))
@@ -725,7 +739,6 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
 
   return (
     <>
-      {/* Generating overlay */}
       {generating && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <motion.div
@@ -746,47 +759,10 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId }: { selected
           </motion.div>
         </div>
       )}
-
-      {showNoCmsPrompt && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="mx-4 w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl"
-          >
-            <h3 className="font-semibold">Connect your CMS first</h3>
-            <p className="mt-2 text-sm text-muted-foreground">
-              Connect WordPress, Shopify, or Webflow so AI-generated fixes can be pushed directly to your site.
-            </p>
-            <div className="mt-5 flex gap-3">
-              <button
-                type="button"
-                onClick={() => setShowNoCmsPrompt(false)}
-                className="flex-1 rounded-lg border border-border px-4 py-2 text-sm transition-colors hover:bg-accent"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={() => router.push(`/website/${websiteId}/cms`)}
-                className="btn-press flex-1 rounded-lg bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-              >
-                Connect CMS →
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
       <button
         type="button"
         disabled={isPending || generating}
         onClick={() => startTransition(async () => {
-          const { getCmsConnection } = await import("@/app/actions/cms.actions");
-          const conn = await getCmsConnection(websiteId);
-          if (!conn.connected) {
-            setShowNoCmsPrompt(true);
-            return;
-          }
           setTotalGenerating(targetIds.length);
           setGenerating(true);
           await generateAndQueueIssueFixes(targetIds);

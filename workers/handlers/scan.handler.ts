@@ -1,9 +1,10 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions, cmsConnections } from "@/lib/db/schema";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
-import { isArchiveUrl } from "@/lib/fix-classifier";
+import { isArchiveUrl, ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
+import type { CmsCapabilities } from "@/lib/cms/probe";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
@@ -166,8 +167,17 @@ async function _runScanJob(
       ? seoIssues.filter((i) => !ignoredTypeSet.has(i.type))
       : seoIssues;
 
+    // Load CMS capabilities for this website so quick-fix classification
+    // reflects what can actually be pushed, not just what the issue type allows.
+    const [cmsConn] = await db
+      .select({ capabilities: cmsConnections.capabilities })
+      .from(cmsConnections)
+      .where(eq(cmsConnections.websiteId, websiteId))
+      .limit(1);
+    const capabilities = (cmsConn?.capabilities ?? null) as CmsCapabilities | null;
+
     if (filteredIssues.length > 0) {
-      await persistIssues(scanId, filteredIssues);
+      await persistIssues(scanId, filteredIssues, capabilities);
     }
 
     await context.updateProgress(85);
@@ -227,7 +237,22 @@ async function _runScanJob(
   }
 }
 
-async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<void> {
+function resolveFixType(issue: SeoIssue, capabilities: CmsCapabilities | null): "quick" | "major" {
+  if (issue.fixType !== "quick") return (issue.fixType as "major") ?? "major";
+  // Archive pages (category/tag/author/date) are never patchable via REST
+  if (issue.pageUrl && isArchiveUrl(issue.pageUrl)) return "major";
+  // No CMS connected — nothing can be pushed automatically
+  if (!capabilities) return "major";
+  // Downgrade if the specific field this issue maps to isn't writable
+  const field = ISSUE_TYPE_TO_FIELD[issue.type];
+  if (!field) return "major";
+  if (field === "meta_title" && !capabilities.meta_title) return "major";
+  if (field === "meta_description" && !capabilities.meta_description) return "major";
+  if (field === "h1" && !capabilities.h1) return "major";
+  return "quick";
+}
+
+async function persistIssues(scanId: string, seoIssues: SeoIssue[], capabilities: CmsCapabilities | null): Promise<void> {
   const rows = seoIssues.map((issue) => ({
     scanId,
     pageUrl: issue.pageUrl ?? null,
@@ -235,11 +260,7 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[]): Promise<voi
     severity: issue.severity,
     title: issue.title,
     description: issue.description,
-    // Archive pages (category/tag/author/date) can't be fixed via REST API —
-    // downgrade quick fixes to major so users know manual action is needed.
-    fixType: issue.fixType === "quick" && issue.pageUrl && isArchiveUrl(issue.pageUrl)
-      ? "major"
-      : issue.fixType,
+    fixType: resolveFixType(issue, capabilities),
   }));
 
   // Drizzle insert accepts multiple rows; split into batches to avoid

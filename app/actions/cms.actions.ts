@@ -1,16 +1,62 @@
 "use server";
 
-import { eq, and } from "drizzle-orm";
+import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { cmsConnections } from "@/lib/db/schema";
+import { cmsConnections, scans, issues } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { storeCredentials, deleteCredentials, loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
+import { probeCmsCapabilities, type CmsCapabilities } from "@/lib/cms/probe";
+import { ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
 import type { CmsType } from "@/lib/cms/types";
 
 export type CmsConnectionState =
   | { connected: false }
   | { connected: true; cmsType: CmsType; connectedAs: string; connectedAt: string; connectionId: string };
+
+// After connecting a CMS, probe capabilities and re-classify quick fixes on the
+// latest scan so the results page immediately shows an accurate count.
+async function probeAndReclassify(
+  websiteId: string,
+  cmsType: CmsType,
+  credentials: unknown,
+): Promise<void> {
+  const capabilities = await probeCmsCapabilities(cmsType, credentials);
+
+  await db
+    .update(cmsConnections)
+    .set({ capabilities: capabilities as unknown as Record<string, unknown>, updatedAt: new Date() })
+    .where(and(eq(cmsConnections.websiteId, websiteId), eq(cmsConnections.cmsType, cmsType)));
+
+  // Re-classify quick-fix issues on the latest completed scan
+  const [latestScan] = await db
+    .select({ id: scans.id })
+    .from(scans)
+    .where(and(eq(scans.websiteId, websiteId), eq(scans.status, "completed")))
+    .orderBy(desc(scans.completedAt))
+    .limit(1);
+
+  if (!latestScan) return;
+
+  const quickIssues = await db
+    .select({ id: issues.id, type: issues.type })
+    .from(issues)
+    .where(and(eq(issues.scanId, latestScan.id), eq(issues.fixType, "quick")));
+
+  for (const issue of quickIssues) {
+    const field = ISSUE_TYPE_TO_FIELD[issue.type];
+    if (!field) continue;
+    const canFix = field === "meta_title" ? capabilities.meta_title
+      : field === "meta_description" ? capabilities.meta_description
+      : capabilities.h1;
+    if (!canFix) {
+      await db
+        .update(issues)
+        .set({ fixType: "major", updatedAt: new Date() })
+        .where(eq(issues.id, issue.id));
+    }
+  }
+}
 
 export async function getCmsConnection(websiteId: string): Promise<CmsConnectionState> {
   await getServerSession();
@@ -66,6 +112,7 @@ export async function connectWordPress(
       },
     });
 
+  void probeAndReclassify(websiteId, "wordpress", creds).catch(() => undefined);
   return { success: true, connectedAs: userLogin };
 }
 
@@ -99,6 +146,7 @@ export async function connectShopify(
       set: { credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date(), updatedAt: new Date() },
     });
 
+  void probeAndReclassify(websiteId, "shopify", creds).catch(() => undefined);
   return { success: true, connectedAs: userLogin };
 }
 
@@ -124,6 +172,7 @@ export async function connectWebflow(
       set: { credentialsRef: `${storageKey}|${userLogin}`, connectedAt: new Date(), updatedAt: new Date() },
     });
 
+  void probeAndReclassify(websiteId, "webflow", creds).catch(() => undefined);
   return { success: true, connectedAs: userLogin };
 }
 

@@ -177,6 +177,7 @@ export const cmsConnections = pgTable(
     cmsType: cmsTypeEnum("cms_type").notNull(),
     credentialsRef: varchar("credentials_ref", { length: 500 }),
     connectedAt: timestamp("connected_at", { withTimezone: true }),
+    capabilities: jsonb("capabilities"),
     ...timestamps,
   },
   (t) => [
