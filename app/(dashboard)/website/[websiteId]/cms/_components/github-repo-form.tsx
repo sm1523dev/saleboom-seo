@@ -10,6 +10,10 @@ const FRAMEWORK_LABELS: Record<string, string> = {
   "nextjs-pages": "Next.js (Pages Router)",
   hugo: "Hugo",
   jekyll: "Jekyll",
+  gatsby: "Gatsby",
+  "react-helmet": "React (react-helmet)",
+  django: "Django — template paths required",
+  laravel: "Laravel — template paths required",
   unknown: "Unknown — connect and re-probe after setup",
 };
 

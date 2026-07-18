@@ -217,6 +217,23 @@ export async function connectGitHub(
   return { success: true, framework };
 }
 
+export async function updateGitHubTemplatePaths(
+  websiteId: string,
+  templatePaths: Record<string, string>,
+): Promise<{ success: boolean; error?: string }> {
+  await getServerSession();
+
+  const existing = await loadCredentials(websiteId, "github");
+  if (!existing) return { success: false, error: "GitHub not connected — connect your repository first" };
+
+  const merged = { ...existing, templatePaths };
+  await storeCredentials(websiteId, "github", merged);
+
+  // Re-probe so capabilities are updated (django/laravel flip from major → quick)
+  void probeAndReclassify(websiteId, "github", merged).catch(() => undefined);
+  return { success: true };
+}
+
 export async function loadCmsCredentials(websiteId: string, cmsType: CmsType) {
   await getServerSession();
   return loadCredentials(websiteId, cmsType);

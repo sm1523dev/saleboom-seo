@@ -1,6 +1,15 @@
 export type CmsType = "wordpress" | "shopify" | "webflow" | "github";
 
-export type GitHubFramework = "nextjs-app" | "nextjs-pages" | "hugo" | "jekyll" | "unknown";
+export type GitHubFramework =
+  | "nextjs-app"
+  | "nextjs-pages"
+  | "hugo"
+  | "jekyll"
+  | "gatsby"
+  | "react-helmet"
+  | "django"
+  | "laravel"
+  | "unknown";
 
 export type CmsField = "meta_title" | "meta_description" | "h1";
 
@@ -15,6 +24,8 @@ export type CmsCredentials = {
     baseBranch: string;
     framework: GitHubFramework;
     subPath?: string;
+    // Django/Laravel only: maps page URL → template file path in the repo
+    templatePaths?: Record<string, string>;
   };
 };
 

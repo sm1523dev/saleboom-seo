@@ -2,6 +2,10 @@ import type { CmsAdapter, CmsCredentials, PushPayload, PushResult, ValidationRes
 import { PrCreationEngine, buildPrBody } from "@/lib/cms/github/pr-engine";
 import { modifyAppRouterMetadata, modifyPagesRouterHead, getNextjsFilePaths } from "@/lib/cms/github/modifiers/nextjs";
 import { modifyFrontMatter, hugoFilePaths, jekyllFilePaths } from "@/lib/cms/github/modifiers/front-matter";
+import { modifyGatsbyHead, getGatsbyFilePaths } from "@/lib/cms/github/modifiers/gatsby";
+import { modifyReactHelmet, getReactHelmetFilePaths } from "@/lib/cms/github/modifiers/react-helmet";
+import { modifyDjangoTemplate } from "@/lib/cms/github/modifiers/django";
+import { modifyLaravelBlade } from "@/lib/cms/github/modifiers/laravel";
 
 type GhCreds = CmsCredentials["github"];
 
@@ -26,7 +30,7 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
 
   async push(payload: PushPayload, credentials: GhCreds): Promise<PushResult> {
     const { pageUrl, fields } = payload;
-    const { accessToken, repoOwner, repoName, baseBranch, framework, subPath } = credentials;
+    const { accessToken, repoOwner, repoName, baseBranch, framework, subPath, templatePaths } = credentials;
 
     if (framework === "unknown") {
       throw new Error("Framework not detected — reconnect the repository to re-probe framework");
@@ -49,7 +53,7 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
     let branchCreated = false;
 
     for (const [field, newValue] of fieldEntries) {
-      const filePaths = resolveFilePaths(pageUrl, framework, subPath);
+      const filePaths = resolveFilePaths(pageUrl, framework, subPath, templatePaths);
 
       // Find first existing file
       let foundPath: string | null = null;
@@ -63,6 +67,15 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
       }
 
       if (!foundPath || !fileMeta) {
+        const isNoTemplatePath = filePaths[0]?.startsWith("__no_template_path_for_");
+        if (isNoTemplatePath) {
+          let lookupKey = pageUrl;
+          try { lookupKey = new URL(pageUrl).pathname; } catch { /* ok */ }
+          throw new Error(
+            `No template path configured for "${lookupKey}". ` +
+            `Add it in your GitHub repository settings (CMS → Custom / GitHub → Template paths).`,
+          );
+        }
         throw new Error(`Could not locate source file for ${pageUrl} (tried: ${filePaths.slice(0, 3).join(", ")})`);
       }
 
@@ -123,11 +136,25 @@ function resolveFilePaths(
   pageUrl: string,
   framework: GhCreds["framework"],
   subPath?: string,
+  templatePaths?: Record<string, string>,
 ): string[] {
   if (framework === "nextjs-app") return getNextjsFilePaths(pageUrl, "nextjs-app", subPath);
   if (framework === "nextjs-pages") return getNextjsFilePaths(pageUrl, "nextjs-pages", subPath);
   if (framework === "hugo") return hugoFilePaths(pageUrl, subPath);
   if (framework === "jekyll") return jekyllFilePaths(pageUrl, subPath);
+  if (framework === "gatsby") return getGatsbyFilePaths(pageUrl, subPath);
+  if (framework === "react-helmet") return getReactHelmetFilePaths(pageUrl, subPath);
+  if (framework === "django" || framework === "laravel") {
+    // Normalize pageUrl to just pathname for lookup
+    let lookupKey = pageUrl;
+    try { lookupKey = new URL(pageUrl).pathname; } catch { /* use as-is */ }
+    const mapped = templatePaths?.[lookupKey] ?? templatePaths?.[pageUrl];
+    if (!mapped) {
+      // Return sentinel value — caught below with a helpful error
+      return [`__no_template_path_for_${lookupKey}__`];
+    }
+    return [mapped];
+  }
   return [];
 }
 
@@ -144,6 +171,10 @@ function applyModifier(
   if (framework === "nextjs-app") return modifyAppRouterMetadata(source, field, newValue);
   if (framework === "nextjs-pages") return modifyPagesRouterHead(source, field, newValue);
   if (framework === "hugo" || framework === "jekyll") return modifyFrontMatter(source, field, newValue);
+  if (framework === "gatsby") return modifyGatsbyHead(source, field, newValue);
+  if (framework === "react-helmet") return modifyReactHelmet(source, field, newValue);
+  if (framework === "django") return modifyDjangoTemplate(source, field, newValue);
+  if (framework === "laravel") return modifyLaravelBlade(source, field, newValue);
 
-  return { modified: false, error: `Framework "${framework}" not supported in Phase 1` };
+  return { modified: false, error: `Framework "${framework}" not yet supported` };
 }

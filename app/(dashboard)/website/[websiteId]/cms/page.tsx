@@ -5,8 +5,9 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { websites } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
-import { getCmsConnection } from "@/app/actions/cms.actions";
+import { getCmsConnection, loadCmsCredentials } from "@/app/actions/cms.actions";
 import { CmsConnectForm } from "./_components/cms-connect-form";
+import { GithubTemplatePaths } from "./_components/github-template-paths";
 
 export const metadata: Metadata = {
   title: "CMS Connection",
@@ -34,6 +35,15 @@ export default async function CmsConnectionPage({ params, searchParams }: Props)
 
   const connectionState = await getCmsConnection(websiteId);
 
+  // Load GitHub credentials to show framework-specific panels (e.g. template paths for django/laravel)
+  let githubFramework: string | null = null;
+  let githubTemplatePaths: Record<string, string> = {};
+  if (connectionState.connected && connectionState.cmsType === "github") {
+    const creds = await loadCmsCredentials(websiteId, "github");
+    githubFramework = (creds as { framework?: string } | null)?.framework ?? null;
+    githubTemplatePaths = (creds as { templatePaths?: Record<string, string> } | null)?.templatePaths ?? {};
+  }
+
   return (
     <div className="flex flex-col gap-8">
       <header>
@@ -51,6 +61,13 @@ export default async function CmsConnectionPage({ params, searchParams }: Props)
 
       <section className="max-w-lg" aria-label="CMS connection form">
         <CmsConnectForm websiteId={websiteId} initialState={connectionState} githubStep={githubStep} />
+        {(githubFramework === "django" || githubFramework === "laravel") && (
+          <GithubTemplatePaths
+            websiteId={websiteId}
+            framework={githubFramework}
+            initialPaths={githubTemplatePaths}
+          />
+        )}
       </section>
 
       <section className="max-w-lg rounded-xl border border-border bg-muted/20 p-5" aria-label="How it works">

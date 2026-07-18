@@ -49,8 +49,14 @@ export async function probeCmsCapabilities(
 
   if (cmsType === "github") {
     const creds = credentials as CmsCredentials["github"];
-    // H1 in source files requires manual edit; title/description are modifiable for known frameworks
-    const canModify = (creds.framework as GitHubFramework) !== "unknown";
+    const fw = creds.framework as GitHubFramework;
+    // Django/Laravel require per-page template path configuration before any fix can be pushed
+    if (fw === "django" || fw === "laravel") {
+      const hasTemplatePaths = Object.keys(creds.templatePaths ?? {}).length > 0;
+      return { meta_title: hasTemplatePaths, meta_description: hasTemplatePaths, h1: false, probeAt };
+    }
+    // H1 in source files requires manual edit; title/description modifiable for known frameworks
+    const canModify = fw !== "unknown";
     return { meta_title: canModify, meta_description: canModify, h1: false, probeAt };
   }
 
