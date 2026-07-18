@@ -13,10 +13,15 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-type Props = { params: Promise<{ websiteId: string }> };
+type Props = {
+  params: Promise<{ websiteId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
+};
 
-export default async function CmsConnectionPage({ params }: Props) {
+export default async function CmsConnectionPage({ params, searchParams }: Props) {
   const { websiteId } = await params;
+  const sp = await searchParams;
+  const githubStep = typeof sp.github_step === "string" ? sp.github_step : null;
   await getServerSession();
 
   const [website] = await db
@@ -45,7 +50,7 @@ export default async function CmsConnectionPage({ params }: Props) {
       </header>
 
       <section className="max-w-lg" aria-label="CMS connection form">
-        <CmsConnectForm websiteId={websiteId} initialState={connectionState} />
+        <CmsConnectForm websiteId={websiteId} initialState={connectionState} githubStep={githubStep} />
       </section>
 
       <section className="max-w-lg rounded-xl border border-border bg-muted/20 p-5" aria-label="How it works">
@@ -53,7 +58,7 @@ export default async function CmsConnectionPage({ params }: Props) {
         <ol className="space-y-2 text-xs text-muted-foreground">
           <li className="flex gap-2"><span className="text-primary">1.</span> Log in to your WordPress admin panel</li>
           <li className="flex gap-2"><span className="text-primary">2.</span> Go to Users → Your Profile → scroll to Application Passwords</li>
-          <li className="flex gap-2"><span className="text-primary">3.</span> Enter a name (e.g. "SaleBoom SEO") and click Add New</li>
+          <li className="flex gap-2"><span className="text-primary">3.</span> Enter a name (e.g. &ldquo;SaleBoom SEO&rdquo;) and click Add New</li>
           <li className="flex gap-2"><span className="text-primary">4.</span> Copy the generated password — it is shown only once</li>
         </ol>
         <p className="mt-3 text-xs text-muted-foreground">

@@ -5,11 +5,12 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
-import type { CmsField, CmsCredentials } from "@/lib/cms/types";
+import type { CmsField, CmsCredentials, PushResult } from "@/lib/cms/types";
 import { loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
 import { WebflowAdapter } from "@/lib/cms/providers/webflow";
+import { GitHubAdapter } from "@/lib/cms/providers/github";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { verifyLiveField } from "@/lib/cms/verify";
 
@@ -38,21 +39,20 @@ async function resolveWebsiteId(snapshot: {
 }
 
 async function pushViaCmsAdapter(
-  cmsType: "wordpress" | "shopify" | "webflow",
+  cmsType: "wordpress" | "shopify" | "webflow" | "github",
   credentials: unknown,
   payload: { pageUrl: string; fields: Partial<Record<CmsField, string>> },
-): Promise<CmsField[]> {
-  let result;
+): Promise<PushResult> {
   if (cmsType === "wordpress") {
-    result = await new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
+    return new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
   } else if (cmsType === "shopify") {
-    result = await new ShopifyAdapter().push(payload, credentials as CmsCredentials["shopify"]);
+    return new ShopifyAdapter().push(payload, credentials as CmsCredentials["shopify"]);
   } else if (cmsType === "webflow") {
-    result = await new WebflowAdapter().push(payload, credentials as CmsCredentials["webflow"]);
-  } else {
-    throw new Error(`Unsupported CMS type: ${cmsType}`);
+    return new WebflowAdapter().push(payload, credentials as CmsCredentials["webflow"]);
+  } else if (cmsType === "github") {
+    return new GitHubAdapter().push(payload, credentials as CmsCredentials["github"]);
   }
-  return result.pushedFields;
+  throw new Error(`Unsupported CMS type: ${cmsType}`);
 }
 
 const FIELD_MAP: Record<CmsField, { current: "currentMetaTitle" | "currentMetaDescription" | "currentH1"; suggested: "metaTitle" | "metaDescription" | "h1" }> = {
@@ -196,7 +196,7 @@ export async function pushChangeTocms(
 
   if (!connection) return { success: false, error: "No CMS connected for this website" };
 
-  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow";
+  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow" | "github";
   const credentials = await loadCredentials(websiteId, cmsType);
   if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
 
@@ -205,7 +205,7 @@ export async function pushChangeTocms(
     const afterValue = afterState?.value;
     if (!afterValue) return { success: false, error: "No value to push" };
 
-    const pushedFields = await pushViaCmsAdapter(cmsType, credentials, {
+    const pushResult = await pushViaCmsAdapter(cmsType, credentials, {
       pageUrl: snapshot.pageUrl,
       fields: { [snapshot.fieldChanged as CmsField]: afterValue },
     });
@@ -213,7 +213,7 @@ export async function pushChangeTocms(
     // Verify the adapter actually wrote the requested field. A no-op push
     // (e.g. meta_description on a site with no SEO plugin) returns an empty
     // pushedFields list — treat this as a failure so the UI is honest.
-    const fieldWritten = pushedFields.includes(snapshot.fieldChanged as CmsField);
+    const fieldWritten = pushResult.pushedFields.includes(snapshot.fieldChanged as CmsField);
     if (!fieldWritten) {
       await db
         .update(changeSnapshots)
@@ -224,6 +224,22 @@ export async function pushChangeTocms(
         success: false,
         error: `Could not write ${fieldLabel} — no SEO plugin (Yoast / Rank Math / AIOSEO) is installed on this WordPress site. Install one to push meta fields.`,
       };
+    }
+
+    // GitHub: PR is open — keep status as "pending" but store PR metadata.
+    // Status will move to "applied" when the PR is merged (handled by pr-poll worker).
+    if (pushResult.prUrl && pushResult.prNumber) {
+      await db
+        .update(changeSnapshots)
+        .set({
+          cmsConnectionId: connection.id,
+          prUrl: pushResult.prUrl,
+          prNumber: pushResult.prNumber,
+          updatedAt: new Date(),
+        })
+        .where(eq(changeSnapshots.id, snapshotId));
+      revalidatePath("/dashboard");
+      return { success: true };
     }
 
     await db
@@ -323,7 +339,12 @@ export async function rollbackChange(
 
   if (!snapshot) return { success: false, error: "Change not found" };
   if (snapshot.status === "rolled_back") return { success: false, error: "already_rolled_back" };
-  if (snapshot.status !== "applied") return { success: false, error: "Only applied changes can be rolled back" };
+
+  // GitHub PRs: rollback is valid for both "pending" (PR open) and "applied" (PR merged)
+  const isGithubPr = !!snapshot.prNumber;
+  if (!isGithubPr && snapshot.status !== "applied") {
+    return { success: false, error: "Only applied changes can be rolled back" };
+  }
 
   const websiteId = await resolveWebsiteId(snapshot);
   if (!websiteId) return { success: false, error: "Could not determine website for this change" };
@@ -336,22 +357,68 @@ export async function rollbackChange(
 
   if (!connection) return { success: false, error: "No CMS connected — cannot rollback" };
 
-  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow";
+  const cmsType = connection.cmsType as "wordpress" | "shopify" | "webflow" | "github";
   const credentials = await loadCredentials(websiteId, cmsType);
   if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
+
+  // GitHub PR rollback: close open PR, or create a revert PR for merged ones
+  if (cmsType === "github" && snapshot.prNumber) {
+    try {
+      const { PrCreationEngine } = await import("@/lib/cms/github/pr-engine");
+      const ghCreds = credentials as import("@/lib/cms/types").CmsCredentials["github"];
+      const engine = new PrCreationEngine(
+        ghCreds.accessToken,
+        ghCreds.repoOwner,
+        ghCreds.repoName,
+        ghCreds.baseBranch,
+      );
+
+      if (snapshot.status === "pending") {
+        // PR still open — just close it
+        await engine.closePr(snapshot.prNumber);
+      } else {
+        // PR merged — open a revert PR restoring the original file
+        // We can't easily restore the file content here without re-fetching, so
+        // we rely on the GitHub revert PR approach using the before value.
+        const beforeState = snapshot.beforeState as { value?: string | null } | null;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "";
+        await engine.createRevertPr(
+          `saleboom/revert-${snapshot.id.slice(0, 8)}`,
+          `(before-state for ${snapshot.pageUrl})`,
+          beforeState?.value ?? "",
+          snapshot.prNumber.toString(),
+          snapshot.fieldChanged,
+          snapshot.pageUrl,
+          appUrl,
+        );
+      }
+
+      await db
+        .update(changeSnapshots)
+        .set({ status: "rolled_back", rolledBackAt: new Date(), updatedAt: new Date() })
+        .where(eq(changeSnapshots.id, snapshotId));
+
+      void persistDvsScore(websiteId).catch(() => undefined);
+      revalidatePath("/dashboard");
+      return { success: true };
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Rollback failed";
+      return { success: false, error: message };
+    }
+  }
 
   const beforeState = snapshot.beforeState as { value?: string | null } | null;
   const beforeValue = beforeState?.value ?? "";
 
   try {
-    const pushedFields = await pushViaCmsAdapter(cmsType, credentials, {
+    const pushResult = await pushViaCmsAdapter(cmsType, credentials, {
       pageUrl: snapshot.pageUrl,
       fields: { [snapshot.fieldChanged as CmsField]: beforeValue },
     });
 
     // If the adapter wrote nothing (e.g. meta_description with no SEO plugin),
     // the rollback can't restore the original value — surface as an error.
-    if (!pushedFields.includes(snapshot.fieldChanged as CmsField)) {
+    if (!pushResult.pushedFields.includes(snapshot.fieldChanged as CmsField)) {
       return { success: false, error: "Could not restore — no SEO plugin installed on this WordPress site" };
     }
 

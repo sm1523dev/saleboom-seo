@@ -1,4 +1,6 @@
-export type CmsType = "wordpress" | "shopify" | "webflow";
+export type CmsType = "wordpress" | "shopify" | "webflow" | "github";
+
+export type GitHubFramework = "nextjs-app" | "nextjs-pages" | "hugo" | "jekyll" | "unknown";
 
 export type CmsField = "meta_title" | "meta_description" | "h1";
 
@@ -6,6 +8,14 @@ export type CmsCredentials = {
   wordpress: { siteUrl: string; username: string; applicationPassword: string };
   shopify: { storeUrl: string; accessToken: string };
   webflow: { apiToken: string; collectionId: string };
+  github: {
+    accessToken: string;
+    repoOwner: string;
+    repoName: string;
+    baseBranch: string;
+    framework: GitHubFramework;
+    subPath?: string;
+  };
 };
 
 export type PushPayload = {
@@ -17,6 +27,8 @@ export type PushResult = {
   success: boolean;
   pageId: string;
   pushedFields: CmsField[];
+  prUrl?: string;
+  prNumber?: number;
 };
 
 export type ValidationResult = {

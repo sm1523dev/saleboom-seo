@@ -82,6 +82,7 @@ export const cmsTypeEnum = pgEnum("cms_type", [
   "webflow",
   "contentful",
   "custom",
+  "github",
 ]);
 
 export const changeStatusEnum = pgEnum("change_status", [
@@ -208,6 +209,9 @@ export const changeSnapshots = pgTable(
     verifiedAt: timestamp("verified_at", { withTimezone: true }),
     liveValue: text("live_value"),
     verifyError: text("verify_error"),
+    prUrl: text("pr_url"),
+    prNumber: integer("pr_number"),
+    mergeSha: text("merge_sha"),
     // Source: either from an AI suggestion or a manual issue fix
     suggestionId: uuid("suggestion_id").references(() => aiSuggestions.id, {
       onDelete: "set null",

@@ -21,13 +21,14 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
   const pageNum = Math.max(1, parseInt(page ?? "1", 10));
 
   const statusFilter = status && ["applied", "rolled_back"].includes(status) ? status : undefined;
-  const cmsTypeFilter = cmsType && ["wordpress", "shopify", "webflow"].includes(cmsType) ? cmsType : undefined;
+  const cmsTypeFilter = cmsType && ["wordpress", "shopify", "webflow", "github"].includes(cmsType) ? cmsType : undefined;
 
   const session = await getServerSession();
 
   const conditions = [
     isNull(changeSnapshots.deletedAt),
-    inArray(changeSnapshots.status, ["applied", "rolled_back", "failed", "reverted"]),
+    // Include "pending" so GitHub PRs (pending + pr_url) appear in history
+    inArray(changeSnapshots.status, ["applied", "rolled_back", "failed", "reverted", "pending"]),
     eq(changeSnapshots.userId, session.user.id as string),
   ];
 
@@ -46,6 +47,8 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifiedAt: changeSnapshots.verifiedAt,
       liveValue: changeSnapshots.liveValue,
       verifyError: changeSnapshots.verifyError,
+      prUrl: changeSnapshots.prUrl,
+      prNumber: changeSnapshots.prNumber,
     })
     .from(changeSnapshots)
     .where(and(...conditions))
@@ -68,6 +71,8 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
     .filter((r) => {
       if (statusFilter && r.status !== statusFilter) return false;
       if (cmsTypeFilter && r.cmsConnectionId && connectionMap[r.cmsConnectionId] !== cmsTypeFilter) return false;
+      // Exclude plain "pending" entries (not GitHub PRs) from history — they belong in the approval queue
+      if (r.status === "pending" && !r.prUrl) return false;
       return true;
     })
     .map((r) => ({
@@ -84,6 +89,8 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifiedAt: r.verifiedAt?.toISOString() ?? null,
       liveValue: r.liveValue ?? null,
       verifyError: r.verifyError ?? null,
+      prUrl: r.prUrl ?? null,
+      prNumber: r.prNumber ?? null,
     }));
 
   return (

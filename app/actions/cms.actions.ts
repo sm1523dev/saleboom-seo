@@ -7,8 +7,9 @@ import { getServerSession } from "@/lib/auth-utils";
 import { storeCredentials, deleteCredentials, loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { probeCmsCapabilities, type CmsCapabilities } from "@/lib/cms/probe";
+import { detectFramework } from "@/lib/cms/github/detect-framework";
 import { ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
-import type { CmsType } from "@/lib/cms/types";
+import type { CmsType, GitHubFramework } from "@/lib/cms/types";
 
 export type CmsConnectionState =
   | { connected: false }
@@ -174,6 +175,46 @@ export async function connectWebflow(
 
   void probeAndReclassify(websiteId, "webflow", creds).catch(() => undefined);
   return { success: true, connectedAs: userLogin };
+}
+
+export async function connectGitHub(
+  websiteId: string,
+  repoOwner: string,
+  repoName: string,
+  baseBranch: string,
+  subPath?: string,
+): Promise<{ success: boolean; error?: string; framework?: string }> {
+  await getServerSession();
+
+  // Load partial credentials stored by the OAuth callback
+  const partial = await loadCredentials(websiteId, "github");
+  if (!partial?.accessToken) {
+    return { success: false, error: "GitHub not authorized — click 'Connect GitHub' to start OAuth flow" };
+  }
+
+  const framework = await detectFramework(repoOwner, repoName, partial.accessToken, subPath).catch(
+    () => "unknown" as GitHubFramework,
+  );
+
+  const fullCreds = { accessToken: partial.accessToken, repoOwner, repoName, baseBranch, framework, subPath };
+  const storageKey = await storeCredentials(websiteId, "github", fullCreds);
+
+  // Retrieve credentialsRef to preserve the login hint stored during OAuth callback
+  const [conn] = await db
+    .select({ credentialsRef: cmsConnections.credentialsRef })
+    .from(cmsConnections)
+    .where(and(eq(cmsConnections.websiteId, websiteId), eq(cmsConnections.cmsType, "github")))
+    .limit(1);
+
+  const loginHint = conn?.credentialsRef?.split("|")[1] ?? repoOwner;
+
+  await db
+    .update(cmsConnections)
+    .set({ credentialsRef: `${storageKey}|${loginHint}`, updatedAt: new Date() })
+    .where(and(eq(cmsConnections.websiteId, websiteId), eq(cmsConnections.cmsType, "github")));
+
+  void probeAndReclassify(websiteId, "github", fullCreds).catch(() => undefined);
+  return { success: true, framework };
 }
 
 export async function loadCmsCredentials(websiteId: string, cmsType: CmsType) {

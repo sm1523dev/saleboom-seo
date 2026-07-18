@@ -1,4 +1,4 @@
-import type { CmsCredentials, CmsType } from "./types";
+import type { CmsCredentials, CmsType, GitHubFramework } from "./types";
 
 export type CmsCapabilities = {
   meta_title: boolean;
@@ -41,10 +41,17 @@ export async function probeCmsCapabilities(
     const plugin = await detectWordPressPlugin(creds);
     return {
       meta_title: true,               // native title always works for posts/pages
-      meta_description: plugin !== "none", // requires SEO plugin
+      meta_description: plugin !== "none", // WordPress has no native meta description field — requires Yoast, Rank Math, or AIOSEO
       h1: true,                       // native title changes H1
       probeAt,
     };
+  }
+
+  if (cmsType === "github") {
+    const creds = credentials as CmsCredentials["github"];
+    // H1 in source files requires manual edit; title/description are modifiable for known frameworks
+    const canModify = (creds.framework as GitHubFramework) !== "unknown";
+    return { meta_title: canModify, meta_description: canModify, h1: false, probeAt };
   }
 
   // Shopify and Webflow expose all three fields via their management APIs

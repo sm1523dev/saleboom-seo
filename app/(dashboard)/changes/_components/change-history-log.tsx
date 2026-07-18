@@ -36,6 +36,8 @@ type HistoryItem = {
   verifiedAt: string | null;
   liveValue: string | null;
   verifyError: string | null;
+  prUrl: string | null;
+  prNumber: number | null;
 };
 
 type Props = {
@@ -171,7 +173,7 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
         </div>
         <div className="flex items-center gap-1">
           <span className="text-xs text-muted-foreground">CMS:</span>
-          {[undefined, "wordpress", "shopify", "webflow"].map((c) => (
+          {[undefined, "wordpress", "shopify", "webflow", "github"].map((c) => (
             <Link
               key={c ?? "all"}
               href={buildHref({ cmsType: c })}
@@ -194,7 +196,8 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
           const rbState = rollbackStates[item.id] ?? "idle";
           const statusCfg = STATUS_CONFIG[item.status] ?? STATUS_CONFIG.reverted;
           const timestamp = item.appliedAt ?? item.createdAt;
-          const isVerifiable = item.status === "applied" || item.status === "rolled_back";
+          const isVerifiable = (item.status === "applied" || item.status === "rolled_back") && !item.prUrl;
+          const canRollback = item.status === "applied" || (item.status === "pending" && !!item.prUrl);
           const vState = verifyStates[item.id] ?? "idle";
           // Merge DB-stored result with in-session result (session wins)
           const vResult = verifyResults[item.id] ?? (item.verifiedAt
@@ -210,9 +213,24 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                     {FIELD_LABELS[item.fieldChanged] ?? item.fieldChanged}
                   </span>
                   <span className="text-xs capitalize text-muted-foreground">{item.cmsType}</span>
-                  <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
-                    {statusCfg.label}
-                  </span>
+                  {/* PR Open badge (GitHub: pending + pr_url set) */}
+                  {item.status === "pending" && item.prUrl ? (
+                    <a
+                      href={item.prUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400 hover:text-yellow-300"
+                    >
+                      PR Open #{item.prNumber}
+                      <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3" aria-hidden="true">
+                        <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
+                      </svg>
+                    </a>
+                  ) : (
+                    <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
+                      {statusCfg.label}
+                    </span>
+                  )}
                   {/* Verification badge */}
                   {vResult && (
                     vResult.matched
@@ -236,10 +254,10 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                     </button>
                   )}
                   {vState === "checking" && <span className="text-xs text-muted-foreground">Checking live…</span>}
-                  {item.status === "applied" && rbState === "idle" && (
+                  {canRollback && rbState === "idle" && (
                     <button type="button" onClick={() => handleRollback(item.id)}
                       className="rounded-md border border-yellow-500/30 px-2.5 py-1 text-xs text-yellow-400 hover:bg-yellow-500/10">
-                      Rollback
+                      {item.prUrl && item.status === "pending" ? "Close PR" : "Rollback"}
                     </button>
                   )}
                   {rbState === "rolling" && <span className="text-xs text-muted-foreground">Rolling back…</span>}
