@@ -5,7 +5,7 @@ import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
-import type { CmsField, CmsCredentials, PushResult } from "@/lib/cms/types";
+import type { CmsField, CmsCredentials, PushResult, PushPayload } from "@/lib/cms/types";
 import { loadCredentials } from "@/lib/cms/credentials";
 import { WordPressAdapter } from "@/lib/cms/providers/wordpress";
 import { ShopifyAdapter } from "@/lib/cms/providers/shopify";
@@ -41,7 +41,7 @@ async function resolveWebsiteId(snapshot: {
 async function pushViaCmsAdapter(
   cmsType: "wordpress" | "shopify" | "webflow" | "github",
   credentials: unknown,
-  payload: { pageUrl: string; fields: Partial<Record<CmsField, string>> },
+  payload: PushPayload,
 ): Promise<PushResult> {
   if (cmsType === "wordpress") {
     return new WordPressAdapter().push(payload, credentials as CmsCredentials["wordpress"]);
@@ -202,12 +202,14 @@ export async function pushChangeTocms(
 
   try {
     const afterState = snapshot.afterState as { value?: string } | null;
+    const beforeState = snapshot.beforeState as { value?: string | null } | null;
     const afterValue = afterState?.value;
     if (!afterValue) return { success: false, error: "No value to push" };
 
     const pushResult = await pushViaCmsAdapter(cmsType, credentials, {
       pageUrl: snapshot.pageUrl,
       fields: { [snapshot.fieldChanged as CmsField]: afterValue },
+      beforeFields: { [snapshot.fieldChanged as CmsField]: beforeState?.value ?? null },
     });
 
     // Verify the adapter actually wrote the requested field. A no-op push

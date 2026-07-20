@@ -32,6 +32,7 @@ export type CmsCredentials = {
 export type PushPayload = {
   pageUrl: string;
   fields: Partial<Record<CmsField, string>>;
+  beforeFields?: Partial<Record<CmsField, string | null>>;
 };
 
 export type PushResult = {

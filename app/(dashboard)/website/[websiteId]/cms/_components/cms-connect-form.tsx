@@ -80,6 +80,16 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
     });
   }
 
+  // GitHub step 2: OAuth token stored but repo details not yet entered.
+  // Show the repo form even though the connection record already exists.
+  if (githubStep === "2" && (!state.connected || (state.connected && state.cmsType === "github"))) {
+    return (
+      <div className="rounded-xl border border-border bg-card p-6">
+        <GithubRepoForm websiteId={websiteId} />
+      </div>
+    );
+  }
+
   if (state.connected) {
     return (
       <div className="rounded-xl border border-border bg-card p-6">

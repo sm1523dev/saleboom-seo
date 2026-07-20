@@ -29,7 +29,7 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
   }
 
   async push(payload: PushPayload, credentials: GhCreds): Promise<PushResult> {
-    const { pageUrl, fields } = payload;
+    const { pageUrl, fields, beforeFields } = payload;
     const { accessToken, repoOwner, repoName, baseBranch, framework, subPath, templatePaths } = credentials;
 
     if (framework === "unknown") {
@@ -63,6 +63,15 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
           foundPath = fp;
           fileMeta = await engine.getFile(fp);
           break;
+        }
+      }
+
+      // Fallback: probe route groups dynamically (Next.js App Router uses (group) dirs)
+      if (!foundPath && (framework === "nextjs-app" || framework === "nextjs-pages")) {
+        const discovered = await discoverViaRouteGroups(engine, pageUrl, framework, subPath);
+        if (discovered) {
+          foundPath = discovered.path;
+          fileMeta = discovered.meta;
         }
       }
 
@@ -106,7 +115,7 @@ export class GitHubAdapter implements CmsAdapter<"github"> {
       buildPrBody({
         field: fieldEntries[0][0],
         pageUrl,
-        beforeValue: "(original)",
+        beforeValue: beforeFields?.[fieldEntries[0][0]] ?? null,
         afterValue: fieldEntries[0][1],
         scanResultsUrl: appUrl,
       }),
@@ -177,4 +186,48 @@ function applyModifier(
   if (framework === "laravel") return modifyLaravelBlade(source, field, newValue);
 
   return { modified: false, error: `Framework "${framework}" not yet supported` };
+}
+
+// Discover files inside Next.js route group directories — e.g. app/(public)/page.tsx
+async function discoverViaRouteGroups(
+  engine: PrCreationEngine,
+  pageUrl: string,
+  framework: "nextjs-app" | "nextjs-pages",
+  subPath?: string,
+): Promise<{ path: string; meta: { sha: string; content: string } } | null> {
+  const prefix = subPath ? `${subPath.replace(/\/$/, "")}/` : "";
+  const base = framework === "nextjs-app" ? `${prefix}app` : `${prefix}pages`;
+
+  // List the base directory to find route groups (directories with parentheses)
+  const res = await fetch(
+    `https://api.github.com/repos/${engine["owner"]}/${engine["repo"]}/contents/${base}`,
+    {
+      headers: { Authorization: `Bearer ${engine["token"]}`, "User-Agent": "SaleBoomSEO" },
+      signal: AbortSignal.timeout(8_000),
+    },
+  ).catch(() => null);
+
+  if (!res?.ok) return null;
+
+  const entries = (await res.json()) as Array<{ name: string; type: string }>;
+  const routeGroups = entries.filter((e) => e.type === "dir" && e.name.startsWith("("));
+
+  const pathname = (() => {
+    try { return new URL(pageUrl).pathname.replace(/^\//, "").replace(/\/$/, ""); } catch { return ""; }
+  })();
+
+  const exts = ["tsx", "jsx", "ts", "js"];
+  const pageFile = pathname === "" ? "page" : `${pathname}/page`;
+
+  for (const group of routeGroups) {
+    for (const ext of exts) {
+      const candidate = `${base}/${group.name}/${pageFile}.${ext}`;
+      if (await engine.fileExists(candidate)) {
+        const meta = await engine.getFile(candidate);
+        return { path: candidate, meta };
+      }
+    }
+  }
+
+  return null;
 }
