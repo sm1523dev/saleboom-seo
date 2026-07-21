@@ -87,15 +87,6 @@ jobs:
             --user "${{ github.actor }}:${{ secrets.GITHUB_TOKEN }}" \
             ${{ env.IMAGE_WORKER }}:latest
 
-      - name: Patch GitHub OAuth secrets
-        env:
-          GH_OAUTH_CLIENT_ID: ${{ secrets.GITHUB_OAUTH_CLIENT_ID }}
-          GH_OAUTH_CLIENT_SECRET: ${{ secrets.GITHUB_OAUTH_CLIENT_SECRET }}
-        run: |
-          sudo k3s kubectl patch secret saleboomseo-secrets -n saleboomseo \
-            --type merge \
-            -p "{\"stringData\":{\"GITHUB_OAUTH_CLIENT_ID\":\"${GH_OAUTH_CLIENT_ID}\",\"GITHUB_OAUTH_CLIENT_SECRET\":\"${GH_OAUTH_CLIENT_SECRET}\"}}"
-
       - name: Apply manifests
         run: sudo k3s kubectl apply -f k8s/dev/nextjs.yaml
 
