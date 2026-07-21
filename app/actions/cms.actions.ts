@@ -13,7 +13,7 @@ import type { CmsType, GitHubFramework } from "@/lib/cms/types";
 
 export type CmsConnectionState =
   | { connected: false }
-  | { connected: true; cmsType: CmsType; connectedAs: string; connectedAt: string; connectionId: string };
+  | { connected: true; cmsType: CmsType; connectedAs: string; connectedAt: string; connectionId: string; framework?: string };
 
 // After connecting a CMS, probe capabilities and re-classify quick fixes on the
 // latest scan so the results page immediately shows an accurate count.
@@ -70,12 +70,18 @@ export async function getCmsConnection(websiteId: string): Promise<CmsConnection
   const cmsType = conn.cmsType as CmsType;
   // credentialsRef stores the masked login hint as "<storageKey>|<userLogin>"
   const hint = conn.credentialsRef?.split("|")[1] ?? "";
+  let framework: string | undefined;
+  if (cmsType === "github") {
+    const creds = await loadCredentials(websiteId, "github").catch(() => null);
+    framework = (creds as { framework?: string } | null)?.framework;
+  }
   return {
     connected: true,
     cmsType,
     connectedAs: hint,
     connectedAt: conn.connectedAt.toISOString(),
     connectionId: conn.id,
+    framework,
   };
 }
 

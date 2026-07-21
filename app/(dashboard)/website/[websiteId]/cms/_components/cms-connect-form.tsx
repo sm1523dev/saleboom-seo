@@ -22,6 +22,18 @@ const CMS_LABELS: Record<CmsType, string> = {
   github: "Custom / GitHub",
 };
 
+const FRAMEWORK_LABELS: Record<string, string> = {
+  "nextjs-app": "Next.js App Router",
+  "nextjs-pages": "Next.js Pages Router",
+  hugo: "Hugo",
+  jekyll: "Jekyll",
+  gatsby: "Gatsby",
+  "react-helmet": "React (react-helmet)",
+  django: "Django",
+  laravel: "Laravel",
+  unknown: "Unknown framework",
+};
+
 export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
   const router = useRouter();
   const [state, setState] = useState(initialState);
@@ -100,6 +112,11 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
               <p className="text-sm font-medium">{CMS_LABELS[state.cmsType as CmsType] ?? state.cmsType} connected</p>
             </div>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{state.connectedAs}</p>
+            {state.framework && (
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Framework: <span className="font-medium text-foreground">{FRAMEWORK_LABELS[state.framework] ?? state.framework}</span>
+              </p>
+            )}
             <p className="mt-0.5 text-xs text-muted-foreground">
               Connected {new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(state.connectedAt))}
             </p>
