@@ -7,6 +7,8 @@ import { scans, websites } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { ScanPoller } from "./_components/scan-poller";
 import { LocalTime } from "@/components/shared/local-time";
+import { PlatformCards } from "@/components/shared/platform-cards";
+import type { Platform } from "@/lib/platform-detect";
 
 export const metadata: Metadata = {
   title: "Scan Status",
@@ -39,7 +41,12 @@ export default async function ScanStatusPage({ params }: Props) {
   if (!scan) notFound();
 
   const [website] = await db
-    .select({ url: websites.url, name: websites.name })
+    .select({
+      url: websites.url,
+      name: websites.name,
+      platformHint: websites.platformHint,
+      platformHintStatus: websites.platformHintStatus,
+    })
     .from(websites)
     .where(eq(websites.id, scan.websiteId))
     .limit(1);
@@ -113,6 +120,16 @@ export default async function ScanStatusPage({ params }: Props) {
           initialTotalPages={scan.totalPages ?? 0}
         />
       </section>
+
+      {(scan.status === "running" || scan.status === "pending") && website?.platformHintStatus !== "confirmed" && (
+        <section aria-label="Platform detection" className="rounded-xl border border-border bg-card p-6">
+          <PlatformCards
+            websiteId={scan.websiteId}
+            detectedPlatform={(website?.platformHint ?? null) as Platform | null}
+            platformHintStatus={(website?.platformHintStatus ?? "unconfirmed") as "unconfirmed" | "confirmed" | "pending_assistance"}
+          />
+        </section>
+      )}
 
       <div className="flex gap-3 text-sm">
         <Link

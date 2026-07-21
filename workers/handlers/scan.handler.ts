@@ -13,6 +13,7 @@ import { recordEvent } from "@/lib/metrics";
 import { checkAndAlert } from "@/lib/metrics/alerts";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
+import { detectPlatformFromCrawl } from "@/lib/platform-detect";
 import type { SeoIssue } from "@/lib/seo-rules";
 import type { ParsedPage } from "@/lib/seo-rules/types";
 
@@ -107,6 +108,15 @@ async function _runScanJob(
         .set({ rawCrawl: crawlResult as unknown as Record<string, unknown>, updatedAt: new Date() })
         .where(eq(scans.id, scanId))
     );
+
+    // Auto-detect platform from crawl HTML — only store if user hasn't confirmed one yet
+    const [site] = await db.select({ platformHintStatus: websites.platformHintStatus }).from(websites).where(eq(websites.id, websiteId)).limit(1);
+    if (site?.platformHintStatus !== "confirmed") {
+      const detected = detectPlatformFromCrawl(crawlResult.pages);
+      if (detected) {
+        await db.update(websites).set({ platformHint: detected, platformHintStatus: "unconfirmed", updatedAt: new Date() }).where(eq(websites.id, websiteId));
+      }
+    }
 
     await context.updateProgress(70);
 

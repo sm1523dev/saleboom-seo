@@ -57,6 +57,34 @@
       "when": 1783518320429,
       "tag": "0007_provider_requests",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1784093014611,
+      "tag": "0008_change_verification",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1784210879532,
+      "tag": "0009_cms_capabilities",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1784352062687,
+      "tag": "0010_github_custom",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1784500000000,
+      "tag": "0011_platform_hint",
+      "breakpoints": true
     }
   ]
 }
