@@ -22,7 +22,7 @@ const timestamps = {
 };
 
 export const infraProviderTypeEnum = pgEnum("infra_provider_type", [
-  "ai", "crawl", "queue", "storage", "notifications",
+  "ai", "crawl", "queue", "storage", "notifications", "major_fix",
 ]);
 
 export const infraSwitchModeEnum = pgEnum("infra_switch_mode", [
@@ -54,6 +54,8 @@ export const providerRequests = pgTable(
     developerEmail: text("developer_email"),
     adminNote: text("admin_note"),
     status: providerRequestStatusEnum("status").notNull().default("pending"),
+    issueId: uuid("issue_id").references(() => issues.id, { onDelete: "set null" }),
+    websiteId: uuid("website_id").references(() => websites.id, { onDelete: "set null" }),
     ...timestamps,
   },
   (t) => [index("provider_requests_status_idx").on(t.status)],

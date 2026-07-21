@@ -9,6 +9,7 @@ import { approveSuggestionField, unapproveField, approveAllSuggestions } from "@
 import { generateAndQueueIssueFixes } from "@/app/actions/quick-fix.actions";
 import type { CmsField } from "@/lib/cms/types";
 import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
+import { requestMajorFixHelp } from "@/app/actions/provider-requests.actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -465,18 +466,18 @@ export function ResultsView({
                         </p>
                       </TableCell>
                       <TableCell className="py-3">
-                        {issue.fixType && (
-                          <Badge
-                            variant="outline"
-                            className={cn(
-                              "text-xs",
-                              issue.fixType === "quick"
-                                ? "border-primary/30 bg-primary/10 text-primary"
-                                : "border-border bg-muted text-muted-foreground"
-                            )}
-                          >
-                            {issue.fixType === "quick" ? "Quick Fix" : "Major Fix"}
+                        {issue.fixType === "quick" && (
+                          <Badge variant="outline" className="text-xs border-primary/30 bg-primary/10 text-primary">
+                            Quick Fix
                           </Badge>
+                        )}
+                        {issue.fixType === "major" && (
+                          <MajorFixCell
+                            issueId={issue.id}
+                            issueTitle={issue.title}
+                            websiteId={websiteId}
+                            websiteUrl={websiteUrl}
+                          />
                         )}
                       </TableCell>
                     </TableRow>
@@ -1107,5 +1108,45 @@ function AiSuggestionsSection({
         </div>
       )}
     </section>
+  );
+
+}
+
+function MajorFixCell({
+  issueId, issueTitle, websiteId, websiteUrl,
+}: { issueId: string; issueTitle: string; websiteId: string; websiteUrl: string }) {
+  const [state, setState] = useState<"idle" | "sent">("idle");
+  const [isPending, startTransition] = useTransition();
+
+  if (state === "sent") {
+    return (
+      <motion.span
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        className="text-xs text-muted-foreground"
+      >
+        ✓ Request sent
+      </motion.span>
+    );
+  }
+
+  return (
+    <div className="flex flex-col gap-1.5">
+      <Badge variant="outline" className="text-xs border-border bg-muted text-muted-foreground w-fit">
+        Major Fix
+      </Badge>
+      <button
+        disabled={isPending}
+        onClick={() =>
+          startTransition(async () => {
+            await requestMajorFixHelp({ issueId, issueTitle, websiteId, websiteUrl });
+            setState("sent");
+          })
+        }
+        className="text-xs text-primary underline-offset-4 hover:underline disabled:opacity-50 text-left"
+      >
+        {isPending ? "Sending…" : "Connect with us →"}
+      </button>
+    </div>
   );
 }
