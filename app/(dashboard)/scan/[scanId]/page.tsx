@@ -6,6 +6,7 @@ import { db } from "@/lib/db";
 import { scans, websites } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { ScanPoller } from "./_components/scan-poller";
+import { LocalTime } from "@/components/shared/local-time";
 
 export const metadata: Metadata = {
   title: "Scan Status",
@@ -89,7 +90,7 @@ export default async function ScanStatusPage({ params }: Props) {
             <dt className="text-xs text-muted-foreground">Started</dt>
             <dd className="mt-0.5 text-sm font-medium">
               {scan.startedAt
-                ? new Intl.DateTimeFormat("en", { timeStyle: "short", dateStyle: "short" }).format(scan.startedAt)
+                ? <LocalTime date={scan.startedAt} dateStyle="short" timeStyle="short" />
                 : "—"}
             </dd>
           </div>

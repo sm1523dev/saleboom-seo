@@ -13,6 +13,7 @@ import { ScanProgressBanner } from "./_components/scan-progress-banner";
 import { cn } from "@/lib/utils";
 import { Badge } from "@/components/ui/badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { LocalTime } from "@/components/shared/local-time";
 
 export const metadata: Metadata = {
   title: "Website Overview",
@@ -490,9 +491,9 @@ export default async function WebsiteDetailPage({ params }: Props) {
                 <p className="text-sm font-medium">{s.status === "completed" ? "Scan completed" : `Scan ${s.status}`}</p>
                 <p className="text-xs text-muted-foreground">
                   {s.completedAt
-                    ? new Intl.DateTimeFormat("en", { dateStyle: "medium", timeStyle: "short" }).format(new Date(s.completedAt))
+                    ? <LocalTime date={s.completedAt} dateStyle="medium" timeStyle="short" />
                     : s.startedAt
-                      ? new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(s.startedAt))
+                      ? <LocalTime date={s.startedAt} dateStyle="medium" />
                       : "—"}
                 </p>
               </div>

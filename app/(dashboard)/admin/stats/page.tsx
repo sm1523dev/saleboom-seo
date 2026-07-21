@@ -3,6 +3,7 @@ import { requireAdmin } from "@/lib/auth-utils";
 import { db } from "@/lib/db";
 import { users, websites, scans, issues, metricsEvents } from "@/lib/db/schema";
 import { sql, gte, count, desc } from "drizzle-orm";
+import { LocalTime } from "@/components/shared/local-time";
 
 export const metadata: Metadata = { title: "System Stats" };
 
@@ -97,7 +98,7 @@ export default async function AdminStatsPage() {
       <div>
         <h1 className="text-2xl font-bold tracking-tight">System Stats</h1>
         <p className="text-sm text-muted-foreground">
-          Real-time platform metrics — last updated {now.toLocaleTimeString()}.
+          Real-time platform metrics — last updated <LocalTime date={now} timeStyle="short" />.
         </p>
       </div>
 
@@ -251,9 +252,11 @@ export default async function AdminStatsPage() {
                         </span>
                       </td>
                       <td className="px-5 py-3 text-xs text-muted-foreground">
-                        {scan.startedAt
-                          ? scan.startedAt.toLocaleString()
-                          : scan.createdAt.toLocaleString()}
+                        <LocalTime
+                          date={scan.startedAt ?? scan.createdAt}
+                          dateStyle="short"
+                          timeStyle="short"
+                        />
                       </td>
                       <td className="px-5 py-3 font-mono text-xs text-muted-foreground">
                         {durationMs !== null ? formatDuration(durationMs) : "—"}
