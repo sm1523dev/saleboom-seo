@@ -1,0 +1,479 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 960" width="1600" height="960">
+  <defs>
+    <!-- Backgrounds -->
+    <radialGradient id="bg" cx="50%" cy="35%" r="75%">
+      <stop offset="0%" stop-color="#120b22"/>
+      <stop offset="100%" stop-color="#09090b"/>
+    </radialGradient>
+
+    <!-- Node fills -->
+    <linearGradient id="nViolet" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1c1030"/>
+      <stop offset="100%" stop-color="#110d1e"/>
+    </linearGradient>
+    <linearGradient id="nBlue" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1a30"/>
+      <stop offset="100%" stop-color="#090f1e"/>
+    </linearGradient>
+    <linearGradient id="nGreen" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0a2018"/>
+      <stop offset="100%" stop-color="#071510"/>
+    </linearGradient>
+    <linearGradient id="nAmber" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#201508"/>
+      <stop offset="100%" stop-color="#150e05"/>
+    </linearGradient>
+    <linearGradient id="nCyan" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#081820"/>
+      <stop offset="100%" stop-color="#050f15"/>
+    </linearGradient>
+    <linearGradient id="nRed" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#200808"/>
+      <stop offset="100%" stop-color="#150505"/>
+    </linearGradient>
+
+    <!-- Connector line gradients -->
+    <linearGradient id="lViolet" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#7c3aed" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lGreen" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lAmber" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lCyan" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0891b2" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lVDown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#8b5cf6" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#6d28d9" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lGDown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#10b981" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#059669" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lADown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#f59e0b" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#d97706" stop-opacity="0.9"/>
+    </linearGradient>
+    <linearGradient id="lCDown" x1="0%" y1="0%" x2="0%" y2="100%">
+      <stop offset="0%" stop-color="#06b6d4" stop-opacity="0.9"/>
+      <stop offset="100%" stop-color="#0891b2" stop-opacity="0.9"/>
+    </linearGradient>
+
+    <!-- Glow filters -->
+    <filter id="glowV" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#8b5cf6" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowG" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#10b981" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowA" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#f59e0b" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowC" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#06b6d4" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="glowR" x="-30%" y="-30%" width="160%" height="160%">
+      <feGaussianBlur stdDeviation="5" result="b"/>
+      <feFlood flood-color="#ef4444" flood-opacity="0.35" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+    <filter id="headerGlow">
+      <feGaussianBlur stdDeviation="12" result="b"/>
+      <feFlood flood-color="#8b5cf6" flood-opacity="0.4" result="c"/>
+      <feComposite in="c" in2="b" operator="in" result="g"/>
+      <feMerge><feMergeNode in="g"/><feMergeNode in="SourceGraphic"/></feMerge>
+    </filter>
+
+    <!-- Arrowheads -->
+    <marker id="aV" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#8b5cf6" opacity="0.9"/>
+    </marker>
+    <marker id="aG" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#10b981" opacity="0.9"/>
+    </marker>
+    <marker id="aA" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#f59e0b" opacity="0.9"/>
+    </marker>
+    <marker id="aC" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#06b6d4" opacity="0.9"/>
+    </marker>
+    <marker id="aR" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#ef4444" opacity="0.9"/>
+    </marker>
+    <marker id="aVup" markerWidth="9" markerHeight="7" refX="9" refY="3.5" orient="auto">
+      <polygon points="0 0,9 3.5,0 7" fill="#8b5cf6" opacity="0.9"/>
+    </marker>
+
+    <!-- Dot grid pattern -->
+    <pattern id="dots" x="0" y="0" width="36" height="36" patternUnits="userSpaceOnUse">
+      <circle cx="18" cy="18" r="1" fill="#ffffff" opacity="0.055"/>
+    </pattern>
+  </defs>
+
+  <!-- ═══════════════════════════════ BACKGROUND ═══════════════════════════════ -->
+  <rect width="1600" height="960" fill="url(#bg)"/>
+  <rect width="1600" height="960" fill="url(#dots)"/>
+
+  <!-- Phase bands (very subtle) -->
+  <rect x="0"    y="0" width="215"  height="960" fill="#8b5cf6" opacity="0.025"/>
+  <rect x="215"  y="0" width="240"  height="960" fill="#3b82f6" opacity="0.025"/>
+  <rect x="455"  y="0" width="265"  height="960" fill="#06b6d4" opacity="0.025"/>
+  <rect x="720"  y="0" width="260"  height="960" fill="#a855f7" opacity="0.025"/>
+  <rect x="980"  y="0" width="385"  height="960" fill="#10b981" opacity="0.025"/>
+  <rect x="1365" y="0" width="235"  height="960" fill="#06b6d4" opacity="0.025"/>
+
+  <!-- Phase dividers -->
+  <line x1="215"  y1="115" x2="215"  y2="960" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <line x1="455"  y1="115" x2="455"  y2="960" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <line x1="720"  y1="115" x2="720"  y2="960" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <line x1="980"  y1="115" x2="980"  y2="960" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+  <line x1="1365" y1="115" x2="1365" y2="960" stroke="#ffffff" stroke-width="1" opacity="0.05"/>
+
+  <!-- ═══════════════════════════════ HEADER ═══════════════════════════════ -->
+  <!-- Logo mark -->
+  <text x="800" y="34" text-anchor="middle" fill="#8b5cf6" font-family="system-ui,-apple-system,sans-serif" font-size="10" font-weight="700" letter-spacing="4" opacity="0.8" filter="url(#headerGlow)">SALEBOOM SEO</text>
+  <text x="800" y="65" text-anchor="middle" fill="#fafafa" font-family="system-ui,-apple-system,sans-serif" font-size="26" font-weight="800" letter-spacing="-0.8">Complete User Journey</text>
+  <text x="800" y="88" text-anchor="middle" fill="#52525b" font-family="system-ui,-apple-system,sans-serif" font-size="12">From first visit to measurable SEO improvement — every path, every decision</text>
+
+  <!-- Decorative header underline -->
+  <line x1="640" y1="96" x2="960" y2="96" stroke="url(#lViolet)" stroke-width="1" opacity="0.4"/>
+
+  <!-- ═══════════════════════════════ PHASE LABELS ═══════════════════════════════ -->
+  <rect x="28"   y="108" width="155" height="22" rx="11" fill="#8b5cf6" opacity="0.12"/>
+  <text x="106"  y="123" text-anchor="middle" fill="#a78bfa" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">ONBOARDING</text>
+
+  <rect x="248"  y="108" width="90"  height="22" rx="11" fill="#3b82f6" opacity="0.12"/>
+  <text x="293"  y="123" text-anchor="middle" fill="#60a5fa" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">SCAN</text>
+
+  <rect x="475"  y="108" width="130" height="22" rx="11" fill="#06b6d4" opacity="0.12"/>
+  <text x="540"  y="123" text-anchor="middle" fill="#22d3ee" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">DETECT</text>
+
+  <rect x="748"  y="108" width="110" height="22" rx="11" fill="#a855f7" opacity="0.12"/>
+  <text x="803"  y="123" text-anchor="middle" fill="#c084fc" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">AUDIT</text>
+
+  <rect x="1005" y="108" width="85"  height="22" rx="11" fill="#10b981" opacity="0.12"/>
+  <text x="1047" y="123" text-anchor="middle" fill="#34d399" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">ACT</text>
+
+  <rect x="1378" y="108" width="112" height="22" rx="11" fill="#06b6d4" opacity="0.12"/>
+  <text x="1434" y="123" text-anchor="middle" fill="#22d3ee" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700" letter-spacing="1.8">MONITOR</text>
+
+  <!-- ═══════════════════════════════ SPINE CONNECTORS ═══════════════════════════════ -->
+  <!-- N1 → N2 -->
+  <path d="M 195 252 L 275 252" stroke="url(#lViolet)" stroke-width="2.5" fill="none" marker-end="url(#aV)"/>
+  <!-- N2 → N3 -->
+  <path d="M 430 252 L 495 252" stroke="url(#lViolet)" stroke-width="2.5" fill="none" marker-end="url(#aV)"/>
+  <!-- N3 → N4 -->
+  <path d="M 695 252 L 765 252" stroke="url(#lViolet)" stroke-width="2.5" fill="none" marker-end="url(#aV)"/>
+  <!-- N4 → N5 -->
+  <path d="M 975 252 L 1025 252" stroke="url(#lGreen)" stroke-width="2.5" fill="none" marker-end="url(#aG)"/>
+  <!-- N5 → N6 -->
+  <path d="M 1230 252 L 1345 252" stroke="url(#lCyan)" stroke-width="2.5" fill="none" marker-end="url(#aC)"/>
+
+  <!-- ═══════════════════════════════ BRANCH CONNECTORS — DETECTION ═══════════════════════════════ -->
+  <!-- N3 drops down to detection zone -->
+  <path d="M 595 287 L 595 360" stroke="url(#lVDown)" stroke-width="2" fill="none" marker-end="url(#aV)"/>
+
+  <!-- Detection → 3 branches -->
+  <!-- left: platform known -->
+  <path d="M 545 380 C 500 380, 440 380, 440 410" stroke="#8b5cf6" stroke-width="1.5" fill="none" opacity="0.7" marker-end="url(#aV)"/>
+  <!-- center: auto-detected -->
+  <path d="M 595 400 L 595 410" stroke="#8b5cf6" stroke-width="1.5" fill="none" opacity="0.7" marker-end="url(#aV)"/>
+  <!-- right: not sure -->
+  <path d="M 645 380 C 690 380, 750 380, 750 410" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity="0.7" marker-end="url(#aA)"/>
+
+  <!-- "not sure" → Connect with us -->
+  <path d="M 750 480 L 750 530" stroke="url(#lADown)" stroke-width="1.5" fill="none" opacity="0.7" marker-end="url(#aA)"/>
+
+  <!-- All detection paths converge back → N4 -->
+  <!-- from left confirmed -->
+  <path d="M 440 480 C 440 520, 630 540, 770 520" stroke="#8b5cf6" stroke-width="1.5" fill="none" opacity="0.5" stroke-dasharray="5,3" marker-end="url(#aV)"/>
+  <!-- from center auto-detected -->
+  <path d="M 595 480 C 595 540, 700 540, 770 515" stroke="#8b5cf6" stroke-width="1.5" fill="none" opacity="0.5" stroke-dasharray="5,3" marker-end="url(#aV)"/>
+  <!-- from "connect with us" -->
+  <path d="M 750 600 C 750 640, 820 640, 820 560" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity="0.5" stroke-dasharray="5,3"/>
+
+  <!-- ═══════════════════════════════ BRANCH CONNECTORS — ACTION ═══════════════════════════════ -->
+  <!-- N4 splits to Quick and Major -->
+  <path d="M 870 287 C 870 340, 1030 340, 1030 365" stroke="#10b981" stroke-width="2" fill="none" opacity="0.7" marker-end="url(#aG)"/>
+  <path d="M 910 287 C 910 500, 1030 500, 1030 495" stroke="#f59e0b" stroke-width="2" fill="none" opacity="0.7" marker-end="url(#aA)"/>
+
+  <!-- Quick Fix chain -->
+  <path d="M 1120 390 L 1200 390" stroke="url(#lGreen)" stroke-width="1.5" fill="none" opacity="0.8" marker-end="url(#aG)"/>
+  <path d="M 1310 390 L 1375 390" stroke="url(#lGreen)" stroke-width="1.5" fill="none" opacity="0.8" marker-end="url(#aG)"/>
+
+  <!-- Major Fix chain -->
+  <path d="M 1120 520 L 1200 520" stroke="url(#lAmber)" stroke-width="1.5" fill="none" opacity="0.8" marker-end="url(#aA)"/>
+  <path d="M 1310 520 L 1355 520" stroke="url(#lAmber)" stroke-width="1.5" fill="none" opacity="0.8" marker-end="url(#aA)"/>
+
+  <!-- Applied ✓ → N6 Change History -->
+  <path d="M 1450 390 L 1450 218" stroke="url(#lCyan)" stroke-width="1.5" fill="none" opacity="0.6" stroke-dasharray="5,3" marker-end="url(#aC)"/>
+  <!-- Team helps → N6 -->
+  <path d="M 1460 520 C 1480 520, 1480 450, 1480 290" stroke="#f59e0b" stroke-width="1.5" fill="none" opacity="0.4" stroke-dasharray="5,3"/>
+
+  <!-- ═══════════════════════════════ MONITOR CONNECTORS ═══════════════════════════════ -->
+  <!-- N6 drops to monitor section -->
+  <path d="M 1478 287 L 1478 630" stroke="url(#lCDown)" stroke-width="2" fill="none" opacity="0.6" marker-end="url(#aC)"/>
+
+  <!-- Score → Something wrong? -->
+  <path d="M 1478 720 L 1478 755" stroke="#ef4444" stroke-width="1.5" fill="none" opacity="0.7" marker-end="url(#aR)"/>
+
+  <!-- Re-scan loop back -->
+  <path d="M 1370 860 C 1200 900, 400 900, 370 287" stroke="#8b5cf6" stroke-width="1.5" fill="none" opacity="0.25" stroke-dasharray="6,4" marker-end="url(#aV)"/>
+
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+  <!-- ═══════════════════ NODES ═══════════════════════════════════════ -->
+  <!-- ═══════════════════════════════════════════════════════════════════ -->
+
+  <!-- ─────── SPINE NODE 1: Sign Up ─────── -->
+  <g filter="url(#glowV)">
+    <rect x="30" y="218" width="165" height="68" rx="13" fill="url(#nViolet)" stroke="#8b5cf6" stroke-width="1.5"/>
+    <rect x="30" y="218" width="4" height="68" rx="2" fill="#8b5cf6" opacity="0.9"/>
+  </g>
+  <text x="115" y="246" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 1</text>
+  <text x="115" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">Sign Up</text>
+  <text x="115" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Microsoft Entra SSO</text>
+
+  <!-- ─────── SPINE NODE 2: Add Website ─────── -->
+  <g filter="url(#glowV)">
+    <rect x="278" y="218" width="150" height="68" rx="13" fill="url(#nViolet)" stroke="#8b5cf6" stroke-width="1.5"/>
+    <rect x="278" y="218" width="4" height="68" rx="2" fill="#8b5cf6" opacity="0.9"/>
+  </g>
+  <text x="355" y="246" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 2</text>
+  <text x="355" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">Enter Website URL</text>
+  <text x="355" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Auto-added to account</text>
+
+  <!-- ─────── SPINE NODE 3: AI Scan ─────── -->
+  <g filter="url(#glowV)">
+    <rect x="498" y="218" width="195" height="68" rx="13" fill="url(#nBlue)" stroke="#3b82f6" stroke-width="1.5"/>
+    <rect x="498" y="218" width="4" height="68" rx="2" fill="#3b82f6" opacity="0.9"/>
+  </g>
+  <text x="595" y="246" text-anchor="middle" fill="#93c5fd" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 3</text>
+  <text x="595" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">AI Scan Begins</text>
+  <text x="595" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Crawls all pages · 1–3 min</text>
+
+  <!-- ─────── SPINE NODE 4: SEO Audit ─────── -->
+  <g filter="url(#glowV)">
+    <rect x="768" y="218" width="205" height="68" rx="13" fill="url(#nViolet)" stroke="#a855f7" stroke-width="1.5"/>
+    <rect x="768" y="218" width="4" height="68" rx="2" fill="#a855f7" opacity="0.9"/>
+  </g>
+  <text x="870" y="246" text-anchor="middle" fill="#d8b4fe" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 4</text>
+  <text x="870" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">SEO + AEO Audit Report</text>
+  <text x="870" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Score · Issues · AI Suggestions</text>
+
+  <!-- ─────── SPINE NODE 5: Approval Queue ─────── -->
+  <g filter="url(#glowG)">
+    <rect x="1028" y="218" width="200" height="68" rx="13" fill="url(#nGreen)" stroke="#10b981" stroke-width="1.5"/>
+    <rect x="1028" y="218" width="4" height="68" rx="2" fill="#10b981" opacity="0.9"/>
+  </g>
+  <text x="1128" y="246" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 5</text>
+  <text x="1128" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">Approval Queue</text>
+  <text x="1128" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Review AI-generated fixes</text>
+
+  <!-- ─────── SPINE NODE 6: Change History ─────── -->
+  <g filter="url(#glowC)">
+    <rect x="1348" y="218" width="195" height="68" rx="13" fill="url(#nCyan)" stroke="#06b6d4" stroke-width="1.5"/>
+    <rect x="1348" y="218" width="4" height="68" rx="2" fill="#06b6d4" opacity="0.9"/>
+  </g>
+  <text x="1445" y="246" text-anchor="middle" fill="#67e8f9" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="0.5" opacity="0.7">STEP 6</text>
+  <text x="1445" y="264" text-anchor="middle" fill="#fafafa" font-family="system-ui,sans-serif" font-size="14" font-weight="700">Change History</text>
+  <text x="1445" y="278" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10.5">Audit log · Score tracks</text>
+
+  <!-- ═══════════════════════ DETECTION BRANCH NODES ═══════════════════════ -->
+
+  <!-- Decision label -->
+  <text x="595" y="350" text-anchor="middle" fill="#52525b" font-family="system-ui,sans-serif" font-size="10" font-weight="500">While scanning — platform question appears</text>
+
+  <!-- Detection diamond -->
+  <polygon points="595,362 635,382 595,402 555,382" fill="#1c1030" stroke="#8b5cf6" stroke-width="1.5" opacity="0.9"/>
+  <text x="595" y="387" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="9.5" font-weight="700">Platform?</text>
+
+  <!-- Branch labels -->
+  <text x="440" y="403" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="9" opacity="0.8">Known</text>
+  <text x="595" y="403" text-anchor="middle" fill="#22d3ee" font-family="system-ui,sans-serif" font-size="9" opacity="0.8">Detected</text>
+  <text x="750" y="403" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9" opacity="0.8">Not sure</text>
+
+  <!-- D-Left: User selects platform -->
+  <g filter="url(#glowV)">
+    <rect x="365" y="410" width="152" height="66" rx="12" fill="url(#nViolet)" stroke="#8b5cf6" stroke-width="1.2"/>
+    <rect x="365" y="410" width="3" height="66" rx="2" fill="#8b5cf6" opacity="0.8"/>
+  </g>
+  <text x="441" y="435" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="10" font-weight="700">User Selects</text>
+  <text x="441" y="450" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Animated cards appear</text>
+  <text x="441" y="463" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">WP · Shopify · Webflow · Dev</text>
+
+  <!-- D-Center: Auto detected -->
+  <g filter="url(#glowC)">
+    <rect x="525" y="410" width="142" height="66" rx="12" fill="url(#nCyan)" stroke="#06b6d4" stroke-width="1.2"/>
+    <rect x="525" y="410" width="3" height="66" rx="2" fill="#06b6d4" opacity="0.8"/>
+  </g>
+  <text x="596" y="435" text-anchor="middle" fill="#67e8f9" font-family="system-ui,sans-serif" font-size="10" font-weight="700">Auto-Detected</text>
+  <text x="596" y="450" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Scan reads HTML signals</text>
+  <text x="596" y="463" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Confirm · No · Not sure</text>
+
+  <!-- D-Right: Not sure -->
+  <g filter="url(#glowA)">
+    <rect x="680" y="410" width="142" height="66" rx="12" fill="url(#nAmber)" stroke="#f59e0b" stroke-width="1.2"/>
+    <rect x="680" y="410" width="3" height="66" rx="2" fill="#f59e0b" opacity="0.8"/>
+  </g>
+  <text x="751" y="435" text-anchor="middle" fill="#fcd34d" font-family="system-ui,sans-serif" font-size="10" font-weight="700">Not Sure</text>
+  <text x="751" y="450" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Selects I don't know</text>
+  <text x="751" y="463" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Scan detects, confirms later</text>
+
+  <!-- D-Right continues: Connect with us -->
+  <g filter="url(#glowA)">
+    <rect x="683" y="530" width="138" height="62" rx="12" fill="#201508" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="4,2"/>
+    <rect x="683" y="530" width="3" height="62" rx="2" fill="#f59e0b" opacity="0.8"/>
+  </g>
+  <text x="752" y="553" text-anchor="middle" fill="#fcd34d" font-family="system-ui,sans-serif" font-size="10" font-weight="700">Connect with Us</text>
+  <text x="752" y="568" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Request sent to admin</text>
+  <text x="752" y="581" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Team reaches out in 24h</text>
+
+  <!-- ═══════════════════════ ACTION BRANCH NODES ═══════════════════════ -->
+
+  <!-- Quick Fix label -->
+  <text x="875" y="345" text-anchor="middle" fill="#34d399" font-family="system-ui,sans-serif" font-size="9.5" opacity="0.8">Quick fixes (auto-pushable)</text>
+  <text x="875" y="498" text-anchor="middle" fill="#fbbf24" font-family="system-ui,sans-serif" font-size="9.5" opacity="0.8">Major fixes (need dev work)</text>
+
+  <!-- A1: Quick Fix chip -->
+  <g filter="url(#glowG)">
+    <rect x="990" y="360" width="130" height="60" rx="12" fill="url(#nGreen)" stroke="#10b981" stroke-width="1.5"/>
+    <rect x="990" y="360" width="3" height="60" rx="2" fill="#10b981" opacity="0.9"/>
+  </g>
+  <text x="1055" y="384" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="11" font-weight="700">Quick Fix</text>
+  <text x="1055" y="399" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Meta title · Description</text>
+
+  <!-- A2: Connect CMS -->
+  <g filter="url(#glowG)">
+    <rect x="1200" y="360" width="108" height="60" rx="12" fill="url(#nGreen)" stroke="#10b981" stroke-width="1.2"/>
+    <rect x="1200" y="360" width="3" height="60" rx="2" fill="#10b981" opacity="0.8"/>
+  </g>
+  <text x="1254" y="382" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="10.5" font-weight="700">Connect CMS</text>
+  <text x="1254" y="397" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">WP · Shopify · Webflow</text>
+  <text x="1254" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">or GitHub repo</text>
+
+  <!-- A3: Applied -->
+  <g filter="url(#glowG)">
+    <rect x="1374" y="360" width="100" height="60" rx="12" fill="url(#nGreen)" stroke="#10b981" stroke-width="1.5"/>
+    <rect x="1374" y="360" width="3" height="60" rx="2" fill="#10b981" opacity="0.9"/>
+  </g>
+  <text x="1424" y="382" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="11" font-weight="700">Applied ✓</text>
+  <text x="1424" y="397" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Live in seconds</text>
+  <text x="1424" y="410" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">or PR created</text>
+
+  <!-- B1: Major Fix chip -->
+  <g filter="url(#glowA)">
+    <rect x="990" y="490" width="130" height="60" rx="12" fill="url(#nAmber)" stroke="#f59e0b" stroke-width="1.5"/>
+    <rect x="990" y="490" width="3" height="60" rx="2" fill="#f59e0b" opacity="0.9"/>
+  </g>
+  <text x="1055" y="514" text-anchor="middle" fill="#fcd34d" font-family="system-ui,sans-serif" font-size="11" font-weight="700">Major Fix</text>
+  <text x="1055" y="529" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Schema · H1 structure</text>
+  <text x="1055" y="542" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Technical SEO</text>
+
+  <!-- B2: Connect with us (major) -->
+  <g filter="url(#glowA)">
+    <rect x="1200" y="490" width="108" height="60" rx="12" fill="url(#nAmber)" stroke="#f59e0b" stroke-width="1.2" stroke-dasharray="4,2"/>
+    <rect x="1200" y="490" width="3" height="60" rx="2" fill="#f59e0b" opacity="0.8"/>
+  </g>
+  <text x="1254" y="512" text-anchor="middle" fill="#fcd34d" font-family="system-ui,sans-serif" font-size="10.5" font-weight="700">Connect with Us</text>
+  <text x="1254" y="527" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Request in admin</text>
+  <text x="1254" y="540" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Team alerted</text>
+
+  <!-- B3: Team helps -->
+  <g filter="url(#glowA)">
+    <rect x="1358" y="490" width="116" height="60" rx="12" fill="url(#nAmber)" stroke="#f59e0b" stroke-width="1.2"/>
+    <rect x="1358" y="490" width="3" height="60" rx="2" fill="#f59e0b" opacity="0.8"/>
+  </g>
+  <text x="1416" y="512" text-anchor="middle" fill="#fcd34d" font-family="system-ui,sans-serif" font-size="10.5" font-weight="700">Team Helps</text>
+  <text x="1416" y="527" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Expert implements fix</text>
+  <text x="1416" y="540" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Verified &amp; closed</text>
+
+  <!-- ═══════════════════════ MONITOR NODES ═══════════════════════ -->
+
+  <!-- M1: Score Improves -->
+  <g filter="url(#glowC)">
+    <rect x="1385" y="635" width="185" height="68" rx="13" fill="url(#nCyan)" stroke="#06b6d4" stroke-width="1.5"/>
+    <rect x="1385" y="635" width="4" height="68" rx="2" fill="#06b6d4" opacity="0.9"/>
+  </g>
+  <text x="1478" y="660" text-anchor="middle" fill="#67e8f9" font-family="system-ui,sans-serif" font-size="12" font-weight="700">Score Improves</text>
+  <text x="1478" y="676" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">DVS + SEO recalculated</text>
+  <text x="1478" y="690" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Issues resolved in real-time</text>
+
+  <!-- M2: Something Wrong? -->
+  <g filter="url(#glowR)">
+    <rect x="1385" y="755" width="185" height="62" rx="13" fill="url(#nRed)" stroke="#ef4444" stroke-width="1.2" stroke-dasharray="5,2.5"/>
+    <rect x="1385" y="755" width="4" height="62" rx="2" fill="#ef4444" opacity="0.8"/>
+  </g>
+  <text x="1478" y="778" text-anchor="middle" fill="#fca5a5" font-family="system-ui,sans-serif" font-size="11" font-weight="700">Something Wrong?</text>
+  <text x="1478" y="793" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Optional comment</text>
+  <text x="1478" y="807" text-anchor="middle" fill="#71717a" font-family="system-ui,sans-serif" font-size="9.5">Quality flag → Admin alert</text>
+
+  <!-- Re-scan pill -->
+  <g filter="url(#glowV)">
+    <rect x="1100" y="848" width="150" height="44" rx="22" fill="url(#nViolet)" stroke="#8b5cf6" stroke-width="1.5"/>
+  </g>
+  <text x="1175" y="874" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="12" font-weight="700">↺ Re-scan</text>
+
+  <!-- Re-scan label -->
+  <text x="820" y="908" text-anchor="middle" fill="#3f3f46" font-family="system-ui,sans-serif" font-size="10">Score keeps improving with every iteration</text>
+
+  <!-- ═══════════════════════ BADGES / CALLOUTS ═══════════════════════ -->
+
+  <!-- Wrong detection counter badge -->
+  <rect x="660" y="494" width="136" height="28" rx="14" fill="#1c1010" stroke="#ef4444" stroke-width="1" opacity="0.8"/>
+  <text x="728" y="512" text-anchor="middle" fill="#fca5a5" font-family="system-ui,sans-serif" font-size="9.5" font-weight="600">⚑ Tracks wrong detections</text>
+
+  <!-- Framework edit badge -->
+  <rect x="680" y="610" width="144" height="28" rx="14" fill="#1c1030" stroke="#8b5cf6" stroke-width="1" opacity="0.8"/>
+  <text x="752" y="628" text-anchor="middle" fill="#c4b5fd" font-family="system-ui,sans-serif" font-size="9.5" font-weight="600">✎ Edit framework anytime</text>
+
+  <!-- GitHub PR badge on Applied -->
+  <rect x="1344" y="318" width="130" height="26" rx="13" fill="#0d2018" stroke="#10b981" stroke-width="1" opacity="0.85"/>
+  <text x="1409" y="335" text-anchor="middle" fill="#6ee7b7" font-family="system-ui,sans-serif" font-size="9.5" font-weight="600">GitHub → PR created</text>
+
+  <!-- ═══════════════════════ LEGEND ═══════════════════════ -->
+  <rect x="30" y="890" width="800" height="58" rx="10" fill="#ffffff" opacity="0.025"/>
+  <text x="52" y="908" fill="#52525b" font-family="system-ui,sans-serif" font-size="10" font-weight="600" letter-spacing="1">LEGEND</text>
+
+  <!-- Violet = main flow -->
+  <rect x="52" y="916" width="14" height="6" rx="3" fill="#8b5cf6"/>
+  <text x="72" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Main journey</text>
+  <!-- Green = quick fix -->
+  <rect x="162" y="916" width="14" height="6" rx="3" fill="#10b981"/>
+  <text x="182" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Quick fix path</text>
+  <!-- Amber = major fix / uncertain -->
+  <rect x="282" y="916" width="14" height="6" rx="3" fill="#f59e0b"/>
+  <text x="302" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Major fix / not sure</text>
+  <!-- Cyan = monitoring -->
+  <rect x="432" y="916" width="14" height="6" rx="3" fill="#06b6d4"/>
+  <text x="452" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Monitoring</text>
+  <!-- Red = quality flag -->
+  <rect x="542" y="916" width="14" height="6" rx="3" fill="#ef4444"/>
+  <text x="562" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Quality flag</text>
+  <!-- Dashed = optional / reconnects -->
+  <line x1="652" y1="919" x2="670" y2="919" stroke="#ffffff" stroke-width="2" stroke-dasharray="4,2" opacity="0.4"/>
+  <text x="678" y="925" fill="#71717a" font-family="system-ui,sans-serif" font-size="10">Optional / rejoins</text>
+
+  <!-- Branding footer -->
+  <text x="1570" y="944" text-anchor="end" fill="#3f3f46" font-family="system-ui,sans-serif" font-size="10" font-weight="500">saleboomseo.com</text>
+  <text x="1570" y="957" text-anchor="end" fill="#27272a" font-family="system-ui,sans-serif" font-size="9">© SaleBoom SEO</text>
+</svg>

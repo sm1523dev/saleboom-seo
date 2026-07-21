@@ -13,7 +13,7 @@ spec:
         - name: migrate
           image: ghcr.io/sm1523dev/saleboomseo-worker:latest
           imagePullPolicy: IfNotPresent
-          command: ["./node_modules/.bin/drizzle-kit", "push", "--force"]
+          command: ["npx", "tsx", "lib/db/migrate.ts"]
           envFrom:
             - secretRef:
                 name: saleboomseo-secrets
