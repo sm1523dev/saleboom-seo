@@ -49,6 +49,7 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifyError: changeSnapshots.verifyError,
       prUrl: changeSnapshots.prUrl,
       prNumber: changeSnapshots.prNumber,
+      qualityFlagged: changeSnapshots.qualityFlagged,
     })
     .from(changeSnapshots)
     .where(and(...conditions))
@@ -91,6 +92,7 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifyError: r.verifyError ?? null,
       prUrl: r.prUrl ?? null,
       prNumber: r.prNumber ?? null,
+      qualityFlagged: r.qualityFlagged ?? false,
     }));
 
   return (

@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { connectWordPress, connectShopify, connectWebflow, disconnectCms } from "@/app/actions/cms.actions";
 import type { CmsConnectionState } from "@/app/actions/cms.actions";
+import { updateGitHubFramework } from "@/app/actions/quality.actions";
+import type { GitHubFramework } from "@/lib/cms/types";
 import { GithubRepoForm } from "./github-repo-form";
 
 type CmsType = "wordpress" | "shopify" | "webflow" | "github";
@@ -113,9 +115,10 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
             </div>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{state.connectedAs}</p>
             {state.framework && (
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Framework: <span className="font-medium text-foreground">{FRAMEWORK_LABELS[state.framework] ?? state.framework}</span>
-              </p>
+              <FrameworkEditor
+                websiteId={websiteId}
+                currentFramework={state.framework}
+              />
             )}
             <p className="mt-0.5 text-xs text-muted-foreground">
               Connected {new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(state.connectedAt))}
@@ -309,5 +312,71 @@ function Field({
       />
       {hint && <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>}
     </div>
+  );
+}
+
+const FRAMEWORK_OPTIONS: { value: GitHubFramework; label: string }[] = [
+  { value: "nextjs-app", label: "Next.js (App Router)" },
+  { value: "nextjs-pages", label: "Next.js (Pages Router)" },
+  { value: "hugo", label: "Hugo" },
+  { value: "jekyll", label: "Jekyll" },
+  { value: "gatsby", label: "Gatsby" },
+  { value: "react-helmet", label: "React (react-helmet)" },
+  { value: "django", label: "Django" },
+  { value: "laravel", label: "Laravel" },
+  { value: "unknown", label: "Unknown" },
+];
+
+function FrameworkEditor({ websiteId, currentFramework }: { websiteId: string; currentFramework: string }) {
+  const [editing, setEditing] = useState(false);
+  const [selected, setSelected] = useState(currentFramework);
+  const [isPending, startTransition] = useTransition();
+
+  if (editing) {
+    return (
+      <div className="mt-0.5 flex items-center gap-2">
+        <select
+          value={selected}
+          onChange={(e) => setSelected(e.target.value)}
+          className="rounded-md border border-border bg-muted/40 px-2 py-1 text-xs outline-none focus:border-primary/50"
+        >
+          {FRAMEWORK_OPTIONS.map((o) => (
+            <option key={o.value} value={o.value}>{o.label}</option>
+          ))}
+        </select>
+        <button
+          disabled={isPending}
+          onClick={() =>
+            startTransition(async () => {
+              await updateGitHubFramework(websiteId, selected as GitHubFramework);
+              setEditing(false);
+            })
+          }
+          className="text-xs text-primary hover:underline disabled:opacity-50"
+        >
+          {isPending ? "Saving…" : "Save"}
+        </button>
+        <button onClick={() => setEditing(false)} className="text-xs text-muted-foreground hover:text-foreground">
+          Cancel
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <p className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+      Framework:{" "}
+      <span className="font-medium text-foreground">
+        {FRAMEWORK_LABELS[selected] ?? selected}
+      </span>
+      <button
+        onClick={() => setEditing(true)}
+        aria-label="Edit framework"
+        className="text-muted-foreground/50 hover:text-muted-foreground transition-colors"
+      >
+        ✎
+      </button>
+      <span className="text-muted-foreground/40">· Wrong? Change it here</span>
+    </p>
   );
 }

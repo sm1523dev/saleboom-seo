@@ -184,6 +184,7 @@ export const cmsConnections = pgTable(
     credentialsRef: varchar("credentials_ref", { length: 500 }),
     connectedAt: timestamp("connected_at", { withTimezone: true }),
     capabilities: jsonb("capabilities"),
+    wrongFrameworkCount: integer("wrong_framework_count").notNull().default(0),
     ...timestamps,
   },
   (t) => [
@@ -217,6 +218,9 @@ export const changeSnapshots = pgTable(
     prUrl: text("pr_url"),
     prNumber: integer("pr_number"),
     mergeSha: text("merge_sha"),
+    qualityFlagged: boolean("quality_flagged").notNull().default(false),
+    qualityFlagComment: text("quality_flag_comment"),
+    qualityFlaggedAt: timestamp("quality_flagged_at", { withTimezone: true }),
     // Source: either from an AI suggestion or a manual issue fix
     suggestionId: uuid("suggestion_id").references(() => aiSuggestions.id, {
       onDelete: "set null",

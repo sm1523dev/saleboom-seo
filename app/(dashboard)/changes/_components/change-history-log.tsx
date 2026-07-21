@@ -6,6 +6,7 @@ import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { rollbackChange, verifyChange } from "@/app/actions/changes.actions";
+import { flagPushQuality } from "@/app/actions/quality.actions";
 import { VERIFY_ERROR_LABELS } from "@/lib/cms/verify";
 import type { VerifyError } from "@/lib/cms/verify";
 
@@ -38,6 +39,7 @@ type HistoryItem = {
   verifyError: string | null;
   prUrl: string | null;
   prNumber: number | null;
+  qualityFlagged: boolean;
 };
 
 type Props = {
@@ -289,6 +291,11 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                 </div>
               </div>
 
+              {/* Quality flag — shown on applied/rolled_back rows */}
+              {(item.status === "applied" || item.status === "rolled_back") && (
+                <QualityFlagWidget snapshotId={item.id} alreadyFlagged={item.qualityFlagged} />
+              )}
+
               {/* Verification detail — shown when failed */}
               {vResult && !vResult.matched && (
                 <div className="mt-3 rounded-lg border border-red-500/20 bg-red-500/5 px-3 py-2">
@@ -310,6 +317,7 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
       {/* Pagination */}
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <span>Page {page} · {items.length} records</span>
+
         <div className="flex gap-3">
           {page > 1 && (
             <Link href={buildHref({ page: String(page - 1) })} className="hover:text-foreground">
@@ -324,5 +332,64 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
         </div>
       </div>
     </div>
+  );
+}
+
+function QualityFlagWidget({ snapshotId, alreadyFlagged }: { snapshotId: string; alreadyFlagged: boolean }) {
+  const [phase, setPhase] = useState<"idle" | "open" | "sent">(alreadyFlagged ? "sent" : "idle");
+  const [comment, setComment] = useState("");
+  const [isPending, startTransition] = useTransition();
+
+  if (phase === "sent") {
+    return (
+      <p className="mt-2 text-xs text-muted-foreground">⚑ Flagged — thanks for letting us know.</p>
+    );
+  }
+
+  if (phase === "open") {
+    return (
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0, height: 0 }}
+          animate={{ opacity: 1, height: "auto" }}
+          className="mt-3 rounded-lg border border-yellow-500/20 bg-yellow-500/5 p-3"
+        >
+          <p className="mb-2 text-xs font-medium text-yellow-400">What went wrong?</p>
+          <textarea
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            placeholder="e.g. changes not reflecting, wrong content was changed… (optional)"
+            rows={2}
+            className="w-full resize-none rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/50 outline-none focus:border-primary/40"
+          />
+          <div className="mt-2 flex gap-2">
+            <button
+              disabled={isPending}
+              onClick={() =>
+                startTransition(async () => {
+                  await flagPushQuality(snapshotId, comment || undefined);
+                  setPhase("sent");
+                })
+              }
+              className="rounded-md bg-yellow-500/20 px-3 py-1 text-xs font-medium text-yellow-400 hover:bg-yellow-500/30 disabled:opacity-50"
+            >
+              {isPending ? "Sending…" : "Send report"}
+            </button>
+            <button onClick={() => setPhase("idle")} className="text-xs text-muted-foreground hover:text-foreground">
+              Cancel
+            </button>
+          </div>
+        </motion.div>
+      </AnimatePresence>
+    );
+  }
+
+  return (
+    <button
+      onClick={() => setPhase("open")}
+      className="mt-2 text-xs text-muted-foreground/60 underline-offset-4 hover:text-muted-foreground hover:underline"
+    >
+      Something wrong? Let us know
+    </button>
   );
 }

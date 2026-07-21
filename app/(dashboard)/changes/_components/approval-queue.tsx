@@ -24,6 +24,7 @@ type QueueItem = {
   websiteName: string | null;
   websiteUrl: string | null;
   isCmsConnected: boolean;
+  platformHint: string | null;
 };
 
 type ItemState = "pending" | "pushing" | "pushed" | "rejected" | "error";
@@ -174,9 +175,13 @@ export function ApprovalQueue({ items }: Props) {
               </div>
               <div className="flex items-center gap-2">
                 {!isCmsConnected && websiteId && (
-                  <Link href={`/website/${websiteId}/cms`}
-                    className="rounded-lg border border-yellow-500/30 px-3 py-1.5 text-xs text-yellow-400 hover:bg-yellow-500/10">
-                    Connect CMS
+                  <Link
+                    href={`/website/${websiteId}/cms`}
+                    className="rounded-lg border border-yellow-500/30 px-3 py-1.5 text-xs text-yellow-400 hover:bg-yellow-500/10"
+                  >
+                    {first.platformHint && first.platformHint !== "unknown"
+                      ? `Connect ${first.platformHint.charAt(0).toUpperCase() + first.platformHint.slice(1)} →`
+                      : "Connect CMS →"}
                   </Link>
                 )}
                 {isCmsConnected && (

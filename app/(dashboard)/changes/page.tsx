@@ -57,7 +57,7 @@ export default async function ChangesPage() {
 
   const [websiteRows, cmsRows] = await Promise.all([
     allWebsiteIds.length > 0
-      ? db.select({ id: websites.id, name: websites.name, url: websites.url })
+      ? db.select({ id: websites.id, name: websites.name, url: websites.url, platformHint: websites.platformHint })
           .from(websites)
           .where(inArray(websites.id, allWebsiteIds))
       : Promise.resolve([]),
@@ -83,6 +83,7 @@ export default async function ChangesPage() {
       websiteId: r.websiteId ?? null,
       websiteName: website?.name ?? null,
       websiteUrl: website?.url ?? null,
+      platformHint: website?.platformHint ?? null,
       isCmsConnected: r.websiteId ? connectedSet.has(r.websiteId) : false,
     };
   });
