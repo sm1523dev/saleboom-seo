@@ -23,6 +23,7 @@ export function ScanPoller({
 }: Props) {
   const router = useRouter();
   const statusRef = useRef(initialStatus);
+  const platformHintRef = useRef<string | null>(null);
   const [pagesScanned, setPagesScanned] = useState(initialPagesScanned);
   const [totalPages, setTotalPages] = useState(initialTotalPages);
 
@@ -33,11 +34,17 @@ export function ScanPoller({
       try {
         const res = await fetch(`/api/scan/${scanId}/status`, { cache: "no-store" });
         if (!res.ok) return;
-        const data = await res.json();
+        const data = await res.json() as { status: string; pagesScanned: number; totalPages: number; platformHint: string | null };
         statusRef.current = data.status;
 
         if (data.pagesScanned > 0) setPagesScanned(data.pagesScanned);
         if (data.totalPages > 0) setTotalPages(data.totalPages);
+
+        // Refresh server component when platform gets detected so PlatformCards shows confirm UI
+        if (data.platformHint && platformHintRef.current === null) {
+          platformHintRef.current = data.platformHint;
+          router.refresh();
+        }
 
         if (data.status === "completed") {
           router.push(`/website/${websiteId}`);

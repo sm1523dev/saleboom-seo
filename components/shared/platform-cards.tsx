@@ -26,13 +26,16 @@ const PLATFORM_DESCRIPTIONS: Record<Platform, string> = {
   shopify: "Shopify-powered store",
   webflow: "Built with Webflow",
   github: "Custom code, managed by a developer",
-  unknown: "I'll find out later",
+  unknown: "I don't know yet",
 };
 
 export function PlatformCards({ websiteId, detectedPlatform, platformHintStatus }: Props) {
   const [isPending, startTransition] = useTransition();
+  // If platform already detected at page load → skip pick, go straight to confirm.
+  // If not yet detected → show pick; "I don't know" will re-check detectedPlatform
+  // (updated via ScanPoller's router.refresh) and bridge to confirm if available.
   const [phase, setPhase] = useState<"confirm" | "pick" | "done" | "assistance">(
-    detectedPlatform && platformHintStatus === "unconfirmed" ? "confirm" : "pick"
+    detectedPlatform ? "confirm" : "pick"
   );
   const [assistanceSent, setAssistanceSent] = useState(platformHintStatus === "pending_assistance");
 
@@ -144,10 +147,15 @@ export function PlatformCards({ websiteId, detectedPlatform, platformHintStatus 
             disabled={isPending}
             onClick={() => {
               if (platform === "unknown") {
-                startTransition(async () => {
-                  await requestPlatformAssistance(websiteId);
-                  setAssistanceSent(true);
-                });
+                if (detectedPlatform) {
+                  // We already detected something — show it for confirmation
+                  setPhase("confirm");
+                } else {
+                  startTransition(async () => {
+                    await requestPlatformAssistance(websiteId);
+                    setAssistanceSent(true);
+                  });
+                }
               } else {
                 startTransition(async () => {
                   await setPlatformHint(websiteId, platform);

@@ -80,7 +80,7 @@ export function GithubRepoForm({ websiteId }: Props) {
       const result = await connectGitHub(websiteId, selected.owner, selected.name, branch, subPath || undefined);
       if (result.success) {
         setDetectedFramework(result.framework ?? "unknown");
-        router.refresh();
+        router.push(`/website/${websiteId}/cms`);
       } else {
         setError(result.error ?? "Failed to save repository settings");
       }

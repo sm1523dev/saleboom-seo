@@ -114,10 +114,10 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
               <p className="text-sm font-medium">{CMS_LABELS[state.cmsType as CmsType] ?? state.cmsType} connected</p>
             </div>
             <p className="mt-1 font-mono text-xs text-muted-foreground">{state.connectedAs}</p>
-            {state.framework && (
+            {state.cmsType === "github" && (
               <FrameworkEditor
                 websiteId={websiteId}
-                currentFramework={state.framework}
+                currentFramework={state.framework ?? "unknown"}
               />
             )}
             <p className="mt-0.5 text-xs text-muted-foreground">
