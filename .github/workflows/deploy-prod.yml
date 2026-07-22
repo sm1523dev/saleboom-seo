@@ -5,11 +5,13 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Only runs on SaleBoomSEO/SEO_Integration — secrets and infra live there
+# sm1523dev/saleboom-seo main → Pi (deploy-dev.yml handles that)
+
 jobs:
   deploy-app:
     name: Build & Deploy Next.js App
     runs-on: ubuntu-latest
-    # Only deploy from the Azure org repo (main branch) — secrets live there
     if: github.repository == 'SaleBoomSEO/SEO_Integration'
     permissions:
       contents: read
@@ -39,46 +41,20 @@ jobs:
             ${{ secrets.REGISTRY_LOGIN_SERVER }}/saleboom-app:${{ github.sha }}
             ${{ secrets.REGISTRY_LOGIN_SERVER }}/saleboom-app:latest
           build-args: |
-            AUTH_SECRET=${{ secrets.AUTH_SECRET }}
+            AUTH_SECRET=build-placeholder
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
       - name: Deploy to Container App
         env:
-          IMAGE_TAG: ${{ github.sha }}
-          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          APP_NAME: ${{ secrets.CONTAINER_APP_NAME }}
-          REGISTRY: ${{ secrets.REGISTRY_LOGIN_SERVER }}
-          AI_PROVIDER: ${{ secrets.AI_PROVIDER }}
-          NIM_KEY: ${{ secrets.NVIDIA_NIM_API_KEY }}
-          AUTH_SECRET: ${{ secrets.AUTH_SECRET }}
-          PW_PEPPER: ${{ secrets.PASSWORD_PEPPER }}
-          DB_URL: ${{ secrets.DATABASE_URL }}
-          STORAGE_CONN: ${{ secrets.AZURE_STORAGE_CONNECTION_STRING }}
-          FC_KEY: ${{ secrets.FIRECRAWL_API_KEY }}
-          KV_URI: ${{ secrets.AZURE_KEYVAULT_URI }}
-          GH_CLIENT_ID: ${{ secrets.GH_OAUTH_CLIENT_ID }}
-          GH_CLIENT_SECRET: ${{ secrets.GH_OAUTH_CLIENT_SECRET }}
+          IMAGE: ${{ secrets.REGISTRY_LOGIN_SERVER }}/saleboom-app:${{ github.sha }}
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          APP: ${{ secrets.CONTAINER_APP_NAME }}
         run: |
           az containerapp update \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$APP_NAME" \
-            --image "$REGISTRY/saleboom-app:$IMAGE_TAG" \
-            --set-env-vars \
-              "NODE_ENV=production" \
-              "QUEUE_PROVIDER=azure-queue" \
-              "STORAGE_PROVIDER=azure-blob" \
-              "AZURE_STORAGE_CONTAINER=saleboom" \
-              "AI_PROVIDER=$AI_PROVIDER" \
-              "NVIDIA_NIM_API_KEY=$NIM_KEY" \
-              "AUTH_SECRET=$AUTH_SECRET" \
-              "PASSWORD_PEPPER=$PW_PEPPER" \
-              "DATABASE_URL=$DB_URL" \
-              "AZURE_STORAGE_CONNECTION_STRING=$STORAGE_CONN" \
-              "FIRECRAWL_API_KEY=$FC_KEY" \
-              "AZURE_KEYVAULT_URI=$KV_URI" \
-              "GITHUB_OAUTH_CLIENT_ID=$GH_CLIENT_ID" \
-              "GITHUB_OAUTH_CLIENT_SECRET=$GH_CLIENT_SECRET"
+            --resource-group "$RG" \
+            --name "$APP" \
+            --image "$IMAGE"
 
   deploy-functions:
     name: Build & Deploy Azure Functions
@@ -99,23 +75,21 @@ jobs:
       - name: Install root dependencies
         run: npm ci
 
-      - name: Install Functions dependencies
-        run: npm ci
+      - name: Install and build Functions
         working-directory: azure-functions
-
-      - name: Build Functions bundle
-        run: node build.mjs
-        working-directory: azure-functions
+        run: |
+          npm ci
+          node build.mjs
 
       - name: Log in to Azure
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Package and deploy Functions
+      - name: Deploy Functions
         env:
-          RESOURCE_GROUP: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          FUNCTIONS_APP: ${{ secrets.FUNCTIONS_APP_NAME }}
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          FN: ${{ secrets.FUNCTIONS_APP_NAME }}
         run: |
           cd azure-functions
           mkdir -p deploy-pkg
@@ -124,6 +98,6 @@ jobs:
           cp dist/index.js deploy-pkg/
           cd deploy-pkg && zip -r ../functions.zip . && cd ..
           az functionapp deployment source config-zip \
-            --resource-group "$RESOURCE_GROUP" \
-            --name "$FUNCTIONS_APP" \
+            --resource-group "$RG" \
+            --name "$FN" \
             --src functions.zip
