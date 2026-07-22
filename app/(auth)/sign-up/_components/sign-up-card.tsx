@@ -1,13 +1,19 @@
 "use client";
 
+import { useActionState } from "react";
 import { motion } from "motion/react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { signUpWithCredentials } from "../actions";
+import { signUpWithCredentials, type SignUpState } from "../actions";
 
 export function SignUpCard({ callbackUrl }: { callbackUrl?: string }) {
+  const [state, action, isPending] = useActionState<SignUpState, FormData>(
+    signUpWithCredentials,
+    null,
+  );
+
   return (
     <motion.div
       initial={{ opacity: 0, scale: 0.97, y: 8 }}
@@ -23,9 +29,14 @@ export function SignUpCard({ callbackUrl }: { callbackUrl?: string }) {
           </p>
         </div>
 
-        <form action={signUpWithCredentials} className="space-y-4">
+        <form action={action} className="space-y-4">
           {callbackUrl && (
             <input type="hidden" name="callbackUrl" value={callbackUrl} />
+          )}
+          {state?.error && (
+            <p className="rounded-md border border-red-500/30 bg-red-500/10 px-3 py-2 text-sm text-red-400" role="alert">
+              {state.error}
+            </p>
           )}
           <div className="space-y-2">
             <Label htmlFor="name">Name</Label>
@@ -63,8 +74,8 @@ export function SignUpCard({ callbackUrl }: { callbackUrl?: string }) {
               className="input-glow"
             />
           </div>
-          <Button type="submit" className="btn-press w-full" aria-label="Create account">
-            Create account
+          <Button type="submit" disabled={isPending} className="btn-press w-full" aria-label="Create account">
+            {isPending ? "Creating account…" : "Create account"}
           </Button>
         </form>
 
