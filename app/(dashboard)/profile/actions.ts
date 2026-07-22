@@ -1,10 +1,11 @@
 "use server";
 
 import { eq } from "drizzle-orm";
+import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
-import { authProvider } from "@/lib/auth";
 import { getServerSession } from "@/lib/auth-utils";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { parseEmail, parseRequiredString } from "@/lib/form-validation";
@@ -100,13 +101,18 @@ export async function updatePasswordAction(
 }
 
 export async function signOutAction() {
-  try {
-    await authProvider.signOut({ redirectTo: "/" });
-  } catch (err) {
-    const e = err as { digest?: string };
-    if (e?.digest?.startsWith("NEXT_REDIRECT")) throw err;
-    // If signOut fails for any reason, redirect manually
-    const { redirect } = await import("next/navigation");
-    redirect("/");
-  }
+  // JWT sessions: deleting the session cookie is sufficient to sign out.
+  // Bypassing authProvider.signOut() avoids redirect chaining issues under
+  // Azure's Envoy proxy where res.redirect can be undefined.
+  const cookieJar = await cookies();
+  const cookieNames = [
+    "authjs.session-token",
+    "__Secure-authjs.session-token",
+    "authjs.callback-url",
+    "__Secure-authjs.callback-url",
+    "authjs.csrf-token",
+    "__Host-authjs.csrf-token",
+  ];
+  for (const name of cookieNames) cookieJar.delete(name);
+  redirect("/");
 }
