@@ -2,14 +2,14 @@ name: Deploy to Azure Production
 
 on:
   push:
-    branches: [main, dev]
+    branches: [main]
   workflow_dispatch:
 
 jobs:
   deploy-app:
     name: Build & Deploy Next.js App
     runs-on: ubuntu-latest
-    # Only deploy from the Azure org repo — secrets live there
+    # Only deploy from the Azure org repo (main branch) — secrets live there
     if: github.repository == 'SaleBoomSEO/SEO_Integration'
     permissions:
       contents: read
