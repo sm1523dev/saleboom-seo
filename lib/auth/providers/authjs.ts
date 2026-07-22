@@ -204,8 +204,12 @@ export class AuthJsProvider implements AuthProvider {
       const { NextResponse } = await import("next/server");
       const { pathname, search } = request.nextUrl;
 
+      // A real session must have a user with an id — guard against NextAuth
+      // returning an empty object {} instead of null when AUTH_SECRET is misread.
+      const userId = (request.auth as { user?: { id?: string } } | null)?.user?.id;
+
       const isProtected = PROTECTED.some((p) => pathname.startsWith(p));
-      if (isProtected && !request.auth) {
+      if (isProtected && !userId) {
         const signInUrl = new URL("/sign-in", request.url);
         signInUrl.searchParams.set("callbackUrl", pathname + search);
         return NextResponse.redirect(signInUrl);
@@ -213,7 +217,7 @@ export class AuthJsProvider implements AuthProvider {
 
       // Admin-only routes — authenticated but non-admin users get redirected
       const isAdminRoute = pathname.startsWith("/admin");
-      if (isAdminRoute && request.auth) {
+      if (isAdminRoute && userId) {
         const sessionRole = (request.auth as { user?: { role?: string } }).user?.role;
         if (sessionRole !== "admin") {
           return NextResponse.redirect(new URL("/dashboard", request.url));
@@ -222,7 +226,7 @@ export class AuthJsProvider implements AuthProvider {
 
       // Logged-in users visiting public/auth pages → send to dashboard
       const isAuthPage = AUTH_PAGES.includes(pathname);
-      if (isAuthPage && request.auth) {
+      if (isAuthPage && userId) {
         return NextResponse.redirect(new URL("/dashboard", request.url));
       }
     });
