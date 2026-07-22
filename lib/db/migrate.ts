@@ -9,7 +9,14 @@ export async function runMigrations(): Promise<void> {
     throw new Error("DATABASE_URL is not set");
   }
 
-  const client = postgres(connectionString, { max: 1 });
+  const useSSL =
+    connectionString.includes(".azure.com") ||
+    connectionString.includes("sslmode=require");
+
+  const client = postgres(connectionString, {
+    max: 1,
+    ...(useSSL && { ssl: "require" }),
+  });
   const db = drizzle(client);
 
   console.log("[migrate] Checking for pending migrations...");
