@@ -1,8 +1,7 @@
 import { app, InvocationContext } from "@azure/functions";
-import { eq } from "drizzle-orm";
-import { db } from "../lib/db";
-import { scans } from "../../../lib/db/schema";
-import { ScanJobMessageSchema } from "../../../lib/queue/types";
+import { ScanJobMessageSchema } from "@/lib/queue/types";
+import { handleScanJob } from "@/workers/handlers/scan.handler";
+import type { JobContext } from "@/lib/queue/types";
 
 async function scanWorkerHandler(message: unknown, context: InvocationContext): Promise<void> {
   const raw = typeof message === "string" ? JSON.parse(message) : message;
@@ -13,32 +12,20 @@ async function scanWorkerHandler(message: unknown, context: InvocationContext): 
     return;
   }
 
-  const { scanId } = parsed.data;
+  const { scanId, websiteId } = parsed.data;
 
-  await db
-    .update(scans)
-    .set({ status: "running", startedAt: new Date(), updatedAt: new Date() })
-    .where(eq(scans.id, scanId));
+  const jobContext: JobContext = {
+    jobId: context.invocationId,
+    attemptNumber: 1,
+    log: (msg: string) => context.log(msg),
+    updateProgress: async (_pct: number) => { /* no-op: Azure Functions has no progress API */ },
+  };
 
-  try {
-    // TODO #44: replace with actual Firecrawl crawl
-    context.log(`Processing scan ${scanId} — Firecrawl not yet available`);
-
-    await db
-      .update(scans)
-      .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
-      .where(eq(scans.id, scanId));
-  } catch (err) {
-    await db
-      .update(scans)
-      .set({ status: "failed", updatedAt: new Date() })
-      .where(eq(scans.id, scanId));
-    throw err;
-  }
+  await handleScanJob({ scanId, websiteId }, jobContext);
 }
 
 app.storageQueue("scan-worker", {
-  queueName: "scan-jobs",
+  queueName: "scan",
   connection: "AZURE_STORAGE_CONNECTION_STRING",
   handler: scanWorkerHandler,
 });

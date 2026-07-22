@@ -4,7 +4,7 @@
   "private": true,
   "main": "dist/index.js",
   "scripts": {
-    "build": "esbuild src/index.ts --bundle --platform=node --target=node18 --outfile=dist/index.js --external:pg-native",
+    "build": "node build.mjs",
     "typecheck": "tsc --noEmit",
     "start": "func start"
   },
