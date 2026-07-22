@@ -24,11 +24,14 @@ export async function signInWithCredentials(
 
     return null;
   } catch (err) {
+    // Let Next.js redirects through (successful sign-in navigates away)
+    const e = err as { digest?: string };
+    if (e?.digest?.startsWith("NEXT_REDIRECT")) throw err;
     if (err instanceof AuthError) {
       return { error: "Invalid email or password." };
     }
-    // Next.js redirect throws — let it propagate
-    throw err;
+    // Any other error (JWT callback failure, DB error, config issue)
+    return { error: "Sign in failed. Please try again." };
   }
 }
 

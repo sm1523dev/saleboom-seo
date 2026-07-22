@@ -100,5 +100,13 @@ export async function updatePasswordAction(
 }
 
 export async function signOutAction() {
-  await authProvider.signOut({ redirectTo: "/" });
+  try {
+    await authProvider.signOut({ redirectTo: "/" });
+  } catch (err) {
+    const e = err as { digest?: string };
+    if (e?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+    // If signOut fails for any reason, redirect manually
+    const { redirect } = await import("next/navigation");
+    redirect("/");
+  }
 }
