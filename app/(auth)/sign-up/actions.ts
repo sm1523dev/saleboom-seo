@@ -33,9 +33,17 @@ export async function signUpWithCredentials(formData: FormData) {
   const raw = formData.get("callbackUrl");
   const redirectTo = typeof raw === "string" && raw.startsWith("/") ? raw : "/dashboard";
 
-  await authProvider.signIn("credentials", {
-    email,
-    password,
-    redirectTo,
-  } as Parameters<typeof authProvider.signIn>[1]);
+  // isRedirect errors are intentional Next.js redirects — let them through.
+  // AuthErrors (CredentialsSignin, Configuration) surface as user-readable messages.
+  try {
+    await authProvider.signIn("credentials", {
+      email,
+      password,
+      redirectTo,
+    } as Parameters<typeof authProvider.signIn>[1]);
+  } catch (err) {
+    const e = err as { digest?: string; type?: string };
+    if (e?.digest?.startsWith("NEXT_REDIRECT")) throw err;
+    throw new Error(e?.type === "CredentialsSignin" ? "Invalid credentials after sign-up." : `Sign-in failed: ${String(err)}`);
+  }
 }
