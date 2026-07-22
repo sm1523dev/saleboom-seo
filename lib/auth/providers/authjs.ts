@@ -190,8 +190,10 @@ export class AuthJsProvider implements AuthProvider {
     return nextAuthSignIn(provider, opts) as Promise<never>;
   }
 
-  async signOut(opts?: { redirectTo?: string }): Promise<never> {
-    return nextAuthSignOut(opts) as Promise<never>;
+  async signOut(opts?: { redirectTo?: string; redirect?: false }): Promise<void> {
+    // When redirect:false, nextAuthSignOut returns the raw response (no throw).
+    // When redirect is omitted, it throws NEXT_REDIRECT — callers must handle that.
+    await nextAuthSignOut(opts as Parameters<typeof nextAuthSignOut>[0]);
   }
 
   // NextAuth's auth() wraps any handler and injects request.auth — this is the

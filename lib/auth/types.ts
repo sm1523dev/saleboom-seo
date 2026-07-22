@@ -26,7 +26,7 @@ export interface AuthProvider {
   getSession(): Promise<AuthSession | null>;
   getAvailableProviders(): string[];
   signIn(provider: string, opts?: SignInOpts): Promise<never>;
-  signOut(opts?: { redirectTo?: string }): Promise<never>;
+  signOut(opts?: { redirectTo?: string; redirect?: false }): Promise<void>;
   // Provider-specific middleware (NextAuth, Clerk, etc.) — intentionally untyped
   // because each provider returns a different internal handler signature
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
