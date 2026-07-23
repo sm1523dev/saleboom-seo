@@ -4,7 +4,11 @@ import type { QueueProvider, JobHandler, EnqueueOpts } from "../types";
 // Azure Queue Storage provider — enqueue side only.
 // Workers are deployed separately as Azure Functions using azure-functions/ directory.
 // For full cloud-agnostic workers, use QUEUE_PROVIDER=bullmq instead.
-export class AzureQueueProvider implements QueueProvider {
+export function createAzureQueueProvider(): QueueProvider {
+  return new AzureQueueProvider();
+}
+
+class AzureQueueProvider implements QueueProvider {
   private readonly serviceClient: QueueServiceClient;
 
   constructor() {
