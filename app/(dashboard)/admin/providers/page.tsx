@@ -31,6 +31,14 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   notifications: ["resend", "sendgrid", "twilio", "ses", "mock"],
 };
 
+const ENV_PROVIDER_DEFAULTS: Record<string, string> = {
+  ai:            process.env.AI_PROVIDER            ?? "mock",
+  crawl:         process.env.CRAWL_PROVIDER         ?? "mock",
+  queue:         process.env.QUEUE_PROVIDER         ?? "mock",
+  storage:       process.env.STORAGE_PROVIDER       ?? "mock",
+  notifications: process.env.NOTIFICATION_PROVIDER  ?? "mock",
+};
+
 export default async function ProvidersPage() {
   await requireAdmin();
 
@@ -64,7 +72,7 @@ export default async function ProvidersPage() {
                 type={type as "ai" | "crawl" | "queue" | "storage" | "notifications"}
                 label={meta.label}
                 icon={meta.icon}
-                currentName={row?.name ?? "mock"}
+                currentName={row?.name ?? ENV_PROVIDER_DEFAULTS[type] ?? "mock"}
                 hasKey={!!row?.encryptedKeyBlob}
                 switchMode={meta.switchMode}
                 options={PROVIDER_OPTIONS[type] ?? []}
