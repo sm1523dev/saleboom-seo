@@ -1,23 +1,16 @@
 "use server";
 
-import { eq } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { systemSettings } from "@/lib/db/schema";
 import { requireAdmin } from "@/lib/auth-utils";
-
-export const SETTINGS_KEYS = {
-  SLACK_WEBHOOK: "notification_slack_webhook",
-  SUPPORT_EMAIL: "notification_support_email",
-  RESPONSE_WINDOW: "notification_response_window",
-} as const;
+import { SETTINGS_KEYS } from "@/lib/settings-keys";
+import type { SettingsState } from "@/lib/settings-keys";
 
 export async function getSystemSettings(): Promise<Record<string, string>> {
   const rows = await db.select().from(systemSettings);
   return Object.fromEntries(rows.map((r) => [r.key, r.value ?? ""]));
 }
-
-export type SettingsState = { error?: string; success?: string } | null;
 
 export async function saveNotificationSettings(
   _prev: SettingsState,

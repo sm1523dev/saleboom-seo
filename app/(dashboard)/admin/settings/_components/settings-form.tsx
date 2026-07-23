@@ -1,7 +1,8 @@
 "use client";
 
 import { useActionState } from "react";
-import { saveNotificationSettings, type SettingsState } from "@/app/actions/system-settings.actions";
+import { saveNotificationSettings } from "@/app/actions/system-settings.actions";
+import type { SettingsState } from "@/lib/settings-keys";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
