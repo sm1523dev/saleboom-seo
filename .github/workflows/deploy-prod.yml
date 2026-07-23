@@ -95,10 +95,10 @@ jobs:
           FN: ${{ secrets.FUNCTIONS_APP_NAME }}
         run: |
           cd azure-functions
-          mkdir -p deploy-pkg
+          mkdir -p deploy-pkg/dist
           cp host.json deploy-pkg/
           cp package.json deploy-pkg/
-          cp dist/index.js deploy-pkg/
+          cp dist/index.js deploy-pkg/dist/
           cd deploy-pkg && zip -r ../functions.zip . && cd ..
           az functionapp deployment source config-zip \
             --resource-group "$RG" \
