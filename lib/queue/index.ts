@@ -7,7 +7,7 @@ function createProvider(): QueueProvider {
     case "bullmq":
       return new (require("./providers/bullmq").BullMQProvider)();
     case "azure-queue":
-      return new (require("./providers/azure-queue").AzureQueueProvider)();
+      return (require("./providers/azure-queue") as typeof import("./providers/azure-queue")).createAzureQueueProvider();
     case "sqs":
       return new (require("./providers/sqs").SQSQueueProvider)();
     case "mock":
