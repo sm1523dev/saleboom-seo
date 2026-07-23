@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { requireAdmin } from "@/lib/auth-utils";
-import { getSystemSettings, SETTINGS_KEYS } from "@/app/actions/system-settings.actions";
+import { getSystemSettings } from "@/app/actions/system-settings.actions";
+import { SETTINGS_KEYS } from "@/lib/settings-keys";
 import { SettingsForm } from "./_components/settings-form";
 
 export const metadata: Metadata = {
