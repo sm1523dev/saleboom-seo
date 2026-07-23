@@ -10,11 +10,19 @@
     }
   },
   "logging": {
+    "logLevel": {
+      "default": "Information",
+      "Host.Results": "Error",
+      "Function": "Information",
+      "Host.Aggregator": "Trace"
+    },
     "applicationInsights": {
       "samplingSettings": {
         "isEnabled": true,
-        "excludedTypes": "Request"
-      }
+        "excludedTypes": "Request",
+        "includedTypes": "PageView;Trace;Event;Exception"
+      },
+      "enableLiveDiagnosticsSettings": true
     }
   }
 }

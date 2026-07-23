@@ -1,3 +1,4 @@
+import "./telemetry"; // must be first — patches Node internals before other modules load
 import "./functions/scan-worker";
 import "./functions/digest-worker";
 import "./functions/rescan-timer";
