@@ -70,9 +70,19 @@ export default async function ChangesPage() {
 
   const websiteMap = new Map(websiteRows.map((w) => [w.id, w]));
   const connectedSet = new Set(cmsRows.map((c) => c.websiteId));
+  const cmsTypeMap = new Map(cmsRows.map((c) => [c.websiteId, c.cmsType]));
+
+  // H1 can only be auto-pushed for CMS platforms that own the heading natively.
+  // On custom code sites (github) it lives in source files and needs a manual edit.
+  const H1_AUTOPUSH_TYPES = new Set(["wordpress", "shopify", "webflow"]);
+  function canAutoPush(field: string, cmsType: string | null) {
+    if (field === "h1") return cmsType !== null && H1_AUTOPUSH_TYPES.has(cmsType);
+    return true;
+  }
 
   const items = enriched.map((r) => {
     const website = r.websiteId ? websiteMap.get(r.websiteId) : null;
+    const cmsType = r.websiteId ? (cmsTypeMap.get(r.websiteId) ?? null) : null;
     return {
       id: r.id,
       pageUrl: r.pageUrl,
@@ -85,6 +95,8 @@ export default async function ChangesPage() {
       websiteUrl: website?.url ?? null,
       platformHint: website?.platformHint ?? null,
       isCmsConnected: r.websiteId ? connectedSet.has(r.websiteId) : false,
+      cmsType,
+      canAutoPush: canAutoPush(r.fieldChanged, cmsType),
     };
   });
 

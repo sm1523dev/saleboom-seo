@@ -25,6 +25,8 @@ type QueueItem = {
   websiteUrl: string | null;
   isCmsConnected: boolean;
   platformHint: string | null;
+  cmsType: string | null;
+  canAutoPush: boolean;
 };
 
 type ItemState = "pending" | "pushing" | "pushed" | "rejected" | "error";
@@ -85,7 +87,7 @@ export function ApprovalQueue({ items }: Props) {
   function handleBulkPush(ids: string[]) {
     const pushable = ids.filter((id) => {
       const item = items.find((i) => i.id === id);
-      return item?.isCmsConnected && !itemStates[id];
+      return item?.isCmsConnected && item?.canAutoPush && !itemStates[id];
     });
     startGroupTransition(async () => {
       await Promise.allSettled(pushable.map((id) => handlePush(id)));
@@ -245,20 +247,36 @@ export function ApprovalQueue({ items }: Props) {
                             {state === "error" && errors[item.id] && (
                               <p className="mt-2 text-xs text-red-400">{errors[item.id]}</p>
                             )}
+                            {!item.canAutoPush && (
+                              <p className="mt-2 text-xs text-yellow-500/80">
+                                H1 lives in source code — copy the AI fix above and edit the file manually, then Reject this item.
+                              </p>
+                            )}
                           </div>
                           <div className="flex shrink-0 gap-1.5 sm:flex-col">
-                            {item.isCmsConnected && (
+                            {item.isCmsConnected && item.canAutoPush && (
                               <button type="button" onClick={() => handlePush(item.id)} disabled={isPushing}
                                 className="btn-press rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary/90 disabled:opacity-50">
                                 {isPushing ? "Pushing…" : "Push"}
                               </button>
                             )}
-                            <button type="button"
-                              onClick={() => { setEditingId(item.id); setEditValue(item.afterValue); }}
-                              disabled={isPushing}
-                              className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
-                              Edit
-                            </button>
+                            {item.isCmsConnected && !item.canAutoPush && (
+                              <Link
+                                href={item.websiteId ? `/website/${item.websiteId}/cms` : "#"}
+                                className="rounded-md border border-yellow-500/40 px-3 py-1.5 text-center text-xs text-yellow-400 hover:bg-yellow-500/10"
+                                title="This field lives in source code and must be edited manually"
+                              >
+                                Manual
+                              </Link>
+                            )}
+                            {item.canAutoPush && (
+                              <button type="button"
+                                onClick={() => { setEditingId(item.id); setEditValue(item.afterValue); }}
+                                disabled={isPushing}
+                                className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
+                                Edit
+                              </button>
+                            )}
                             <button type="button" onClick={() => handleReject(item.id)} disabled={isPushing}
                               className="rounded-md border border-border px-3 py-1.5 text-xs text-muted-foreground hover:text-foreground disabled:opacity-50">
                               Reject
