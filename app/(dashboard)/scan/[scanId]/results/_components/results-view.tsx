@@ -9,7 +9,7 @@ import { approveSuggestionField, unapproveField, approveAllSuggestions } from "@
 import { generateAndQueueIssueFixes } from "@/app/actions/quick-fix.actions";
 import type { CmsField } from "@/lib/cms/types";
 import { ignoreIssues, unignoreIssues } from "@/app/actions/issues.actions";
-import { requestMajorFixHelp } from "@/app/actions/provider-requests.actions";
+import { requestMajorFixHelp, requestMajorFixHelpBulk } from "@/app/actions/provider-requests.actions";
 import { Badge } from "@/components/ui/badge";
 import {
   Table,
@@ -399,6 +399,14 @@ export function ResultsView({
                 cmsConnected={cmsConnected}
               />
             )}
+            {filtered.some((i) => i.fixType === "major") && (
+              <BulkConnectButton
+                selectedIssues={selectedIssues}
+                allMajorIssues={filtered.filter((i) => i.fixType === "major")}
+                websiteId={websiteId}
+                websiteUrl={websiteUrl}
+              />
+            )}
           </div>
         </div>
 
@@ -775,6 +783,55 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, cmsConnected
         {label}
       </button>
     </>
+  );
+}
+
+function BulkConnectButton({ selectedIssues, allMajorIssues, websiteId, websiteUrl }: {
+  selectedIssues: Set<string>;
+  allMajorIssues: Issue[];
+  websiteId: string;
+  websiteUrl: string;
+}) {
+  const [state, setState] = useState<"idle" | "sent">("idle");
+  const [isPending, startTransition] = useTransition();
+
+  const targetIssues = selectedIssues.size > 0
+    ? allMajorIssues.filter((i) => selectedIssues.has(i.id))
+    : allMajorIssues;
+
+  if (targetIssues.length === 0) return null;
+
+  if (state === "sent") {
+    return (
+      <span className="text-xs text-muted-foreground">✓ {targetIssues.length} request{targetIssues.length !== 1 ? "s" : ""} sent</span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      disabled={isPending}
+      onClick={() =>
+        startTransition(async () => {
+          await requestMajorFixHelpBulk(
+            targetIssues.map((i) => ({
+              issueId: i.id,
+              issueTitle: i.title,
+              websiteId,
+              websiteUrl,
+            }))
+          );
+          setState("sent");
+        })
+      }
+      className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
+    >
+      {isPending
+        ? "Sending…"
+        : selectedIssues.size > 0
+          ? `Connect with us (${targetIssues.length})`
+          : "Connect with us (all)"}
+    </button>
   );
 }
 

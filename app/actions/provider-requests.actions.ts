@@ -7,6 +7,33 @@ import { getServerSession, requireAdmin } from "@/lib/auth-utils";
 import { getNotificationProvider } from "@/lib/notifications";
 import { revalidatePath } from "next/cache";
 
+export async function requestMajorFixHelpBulk(issues: {
+  issueId: string;
+  issueTitle: string;
+  websiteId: string;
+  websiteUrl: string;
+}[]): Promise<{ success: boolean; count: number; error?: string }> {
+  if (issues.length === 0) return { success: true, count: 0 };
+  try {
+    const session = await getServerSession();
+    await db.insert(providerRequests).values(
+      issues.map((d) => ({
+        type: "major_fix" as const,
+        providerName: d.issueTitle.slice(0, 100),
+        reason: `User requested help with a major SEO fix on ${d.websiteUrl}`,
+        requestedBy: session.user.id,
+        issueId: d.issueId,
+        websiteId: d.websiteId,
+        status: "pending" as const,
+      }))
+    );
+    revalidatePath("/admin/requests");
+    return { success: true, count: issues.length };
+  } catch {
+    return { success: false, count: 0, error: "Failed to submit requests" };
+  }
+}
+
 export async function requestMajorFixHelp(data: {
   issueId: string;
   issueTitle: string;
