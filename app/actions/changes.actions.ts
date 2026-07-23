@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
+import { logger } from "@/lib/logger";
 import { changeSnapshots, aiSuggestions, cmsConnections, issues, scans, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import type { CmsField, CmsCredentials, PushResult, PushPayload } from "@/lib/cms/types";
@@ -200,6 +201,9 @@ export async function pushChangeTocms(
   const credentials = await loadCredentials(websiteId, cmsType);
   if (!credentials) return { success: false, error: "Credentials not found — reconnect your CMS" };
 
+  const log = logger.child({ component: "cms-push", snapshotId, cmsType, websiteId });
+  log.info("push started", { field: snapshot.fieldChanged, pageUrl: snapshot.pageUrl });
+
   try {
     const afterState = snapshot.afterState as { value?: string } | null;
     const beforeState = snapshot.beforeState as { value?: string | null } | null;
@@ -217,6 +221,7 @@ export async function pushChangeTocms(
     // pushedFields list — treat this as a failure so the UI is honest.
     const fieldWritten = pushResult.pushedFields.includes(snapshot.fieldChanged as CmsField);
     if (!fieldWritten) {
+      log.warn("push no-op: field not written", { field: snapshot.fieldChanged });
       await db
         .update(changeSnapshots)
         .set({ status: "failed", updatedAt: new Date() })
@@ -231,6 +236,7 @@ export async function pushChangeTocms(
     // GitHub: PR is open — keep status as "pending" but store PR metadata.
     // Status will move to "applied" when the PR is merged (handled by pr-poll worker).
     if (pushResult.prUrl && pushResult.prNumber) {
+      log.info("push succeeded: PR opened", { prUrl: pushResult.prUrl, prNumber: pushResult.prNumber });
       await db
         .update(changeSnapshots)
         .set({
@@ -244,6 +250,7 @@ export async function pushChangeTocms(
       return { success: true };
     }
 
+    log.info("push succeeded: applied", { field: snapshot.fieldChanged });
     await db
       .update(changeSnapshots)
       .set({ status: "applied", cmsConnectionId: connection.id, appliedAt: new Date(), updatedAt: new Date() })
@@ -292,6 +299,7 @@ export async function pushChangeTocms(
     return { success: true };
   } catch (err) {
     const message = err instanceof Error ? err.message : "Unknown error";
+    log.error("push failed", { error: message });
     await db
       .update(changeSnapshots)
       .set({ status: "failed", updatedAt: new Date() })
