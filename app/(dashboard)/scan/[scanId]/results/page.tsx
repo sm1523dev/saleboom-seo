@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { notFound } from "next/navigation";
 import { eq, and, inArray } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions, changeSnapshots, cmsConnections } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions, changeSnapshots, cmsConnections, providerRequests } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { computeSeoScore } from "@/lib/seo-score";
 import { countByFixType } from "@/lib/fix-classifier";
@@ -178,6 +178,19 @@ export default async function AuditResultsPage({ params }: Props) {
           )
       : [];
 
+  // Fetch existing "Connect with us" requests for major fix issues in this scan
+  const majorIssueIds = allIssues.filter((i) => i.fixType === "major").map((i) => i.id);
+  const existingRequestRows = majorIssueIds.length > 0
+    ? await db
+        .select({ issueId: providerRequests.issueId, createdAt: providerRequests.createdAt })
+        .from(providerRequests)
+        .where(and(inArray(providerRequests.issueId, majorIssueIds), eq(providerRequests.status, "pending")))
+    : [];
+  const majorFixRequests: Record<string, string> = {};
+  for (const r of existingRequestRows) {
+    if (r.issueId) majorFixRequests[r.issueId] = r.createdAt.toISOString();
+  }
+
   return (
     <ResultsView
       scanId={scanId}
@@ -197,6 +210,7 @@ export default async function AuditResultsPage({ params }: Props) {
       pastSuggestions={pastSuggestions}
       approvedSnapshots={approvedSnapshots}
       cmsConnected={!!cmsConn}
+      majorFixRequests={majorFixRequests}
     />
   );
 }

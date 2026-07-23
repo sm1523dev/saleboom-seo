@@ -27,7 +27,28 @@ type QueueItem = {
   platformHint: string | null;
   cmsType: string | null;
   canAutoPush: boolean;
+  blockReason: string | null;
 };
+
+function buildSupportMailto(item: QueueItem, errorMsg: string) {
+  const field = FIELD_LABELS[item.fieldChanged] ?? item.fieldChanged;
+  const subject = `SaleBoom SEO — Fix assistance needed: ${field} on ${item.pageUrl}`;
+  const body = [
+    `Hi SaleBoom team,`,
+    ``,
+    `An automated fix could not be applied and I need help:`,
+    ``,
+    `Error:         ${errorMsg}`,
+    `Field:         ${field} (${item.fieldChanged})`,
+    `Page:          ${item.pageUrl}`,
+    `Website:       ${item.websiteUrl ?? "unknown"}`,
+    `CMS type:      ${item.cmsType ?? "not connected"}`,
+    `Current value: ${item.beforeValue ?? "(missing)"}`,
+    `AI suggested:  ${item.afterValue}`,
+    `Snapshot ID:   ${item.id}`,
+  ].join("\n");
+  return `mailto:support@saleboom.com?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+}
 
 type ItemState = "pending" | "pushing" | "pushed" | "rejected" | "error";
 

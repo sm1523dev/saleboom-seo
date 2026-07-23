@@ -485,3 +485,11 @@ export const aeoScores = pgTable(
     index("aeo_scores_scored_at_idx").on(t.scoredAt),
   ],
 );
+
+// Admin-configurable key-value settings (notification channels, etc.)
+export const systemSettings = pgTable("system_settings", {
+  key: text("key").primaryKey(),
+  value: text("value"),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedBy: uuid("updated_by").references(() => users.id, { onDelete: "set null" }),
+});

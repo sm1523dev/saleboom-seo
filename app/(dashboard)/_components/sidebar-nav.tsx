@@ -19,6 +19,7 @@ export const ADMIN_NAV_ITEMS = [
   { href: "/admin/providers", label: "Providers", icon: "⊗" },
   { href: "/admin/requests", label: "Requests", icon: "⊜" },
   { href: "/admin/history", label: "Change History", icon: "⊝" },
+  { href: "/admin/settings", label: "Settings", icon: "⊛" },
 ] as const;
 
 export type SidebarProps = {

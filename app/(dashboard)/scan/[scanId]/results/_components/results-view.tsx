@@ -71,6 +71,7 @@ type Props = {
   pastSuggestions: Suggestion[];
   approvedSnapshots: ApprovedSnapshot[];
   cmsConnected: boolean;
+  majorFixRequests: Record<string, string>; // issueId → requestedAt ISO string
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -125,6 +126,7 @@ export function ResultsView({
   pastSuggestions,
   approvedSnapshots,
   cmsConnected,
+  majorFixRequests,
 }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Severity | null>(null);
@@ -405,6 +407,7 @@ export function ResultsView({
                 allMajorIssues={filtered.filter((i) => i.fixType === "major")}
                 websiteId={websiteId}
                 websiteUrl={websiteUrl}
+                majorFixRequests={majorFixRequests}
               />
             )}
           </div>
@@ -485,6 +488,7 @@ export function ResultsView({
                             issueTitle={issue.title}
                             websiteId={websiteId}
                             websiteUrl={websiteUrl}
+                            requestedAt={majorFixRequests[issue.id] ?? null}
                           />
                         )}
                       </TableCell>
@@ -786,52 +790,58 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, cmsConnected
   );
 }
 
-function BulkConnectButton({ selectedIssues, allMajorIssues, websiteId, websiteUrl }: {
+function BulkConnectButton({ selectedIssues, allMajorIssues, websiteId, websiteUrl, majorFixRequests }: {
   selectedIssues: Set<string>;
   allMajorIssues: Issue[];
   websiteId: string;
   websiteUrl: string;
+  majorFixRequests: Record<string, string>;
 }) {
-  const [state, setState] = useState<"idle" | "sent">("idle");
+  const [localSent, setLocalSent] = useState<Set<string>>(new Set());
   const [isPending, startTransition] = useTransition();
 
   const targetIssues = selectedIssues.size > 0
     ? allMajorIssues.filter((i) => selectedIssues.has(i.id))
     : allMajorIssues;
 
+  // Issues not yet requested (neither persisted nor sent this session)
+  const pendingIssues = targetIssues.filter(
+    (i) => !majorFixRequests[i.id] && !localSent.has(i.id)
+  );
+  const allRequested = targetIssues.length > 0 && pendingIssues.length === 0;
+
   if (targetIssues.length === 0) return null;
 
-  if (state === "sent") {
-    return (
-      <span className="text-xs text-muted-foreground">✓ {targetIssues.length} request{targetIssues.length !== 1 ? "s" : ""} sent</span>
-    );
-  }
+  const sentCount = targetIssues.length - pendingIssues.length;
+  const tooltipText = allRequested
+    ? `All ${targetIssues.length} request${targetIssues.length !== 1 ? "s" : ""} raised — our team will reach out within 24-72 hours`
+    : undefined;
 
   return (
-    <button
-      type="button"
-      disabled={isPending}
-      onClick={() =>
-        startTransition(async () => {
-          await requestMajorFixHelpBulk(
-            targetIssues.map((i) => ({
-              issueId: i.id,
-              issueTitle: i.title,
-              websiteId,
-              websiteUrl,
-            }))
-          );
-          setState("sent");
-        })
-      }
-      className="rounded-lg border border-primary/30 px-3 py-1.5 text-xs text-primary transition-colors hover:bg-primary/10 disabled:opacity-50"
-    >
-      {isPending
-        ? "Sending…"
-        : selectedIssues.size > 0
-          ? `Connect with us (${targetIssues.length})`
-          : "Connect with us (all)"}
-    </button>
+    <span title={tooltipText}>
+      <button
+        type="button"
+        disabled={isPending || allRequested}
+        onClick={() =>
+          startTransition(async () => {
+            await requestMajorFixHelpBulk(
+              pendingIssues.map((i) => ({ issueId: i.id, issueTitle: i.title, websiteId, websiteUrl }))
+            );
+            setLocalSent((prev) => new Set([...prev, ...pendingIssues.map((i) => i.id)]));
+          })
+        }
+        className="rounded-lg border px-3 py-1.5 text-xs transition-colors disabled:cursor-default disabled:opacity-100
+          border-primary/30 text-primary hover:bg-primary/10
+          disabled:border-border disabled:text-muted-foreground"
+      >
+        {isPending ? "Sending…"
+          : allRequested
+            ? `✓ ${sentCount} request${sentCount !== 1 ? "s" : ""} raised`
+            : selectedIssues.size > 0
+              ? `Connect with us (${pendingIssues.length})`
+              : "Connect with us (all)"}
+      </button>
+    </span>
   );
 }
 
@@ -1170,40 +1180,47 @@ function AiSuggestionsSection({
 }
 
 function MajorFixCell({
-  issueId, issueTitle, websiteId, websiteUrl,
-}: { issueId: string; issueTitle: string; websiteId: string; websiteUrl: string }) {
-  const [state, setState] = useState<"idle" | "sent">("idle");
+  issueId, issueTitle, websiteId, websiteUrl, requestedAt,
+}: { issueId: string; issueTitle: string; websiteId: string; websiteUrl: string; requestedAt: string | null }) {
+  const [sentAt, setSentAt] = useState<string | null>(requestedAt);
   const [isPending, startTransition] = useTransition();
 
-  if (state === "sent") {
-    return (
-      <motion.span
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        className="text-xs text-muted-foreground"
-      >
-        ✓ Request sent
-      </motion.span>
-    );
-  }
+  const alreadyRequested = sentAt !== null;
+
+  const tooltipText = alreadyRequested
+    ? `Requested on ${new Date(sentAt!).toLocaleString()} — our team will reach out within 24-72 hours`
+    : undefined;
 
   return (
     <div className="flex flex-col gap-1.5">
       <Badge variant="outline" className="text-xs border-border bg-muted text-muted-foreground w-fit">
         Major Fix
       </Badge>
-      <button
-        disabled={isPending}
-        onClick={() =>
-          startTransition(async () => {
-            await requestMajorFixHelp({ issueId, issueTitle, websiteId, websiteUrl });
-            setState("sent");
-          })
-        }
-        className="text-xs text-primary underline-offset-4 hover:underline disabled:opacity-50 text-left"
-      >
-        {isPending ? "Sending…" : "Connect with us →"}
-      </button>
+      <span title={tooltipText}>
+        <button
+          disabled={isPending || alreadyRequested}
+          onClick={() =>
+            startTransition(async () => {
+              await requestMajorFixHelp({ issueId, issueTitle, websiteId, websiteUrl });
+              setSentAt(new Date().toISOString());
+            })
+          }
+          className="text-xs disabled:cursor-default text-left disabled:opacity-100"
+        >
+          {isPending ? (
+            <span className="text-muted-foreground">Sending…</span>
+          ) : alreadyRequested ? (
+            <motion.span initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-muted-foreground">
+              ✓ Request raised
+            </motion.span>
+          ) : (
+            <span className="text-primary underline-offset-4 hover:underline">Connect with us →</span>
+          )}
+        </button>
+      </span>
+      {alreadyRequested && (
+        <p className="text-[11px] text-muted-foreground/70">Our team will reach out within 24-72 hours.</p>
+      )}
     </div>
   );
 }

@@ -75,14 +75,16 @@ export default async function ChangesPage() {
   // H1 can only be auto-pushed for CMS platforms that own the heading natively.
   // On custom code sites (github) it lives in source files and needs a manual edit.
   const H1_AUTOPUSH_TYPES = new Set(["wordpress", "shopify", "webflow"]);
-  function canAutoPush(field: string, cmsType: string | null) {
-    if (field === "h1") return cmsType !== null && H1_AUTOPUSH_TYPES.has(cmsType);
-    return true;
+  function getBlockReason(field: string, cmsType: string | null): string | null {
+    if (field === "h1" && cmsType !== null && !H1_AUTOPUSH_TYPES.has(cmsType))
+      return "H1 in source code requires manual edit — use meta_title as a proxy instead";
+    return null;
   }
 
   const items = enriched.map((r) => {
     const website = r.websiteId ? websiteMap.get(r.websiteId) : null;
     const cmsType = r.websiteId ? (cmsTypeMap.get(r.websiteId) ?? null) : null;
+    const blockReason = getBlockReason(r.fieldChanged, cmsType);
     return {
       id: r.id,
       pageUrl: r.pageUrl,
@@ -96,7 +98,8 @@ export default async function ChangesPage() {
       platformHint: website?.platformHint ?? null,
       isCmsConnected: r.websiteId ? connectedSet.has(r.websiteId) : false,
       cmsType,
-      canAutoPush: canAutoPush(r.fieldChanged, cmsType),
+      canAutoPush: blockReason === null,
+      blockReason,
     };
   });
 

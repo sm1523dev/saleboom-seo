@@ -1,0 +1,22 @@
+{
+  "name": "saleboom-functions",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "node build.mjs",
+    "typecheck": "tsc --noEmit",
+    "start": "func start"
+  },
+  "dependencies": {
+    "@azure/functions": "^4",
+    "drizzle-orm": "^0.45.2",
+    "postgres": "^3",
+    "zod": "^3"
+  },
+  "devDependencies": {
+    "@types/node": "^20",
+    "esbuild": "^0.25",
+    "typescript": "^5"
+  }
+}

@@ -68,3 +68,6 @@ skills-lock.json
 session-report-*.html
 storage/
 docs
+
+# foglamp codebase scan (edit token is a secret)
+.foglamp/
