@@ -7,7 +7,17 @@ import { cookies } from "next/headers";
 export async function POST(request: Request) {
   const cookieJar = await cookies();
 
-  const origin = process.env.AUTH_URL ?? new URL(request.url).origin;
+  // AUTH_URL (Azure) → NEXT_PUBLIC_APP_URL (Pi) → forwarded headers → request origin (local dev)
+  const origin =
+    process.env.AUTH_URL ??
+    process.env.NEXT_PUBLIC_APP_URL ??
+    ((): string => {
+      const proto = request.headers.get("x-forwarded-proto") ?? "https";
+      const host =
+        request.headers.get("x-forwarded-host") ?? request.headers.get("host");
+      if (host) return `${proto}://${host}`;
+      return new URL(request.url).origin;
+    })();
 
   // Delete session tokens for both HTTPS (__Secure- prefix) and HTTP variants.
   // The Secure attribute must be present when deleting a __Secure- cookie.
