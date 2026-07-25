@@ -1,17 +1,21 @@
 import type { StorageProvider } from "./types";
+import { LocalStorageProvider } from "./providers/local";
+import { S3StorageProvider } from "./providers/s3";
+import { AzureBlobStorageProvider } from "./providers/azure-blob";
+import { MockStorageProvider } from "./providers/mock";
 
 function createProvider(): StorageProvider {
   const name = process.env.STORAGE_PROVIDER ?? "local";
 
   switch (name) {
     case "local":
-      return new (require("./providers/local").LocalStorageProvider)();
+      return new LocalStorageProvider();
     case "s3":
-      return new (require("./providers/s3").S3StorageProvider)();
+      return new S3StorageProvider();
     case "azure-blob":
-      return new (require("./providers/azure-blob").AzureBlobStorageProvider)();
+      return new AzureBlobStorageProvider();
     case "mock":
-      return new (require("./providers/mock").MockStorageProvider)();
+      return new MockStorageProvider();
     default:
       throw new Error(
         `Unknown STORAGE_PROVIDER: "${name}". Valid: local, s3, azure-blob, mock`

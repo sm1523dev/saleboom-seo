@@ -1,17 +1,21 @@
 import type { QueueProvider } from "./types";
+import { createAzureQueueProvider } from "./providers/azure-queue";
+import { BullMQProvider } from "./providers/bullmq";
+import { SQSQueueProvider } from "./providers/sqs";
+import { MockQueueProvider } from "./providers/mock";
 
 function createProvider(): QueueProvider {
   const name = process.env.QUEUE_PROVIDER ?? "mock";
 
   switch (name) {
     case "bullmq":
-      return new (require("./providers/bullmq").BullMQProvider)();
+      return new BullMQProvider();
     case "azure-queue":
-      return (require("./providers/azure-queue") as typeof import("./providers/azure-queue")).createAzureQueueProvider();
+      return createAzureQueueProvider();
     case "sqs":
-      return new (require("./providers/sqs").SQSQueueProvider)();
+      return new SQSQueueProvider();
     case "mock":
-      return new (require("./providers/mock").MockQueueProvider)();
+      return new MockQueueProvider();
     default:
       throw new Error(
         `Unknown QUEUE_PROVIDER: "${name}". Valid: bullmq, azure-queue, sqs, mock`
