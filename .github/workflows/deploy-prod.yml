@@ -89,16 +89,6 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Clear WEBSITE_RUN_FROM_PACKAGE if present
-        env:
-          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
-          FN: ${{ secrets.FUNCTIONS_APP_NAME }}
-        run: |
-          az functionapp config appsettings delete \
-            --resource-group "$RG" \
-            --name "$FN" \
-            --setting-names WEBSITE_RUN_FROM_PACKAGE 2>/dev/null || true
-
       - name: Deploy Functions
         env:
           RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
@@ -120,9 +110,12 @@ jobs:
             };
             require('fs').writeFileSync('deploy-pkg/package.json', JSON.stringify(deploy, null, 2));
           "
-          cd deploy-pkg && npm install --omit=dev --ignore-scripts && cd ..
-          zip -r functions.zip deploy-pkg
-          az functionapp deployment source config-zip \
+          cd deploy-pkg
+          npm install --omit=dev --ignore-scripts
+          zip -r ../functions.zip .
+          cd ..
+          az functionapp deploy \
             --resource-group "$RG" \
             --name "$FN" \
-            --src functions.zip
+            --src-path functions.zip \
+            --type zip
