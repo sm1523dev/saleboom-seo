@@ -51,6 +51,19 @@ async function _runScanJob(
   log.info("scan started");
   const jobStart = Date.now();
 
+  // Reset scans that are stuck in "running" from a prior Function timeout where the
+  // catch block never fired (Azure killed the process before it could write "failed").
+  await db
+    .update(scans)
+    .set({ status: "failed", updatedAt: new Date() })
+    .where(
+      and(
+        eq(scans.status, "running"),
+        sql`${scans.id} != ${scanId}`,
+        sql`${scans.updatedAt} < now() - interval '15 minutes'`
+      )
+    );
+
   await withSpan("db.scan.setRunning", { "scan.id": scanId }, () =>
     db
       .update(scans)
@@ -87,13 +100,23 @@ async function _runScanJob(
     log.info("fetched site metadata", { url });
     await context.updateProgress(10);
 
-    // Crawl the site — onProgress writes live counts to DB every poll tick
-    const crawlResult = await (await getCrawlProvider()).crawlSite(url, { limit: 100 }, async ({ completed, total }) => {
-      await db
-        .update(scans)
-        .set({ pagesScanned: completed, totalPages: total, updatedAt: new Date() })
-        .where(eq(scans.id, scanId));
-    });
+    // Crawl the site — onProgress writes live counts to DB every poll tick.
+    // Hard 7-minute wall-clock limit so the catch block fires before Azure kills the process.
+    let crawlTimeoutId: ReturnType<typeof setTimeout> | undefined;
+    const crawlResult = await Promise.race([
+      (await getCrawlProvider()).crawlSite(url, { limit: 100 }, async ({ completed, total }) => {
+        await db
+          .update(scans)
+          .set({ pagesScanned: completed, totalPages: total, updatedAt: new Date() })
+          .where(eq(scans.id, scanId));
+      }),
+      new Promise<never>((_, reject) => {
+        crawlTimeoutId = setTimeout(
+          () => reject(new Error("Crawl exceeded 7-minute limit — site too slow or too large")),
+          7 * 60_000
+        );
+      }),
+    ]).finally(() => clearTimeout(crawlTimeoutId));
     log.info("crawl complete", { pages: crawlResult.pages.length });
     await db
       .update(scans)
@@ -211,7 +234,26 @@ async function _runScanJob(
       .slice(0, 10);
 
     if (pagesNeedingSuggestions.length > 0) {
-      await generateAndPersistSuggestions(scanId, websiteId, pagesNeedingSuggestions, log);
+      // Non-fatal 2-minute timeout — AI suggestions are best-effort; a slow model
+      // response shouldn't fail an otherwise complete scan.
+      let aiTimeoutId: ReturnType<typeof setTimeout> | undefined;
+      await Promise.race([
+        generateAndPersistSuggestions(scanId, websiteId, pagesNeedingSuggestions, log),
+        new Promise<never>((_, reject) => {
+          aiTimeoutId = setTimeout(
+            () => reject(new Error("ai_timeout")),
+            2 * 60_000
+          );
+        }),
+      ])
+        .catch((err: unknown) => {
+          if (err instanceof Error && err.message === "ai_timeout") {
+            log.warn("AI suggestions timed out after 2 minutes, scan will complete without them");
+          } else {
+            log.error("AI suggestions failed", { error: String(err) });
+          }
+        })
+        .finally(() => clearTimeout(aiTimeoutId));
     }
 
     await context.updateProgress(95);
