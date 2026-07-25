@@ -1,12 +1,9 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 
 // POST /api/sign-out
 // Plain HTTP route handler — avoids server-action NEXT_REDIRECT mechanics.
 // JWT session: deleting the session cookie is sufficient to sign out.
 export async function POST(request: Request) {
-  const cookieJar = await cookies();
-
   // AUTH_URL (Azure) → NEXT_PUBLIC_APP_URL (Pi) → forwarded headers → request origin (local dev)
   const origin =
     process.env.AUTH_URL ??
@@ -19,6 +16,11 @@ export async function POST(request: Request) {
       return new URL(request.url).origin;
     })();
 
+  // Set deletion cookies directly on the redirect response — cookies() from next/headers
+  // and NextResponse.redirect() are separate objects; mutations to the cookies() store
+  // are not applied to a separately constructed NextResponse.
+  const response = NextResponse.redirect(new URL("/", origin), { status: 303 });
+
   // Delete session tokens for both HTTPS (__Secure- prefix) and HTTP variants.
   // The Secure attribute must be present when deleting a __Secure- cookie.
   for (const [name, secure] of [
@@ -29,7 +31,7 @@ export async function POST(request: Request) {
     ["__Host-authjs.csrf-token", true],
     ["authjs.csrf-token", false],
   ] as [string, boolean][]) {
-    cookieJar.set(name, "", {
+    response.cookies.set(name, "", {
       httpOnly: true,
       secure,
       sameSite: "lax",
@@ -38,5 +40,5 @@ export async function POST(request: Request) {
     });
   }
 
-  return NextResponse.redirect(new URL("/", origin), { status: 303 });
+  return response;
 }
