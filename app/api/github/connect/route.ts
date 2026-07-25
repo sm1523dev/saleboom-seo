@@ -1,5 +1,4 @@
 import { createHmac } from "crypto";
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getServerSession } from "@/lib/auth-utils";
 
@@ -26,19 +25,21 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const state = signState(websiteId);
 
-  const cookieStore = await cookies();
-  cookieStore.set("gh_oauth_state", state, {
+  const authUrl = new URL("https://github.com/login/oauth/authorize");
+  authUrl.searchParams.set("client_id", clientId);
+  authUrl.searchParams.set("scope", "repo");
+  authUrl.searchParams.set("state", websiteId);
+
+  // Cookie must be set on the redirect response object directly — cookies() and
+  // NextResponse.redirect() are separate response objects; setting via cookies()
+  // store does not carry over to the redirect response the browser receives.
+  const response = NextResponse.redirect(authUrl.toString());
+  response.cookies.set("gh_oauth_state", state, {
     httpOnly: true,
     sameSite: "lax",
     maxAge: 600,
     path: "/",
     secure: process.env.NODE_ENV === "production",
   });
-
-  const authUrl = new URL("https://github.com/login/oauth/authorize");
-  authUrl.searchParams.set("client_id", clientId);
-  authUrl.searchParams.set("scope", "repo");
-  authUrl.searchParams.set("state", websiteId);
-
-  return NextResponse.redirect(authUrl.toString());
+  return response;
 }
