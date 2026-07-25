@@ -32,8 +32,6 @@ await esbuild.build({
   external: [
     "pg-native",
     "@azure/functions-core",
-    // Must not be bundled — patches Node http/https/pg at startup
-    "applicationinsights",
     // Optional notification providers not used in Azure deployment
     "@sendgrid/mail",
     "@aws-sdk/client-sesv2",
