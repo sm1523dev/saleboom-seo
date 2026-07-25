@@ -8,6 +8,11 @@ on:
 # Only runs on SaleBoomSEO/SEO_Integration — secrets and infra live there
 # sm1523dev/saleboom-seo main → Pi (deploy-dev.yml handles that)
 
+# Queue deployments — Azure rejects concurrent operations on the same resource.
+concurrency:
+  group: production-deploy
+  cancel-in-progress: false
+
 jobs:
   deploy-app:
     name: Build & Deploy Next.js App
