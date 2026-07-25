@@ -25,44 +25,52 @@ export async function startScanAction(
     return { error: err instanceof Error ? err.message : "Invalid URL." };
   }
 
-  // Upsert website — reuse existing record if this user already has this URL
-  const existing = await db
-    .select({ id: websites.id })
-    .from(websites)
-    .where(
-      and(eq(websites.userId, session.user.id), eq(websites.url, url))
-    )
-    .limit(1);
+  let scanId: string;
 
-  let websiteId: string;
+  try {
+    // Upsert website — reuse existing record if this user already has this URL
+    const existing = await db
+      .select({ id: websites.id })
+      .from(websites)
+      .where(
+        and(eq(websites.userId, session.user.id), eq(websites.url, url))
+      )
+      .limit(1);
 
-  if (existing.length > 0) {
-    websiteId = existing[0].id;
-  } else {
-    const hostname = new URL(url).hostname;
-    const [website] = await db
-      .insert(websites)
-      .values({ userId: session.user.id, url, name: hostname })
-      .returning({ id: websites.id });
-    websiteId = website.id;
+    let websiteId: string;
+
+    if (existing.length > 0) {
+      websiteId = existing[0].id;
+    } else {
+      const hostname = new URL(url).hostname;
+      const [website] = await db
+        .insert(websites)
+        .values({ userId: session.user.id, url, name: hostname })
+        .returning({ id: websites.id });
+      websiteId = website.id;
+    }
+
+    // Seed default AEO queries for this website (idempotent — skips if already exist)
+    const hostnameString = new URL(url).hostname;
+    await seedDefaultQueries(websiteId, hostnameString, url);
+
+    // Create scan record
+    const [scan] = await db
+      .insert(scans)
+      .values({ websiteId, status: "pending", startedAt: new Date() })
+      .returning({ id: scans.id });
+
+    // Enqueue SEO scan + AEO scan in parallel
+    await Promise.all([
+      queueProvider.enqueue("scan", { scanId: scan.id, websiteId, url }),
+      queueProvider.enqueue("aeo-scan", { websiteId }),
+      recordEvent("scan.triggered", undefined, { scanId: scan.id, websiteId }),
+    ]);
+
+    scanId = scan.id;
+  } catch (err) {
+    return { error: err instanceof Error ? err.message : "Failed to start scan due to an unexpected error." };
   }
 
-  // Seed default AEO queries for this website (idempotent — skips if already exist)
-  const hostname = new URL(url).hostname;
-  await seedDefaultQueries(websiteId, hostname, url);
-
-  // Create scan record
-  const [scan] = await db
-    .insert(scans)
-    .values({ websiteId, status: "pending", startedAt: new Date() })
-    .returning({ id: scans.id });
-
-  // Enqueue SEO scan + AEO scan in parallel
-  await Promise.all([
-    queueProvider.enqueue("scan", { scanId: scan.id, websiteId, url }),
-    queueProvider.enqueue("aeo-scan", { websiteId }),
-    recordEvent("scan.triggered", undefined, { scanId: scan.id, websiteId }),
-  ]);
-
-  redirect(`/scan/${scan.id}`);
+  redirect(`/scan/${scanId}`);
 }
