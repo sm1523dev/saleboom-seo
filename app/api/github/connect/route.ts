@@ -25,10 +25,17 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const state = signState(websiteId);
 
+  // Derive the callback URL from the current request origin so this works on any domain
+  // (Azure Container App, Pi VPS, local dev) without hardcoded env vars. GitHub will reject
+  // redirect_uri values not registered in the OAuth App — add every deployment domain there.
+  const requestOrigin = new URL(req.url).origin;
+  const redirectUri = `${requestOrigin}/api/github/callback`;
+
   const authUrl = new URL("https://github.com/login/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("scope", "repo");
   authUrl.searchParams.set("state", websiteId);
+  authUrl.searchParams.set("redirect_uri", redirectUri);
 
   // Cookie must be set on the redirect response object directly — cookies() and
   // NextResponse.redirect() are separate response objects; setting via cookies()

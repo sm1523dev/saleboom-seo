@@ -14,19 +14,24 @@ function verifyState(websiteId: string, cookieState: string): boolean {
 }
 
 export async function GET(req: Request): Promise<NextResponse> {
+  // Derive app URL from request origin — works on any domain without env var coupling.
+  // NEXT_PUBLIC_APP_URL is intentionally NOT used here; if it held the wrong domain
+  // (e.g. Pi VPS URL set in Azure Container App) all error redirects would land there.
+  const appUrl = new URL(req.url).origin;
+
   const { searchParams } = new URL(req.url);
   const code = searchParams.get("code");
   const websiteId = searchParams.get("state");
 
   if (!code || !websiteId) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard?github_error=missing_params`);
+    return NextResponse.redirect(`${appUrl}/dashboard?github_error=missing_params`);
   }
 
   const cookieStore = await cookies();
   const cookieState = cookieStore.get("gh_oauth_state")?.value ?? "";
 
   if (!verifyState(websiteId, cookieState)) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard?github_error=csrf`);
+    return NextResponse.redirect(`${appUrl}/dashboard?github_error=csrf`);
   }
 
   cookieStore.delete("gh_oauth_state");
@@ -34,7 +39,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   const clientId = process.env.GITHUB_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GITHUB_OAUTH_CLIENT_SECRET;
   if (!clientId || !clientSecret) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/dashboard?github_error=not_configured`);
+    return NextResponse.redirect(`${appUrl}/dashboard?github_error=not_configured`);
   }
 
   // Exchange code for access token
@@ -45,12 +50,12 @@ export async function GET(req: Request): Promise<NextResponse> {
   });
 
   if (!tokenRes.ok) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/website/${websiteId}/cms?github_error=token_exchange`);
+    return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?github_error=token_exchange`);
   }
 
   const tokenData = (await tokenRes.json()) as { access_token?: string; error?: string };
   if (!tokenData.access_token) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/website/${websiteId}/cms?github_error=no_token`);
+    return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?github_error=no_token`);
   }
 
   // Get GitHub user login
@@ -62,7 +67,7 @@ export async function GET(req: Request): Promise<NextResponse> {
   });
 
   if (!userRes.ok) {
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/website/${websiteId}/cms?github_error=user_fetch`);
+    return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?github_error=user_fetch`);
   }
 
   const userData = (await userRes.json()) as { login: string };
@@ -93,5 +98,5 @@ export async function GET(req: Request): Promise<NextResponse> {
       },
     });
 
-  return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/website/${websiteId}/cms?github_step=2`);
+  return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?github_step=2`);
 }
