@@ -36,6 +36,10 @@ await esbuild.build({
     // registrations run (admin/functions returns empty, dequeueCount stays 0).
     "@azure/functions",
     "@azure/functions-core",
+    // applicationinsights patches Node.js internals (http, https, module loader) at startup.
+    // When bundled by esbuild the inlined module initialization order differs from normal
+    // Node.js module loading, causing the default export to be undefined at the call site.
+    "applicationinsights",
     "pg-native",
     // Optional notification providers not used in Azure deployment
     "@sendgrid/mail",
