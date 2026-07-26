@@ -8,6 +8,32 @@ const POLL_INTERVAL_MS = 3_000;
 
 export { SdkError as FirecrawlError, JobTimeoutError as FirecrawlTimeoutError };
 
+function parseRetryAfterMs(err: SdkError): number {
+  // Firecrawl embeds "retry after Xs" in the rate-limit message; extract it.
+  const match = /retry after (\d+)s/i.exec(err.message);
+  const secs = match ? parseInt(match[1], 10) : 30;
+  return (secs + 2) * 1000;
+}
+
+async function withRateLimitRetry<T>(fn: () => Promise<T>, maxAttempts = 5): Promise<T> {
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    try {
+      return await fn();
+    } catch (err) {
+      if (
+        err instanceof SdkError &&
+        err.message.includes("Rate limit exceeded") &&
+        attempt < maxAttempts
+      ) {
+        await sleep(parseRetryAfterMs(err));
+        continue;
+      }
+      throw err;
+    }
+  }
+  throw new Error("withRateLimitRetry: exhausted attempts");
+}
+
 export class FirecrawlCrawlProvider implements CrawlProvider {
   private readonly client: Firecrawl;
 
@@ -29,10 +55,10 @@ export class FirecrawlCrawlProvider implements CrawlProvider {
 
   async scrapeUrl(url: string): Promise<PageResult> {
     return withSpan("crawl.scrapeUrl", { "crawl.url": url, "crawl.provider": "firecrawl" }, async () => {
-      const doc = await this.client.scrape(url, {
+      const doc = await withRateLimitRetry(() => this.client.scrape(url, {
         formats: ["markdown", "html", "links"],
         onlyMainContent: true,
-      });
+      }));
 
       return PageResultSchema.parse({
         url: doc.metadata?.url ?? url,
@@ -49,13 +75,13 @@ export class FirecrawlCrawlProvider implements CrawlProvider {
       "crawl.crawlSite",
       { "crawl.url": url, "crawl.provider": "firecrawl", "crawl.limit": opts?.limit ?? 100 },
       async (span) => {
-        const started = await this.client.startCrawl(url, {
+        const started = await withRateLimitRetry(() => this.client.startCrawl(url, {
           limit: opts?.limit ?? 100,
           scrapeOptions: {
             formats: ["markdown", "html", "links"],
             onlyMainContent: true,
           },
-        });
+        }));
 
         const jobId = started.id;
 
@@ -63,7 +89,7 @@ export class FirecrawlCrawlProvider implements CrawlProvider {
         // eslint-disable-next-line no-constant-condition
         while (true) {
           await sleep(POLL_INTERVAL_MS);
-          const status = await this.client.getCrawlStatus(jobId);
+          const status = await withRateLimitRetry(() => this.client.getCrawlStatus(jobId));
 
           if (onProgress) {
             await onProgress({ completed: status.completed, total: status.total }).catch(() => {});
