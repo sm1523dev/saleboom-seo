@@ -30,8 +30,13 @@ await esbuild.build({
   target: "node22",
   outfile: "dist/index.js",
   external: [
-    "pg-native",
+    // Must NOT be bundled — @azure/functions resolves @azure/functions-core from its own
+    // node_modules directory. If bundled, require('@azure/functions-core') resolves from
+    // dist/ context where there is no node_modules, crashing the worker before any function
+    // registrations run (admin/functions returns empty, dequeueCount stays 0).
+    "@azure/functions",
     "@azure/functions-core",
+    "pg-native",
     // Optional notification providers not used in Azure deployment
     "@sendgrid/mail",
     "@aws-sdk/client-sesv2",
