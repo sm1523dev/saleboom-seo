@@ -29,11 +29,26 @@ await esbuild.build({
   platform: "node",
   target: "node22",
   outfile: "dist/index.js",
-  // Never bundle npm packages into a Node.js server binary. Azure Functions has a real
-  // node_modules at runtime. Bundling breaks packages that do runtime module patching
-  // (@azure/functions, applicationinsights), lazy require(), or native addon loading.
-  // The deploy step runs `npm install --production` to ship the full node_modules.
-  packages: "external",
+  external: [
+    // @azure/functions must NOT be bundled: it requires @azure/functions-core as a sibling
+    // package at runtime. When bundled, that internal require() resolves from dist/ context
+    // where no node_modules exists → worker crashes before any function registrations run.
+    "@azure/functions",
+    "@azure/functions-core",
+    // applicationinsights must NOT be bundled: it's a CJS module compiled with __esModule:true
+    // but no default export. When bundled and imported as default, import.default is undefined.
+    // Additionally it patches Node.js module internals and must load as a real package.
+    "applicationinsights",
+    // Native addon — cannot be bundled
+    "pg-native",
+    // Pi-only providers — not installed in Azure, loaded only if env flags select them
+    "bullmq",
+    "ioredis",
+    // Optional notification providers not provisioned in Azure deployment
+    "@sendgrid/mail",
+    "@aws-sdk/client-sesv2",
+    "twilio",
+  ],
   tsconfig: "tsconfig.json",
   plugins: [
     {
