@@ -94,6 +94,16 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Clear WEBSITE_RUN_FROM_PACKAGE if present
+        env:
+          RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
+          FN: ${{ secrets.FUNCTIONS_APP_NAME }}
+        run: |
+          az functionapp config appsettings delete \
+            --resource-group "$RG" \
+            --name "$FN" \
+            --setting-names WEBSITE_RUN_FROM_PACKAGE 2>/dev/null || true
+
       - name: Deploy Functions
         env:
           RG: ${{ secrets.AZURE_RESOURCE_GROUP }}
@@ -111,8 +121,7 @@ jobs:
           "
           cd deploy-pkg && zip -r ../../functions.zip .
           cd ../..
-          az functionapp deploy \
+          az functionapp deployment source config-zip \
             --resource-group "$RG" \
             --name "$FN" \
-            --src-path functions.zip \
-            --type zip
+            --src functions.zip
