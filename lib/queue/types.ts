@@ -38,7 +38,7 @@ export interface QueueProvider {
   stop(): Promise<void>;
 }
 
-// Legacy scan job message schema — kept for azure-queue provider compatibility
+// Message schemas for azure-queue provider compatibility
 import { z } from "zod";
 export const ScanJobMessageSchema = z.object({
   scanId: z.string().uuid(),
@@ -46,3 +46,9 @@ export const ScanJobMessageSchema = z.object({
   enqueuedAt: z.string().datetime(),
 });
 export type ScanJobMessage = z.infer<typeof ScanJobMessageSchema>;
+
+export const AeoJobMessageSchema = z.object({
+  websiteId: z.string().uuid(),
+  enqueuedAt: z.string().datetime(),
+});
+export type AeoJobMessage = z.infer<typeof AeoJobMessageSchema>;
