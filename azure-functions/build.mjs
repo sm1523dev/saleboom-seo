@@ -30,11 +30,11 @@ await esbuild.build({
   target: "node22",
   outfile: "dist/index.js",
   external: [
-    // @azure/functions must NOT be bundled: it requires @azure/functions-core as a sibling
-    // package at runtime. When bundled, that internal require() resolves from dist/ context
-    // where no node_modules exists → worker crashes before any function registrations run.
-    "@azure/functions",
-    "@azure/functions-core",
+    // All @azure/* packages must NOT be bundled: they use createRequire(import.meta.url) for
+    // native addon loading (e.g. NativeCRC64 in @azure/storage-queue). esbuild's CJS shim sets
+    // import.meta.url = undefined → createRequire(undefined) throws ERR_INVALID_ARG_VALUE at
+    // module load, aborting GRPC function registration → host sees 0 functions.
+    "@azure/*",
     // applicationinsights must NOT be bundled: it's a CJS module compiled with __esModule:true
     // but no default export. When bundled and imported as default, import.default is undefined.
     // Additionally it patches Node.js module internals and must load as a real package.

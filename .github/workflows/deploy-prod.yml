@@ -116,6 +116,7 @@ jobs:
           # @azure/functions must be in node_modules (not bundled) so it can find @azure/functions-core
           node -e "
             const pkg = require('./package.json');
+            const rootPkg = require('../package.json');
             const deploy = {
               name: pkg.name,
               version: pkg.version,
@@ -125,7 +126,11 @@ jobs:
               // Everything else is compiled into dist/index.js by esbuild.
               dependencies: {
                 '@azure/functions': pkg.dependencies['@azure/functions'],
-                'applicationinsights': pkg.dependencies['applicationinsights']
+                'applicationinsights': pkg.dependencies['applicationinsights'],
+                // @azure/storage-queue and its entire @azure/* dependency tree cannot be
+                // bundled (createRequire(import.meta.url) crashes under esbuild CJS shim).
+                // Include it here so npm installs the full package tree at runtime.
+                '@azure/storage-queue': rootPkg.dependencies['@azure/storage-queue']
               }
             };
             require('fs').writeFileSync('deploy-pkg/package.json', JSON.stringify(deploy, null, 2));
