@@ -29,26 +29,11 @@ await esbuild.build({
   platform: "node",
   target: "node22",
   outfile: "dist/index.js",
-  external: [
-    // Must NOT be bundled — @azure/functions resolves @azure/functions-core from its own
-    // node_modules directory. If bundled, require('@azure/functions-core') resolves from
-    // dist/ context where there is no node_modules, crashing the worker before any function
-    // registrations run (admin/functions returns empty, dequeueCount stays 0).
-    "@azure/functions",
-    "@azure/functions-core",
-    // applicationinsights patches Node.js internals (http, https, module loader) at startup.
-    // When bundled by esbuild the inlined module initialization order differs from normal
-    // Node.js module loading, causing the default export to be undefined at the call site.
-    "applicationinsights",
-    "pg-native",
-    // Optional notification providers not used in Azure deployment
-    "@sendgrid/mail",
-    "@aws-sdk/client-sesv2",
-    "twilio",
-    // Pi-only queue provider
-    "bullmq",
-    "ioredis",
-  ],
+  // Never bundle npm packages into a Node.js server binary. Azure Functions has a real
+  // node_modules at runtime. Bundling breaks packages that do runtime module patching
+  // (@azure/functions, applicationinsights), lazy require(), or native addon loading.
+  // The deploy step runs `npm install --production` to ship the full node_modules.
+  packages: "external",
   tsconfig: "tsconfig.json",
   plugins: [
     {

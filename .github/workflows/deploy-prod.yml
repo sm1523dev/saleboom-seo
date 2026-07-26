@@ -121,10 +121,7 @@ jobs:
               version: pkg.version,
               private: true,
               main: pkg.main,
-              dependencies: {
-                '@azure/functions': pkg.dependencies['@azure/functions'],
-                'applicationinsights': pkg.dependencies['applicationinsights']
-              }
+              dependencies: pkg.dependencies
             };
             require('fs').writeFileSync('deploy-pkg/package.json', JSON.stringify(deploy, null, 2));
           "
