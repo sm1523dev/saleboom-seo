@@ -1,4 +1,4 @@
-import { QueueServiceClient } from "@azure/storage-queue";
+import type { QueueServiceClient } from "@azure/storage-queue";
 import type { QueueProvider, JobHandler, EnqueueOpts } from "../types";
 
 // Azure Queue Storage provider — enqueue side only.
@@ -9,7 +9,12 @@ export function createAzureQueueProvider(): QueueProvider {
 }
 
 class AzureQueueProvider implements QueueProvider {
-  private readonly serviceClient: QueueServiceClient;
+  // Connection string stored at construction time but client created lazily.
+  // Lazy init: @azure/storage-queue has ~30 transitive deps loaded from Azure Files, causing
+  // synchronous require() to take >30s during cold start and exceed the GRPC worker timeout.
+  // Deferring to the first queue operation allows GRPC registration to complete first.
+  private readonly connectionString: string;
+  private _client: QueueServiceClient | null = null;
 
   constructor() {
     const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -18,8 +23,16 @@ class AzureQueueProvider implements QueueProvider {
         "AZURE_STORAGE_CONNECTION_STRING is required for QUEUE_PROVIDER=azure-queue"
       );
     }
-    this.serviceClient =
-      QueueServiceClient.fromConnectionString(connectionString);
+    this.connectionString = connectionString;
+  }
+
+  private get client(): QueueServiceClient {
+    if (!this._client) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      const { QueueServiceClient: QSC } = require("@azure/storage-queue") as typeof import("@azure/storage-queue");
+      this._client = QSC.fromConnectionString(this.connectionString);
+    }
+    return this._client;
   }
 
   async enqueue<T extends Record<string, unknown>>(
@@ -27,7 +40,7 @@ class AzureQueueProvider implements QueueProvider {
     data: T,
     _opts?: EnqueueOpts
   ): Promise<string> {
-    const queueClient = this.serviceClient.getQueueClient(jobType);
+    const queueClient = this.client.getQueueClient(jobType);
     await queueClient.createIfNotExists();
 
     const message = JSON.stringify({ ...data, enqueuedAt: new Date().toISOString() });
