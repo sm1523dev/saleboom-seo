@@ -1,6 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions, cmsConnections } from "@/lib/db/schema";
+import { scans, websites, issues, aiSuggestions, cmsConnections, aeoQueries } from "@/lib/db/schema";
+import { queueProvider } from "@/lib/queue";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { isArchiveUrl, ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
@@ -274,6 +275,19 @@ async function _runScanJob(
     span.setAttribute("scan.issues_found", seoIssues.length);
     await persistDvsScore(websiteId);
     await recordEvent("scan.completed", durationMs, { scanId, websiteId, ...bySeverity });
+
+    // Trigger AEO analysis for this website if it has active queries.
+    // This runs AEO immediately after each manual scan rather than waiting for the 3am timer.
+    const [hasAeoQueries] = await db
+      .select({ websiteId: aeoQueries.websiteId })
+      .from(aeoQueries)
+      .where(and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true)))
+      .limit(1);
+    if (hasAeoQueries) {
+      await queueProvider.enqueue("aeo-scan", { websiteId });
+      log.info("aeo scan enqueued");
+    }
+
     await context.updateProgress(100);
     log.info("scan completed", { issues: seoIssues.length, durationMs });
   } catch (err) {
