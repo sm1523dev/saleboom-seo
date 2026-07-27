@@ -3,4 +3,5 @@ import "./functions/scan-worker";
 import "./functions/aeo-worker";
 import "./functions/digest-worker";
 import "./functions/rescan-timer";
+import "./functions/aeo-timer";
 import "./functions/digest-timer";
