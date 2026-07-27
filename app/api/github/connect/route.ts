@@ -25,11 +25,13 @@ export async function GET(req: Request): Promise<NextResponse> {
 
   const state = signState(websiteId);
 
-  // Derive the callback URL from the current request origin so this works on any domain
-  // (Azure Container App, Pi VPS, local dev) without hardcoded env vars. GitHub will reject
-  // redirect_uri values not registered in the OAuth App — add every deployment domain there.
-  const requestOrigin = new URL(req.url).origin;
-  const redirectUri = `${requestOrigin}/api/github/callback`;
+  // Azure Container Apps terminate SSL at the ingress and forward HTTP internally, so
+  // req.url arrives as http:// even though the external URL is https://. Use
+  // x-forwarded-proto/host headers to reconstruct the correct public origin.
+  const reqUrl = new URL(req.url);
+  const proto = req.headers.get("x-forwarded-proto") ?? reqUrl.protocol.replace(":", "");
+  const host = req.headers.get("x-forwarded-host") ?? reqUrl.host;
+  const redirectUri = `${proto}://${host}/api/github/callback`;
 
   const authUrl = new URL("https://github.com/login/oauth/authorize");
   authUrl.searchParams.set("client_id", clientId);
