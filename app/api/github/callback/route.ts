@@ -14,12 +14,16 @@ function verifyState(websiteId: string, cookieState: string): boolean {
 }
 
 export async function GET(req: Request): Promise<NextResponse> {
-  // Derive app URL from request origin — works on any domain without env var coupling.
-  // NEXT_PUBLIC_APP_URL is intentionally NOT used here; if it held the wrong domain
-  // (e.g. Pi VPS URL set in Azure Container App) all error redirects would land there.
-  const appUrl = new URL(req.url).origin;
+  // Derive app URL from request — prefer x-forwarded-proto/host (set by reverse proxies
+  // and Azure Container Apps ingress) over req.url, which has http://0.0.0.0:3000 inside
+  // the container. NEXT_PUBLIC_APP_URL is intentionally NOT used; it may hold the wrong
+  // domain if the env var was set for a different environment.
+  const reqUrl = new URL(req.url);
+  const proto = req.headers.get("x-forwarded-proto") ?? reqUrl.protocol.replace(":", "");
+  const host = req.headers.get("x-forwarded-host") ?? reqUrl.host;
+  const appUrl = `${proto}://${host}`;
 
-  const { searchParams } = new URL(req.url);
+  const { searchParams } = reqUrl;
   const code = searchParams.get("code");
   const websiteId = searchParams.get("state");
 
