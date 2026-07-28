@@ -26,6 +26,8 @@ export type CmsCredentials = {
     subPath?: string;
     // Django/Laravel only: maps page URL → template file path in the repo
     templatePaths?: Record<string, string>;
+    webhookSecret?: string;
+    webhookId?: number;
   };
 };
 

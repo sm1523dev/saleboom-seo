@@ -234,7 +234,8 @@ export async function pushChangeTocms(
     }
 
     // GitHub: PR is open — keep status as "pending" but store PR metadata.
-    // Status will move to "applied" when the PR is merged (handled by pr-poll worker).
+    // Status updates via the GitHub webhook (POST /api/github/webhook/[connectionId])
+    // or via the manual "Check status" button on the Change History page.
     if (pushResult.prUrl && pushResult.prNumber) {
       log.info("push succeeded: PR opened", { prUrl: pushResult.prUrl, prNumber: pushResult.prNumber });
       await db
@@ -543,4 +544,65 @@ export async function editChangeAfterValue(
       updatedAt: new Date(),
     })
     .where(and(eq(changeSnapshots.id, snapshotId), eq(changeSnapshots.status, "pending")));
+}
+
+// Manually check the current state of an open PR on GitHub and update the snapshot status.
+export async function checkPrStatus(
+  snapshotId: string,
+): Promise<{ success: boolean; status?: string; error?: string }> {
+  await getServerSession();
+
+  const [snapshot] = await db
+    .select({
+      id: changeSnapshots.id,
+      status: changeSnapshots.status,
+      prNumber: changeSnapshots.prNumber,
+      suggestionId: changeSnapshots.suggestionId,
+      issueId: changeSnapshots.issueId,
+      cmsConnectionId: changeSnapshots.cmsConnectionId,
+    })
+    .from(changeSnapshots)
+    .where(eq(changeSnapshots.id, snapshotId))
+    .limit(1);
+
+  if (!snapshot) return { success: false, error: "Change not found" };
+  if (snapshot.status !== "pending" || !snapshot.prNumber) {
+    return { success: false, error: "No open PR to check" };
+  }
+
+  const websiteId = await resolveWebsiteId(snapshot);
+  if (!websiteId) return { success: false, error: "Could not determine website" };
+
+  const creds = await loadCredentials(websiteId, "github").catch(() => null);
+  if (!creds) return { success: false, error: "GitHub credentials not found" };
+
+  const res = await fetch(
+    `https://api.github.com/repos/${creds.repoOwner}/${creds.repoName}/pulls/${snapshot.prNumber}`,
+    {
+      headers: { Authorization: `Bearer ${creds.accessToken}`, "User-Agent": "SaleBoomSEO" },
+      signal: AbortSignal.timeout(10_000),
+    },
+  );
+
+  if (!res.ok) return { success: false, error: `GitHub API error: ${res.status}` };
+
+  const pr = (await res.json()) as { state: string; merged: boolean; merge_commit_sha?: string };
+
+  if (pr.state === "open") return { success: true, status: "pending" };
+
+  if (pr.merged) {
+    await db
+      .update(changeSnapshots)
+      .set({ status: "applied", mergeSha: pr.merge_commit_sha ?? null, appliedAt: new Date(), updatedAt: new Date() })
+      .where(eq(changeSnapshots.id, snapshotId));
+    revalidatePath("/changes/history");
+    return { success: true, status: "applied" };
+  }
+
+  await db
+    .update(changeSnapshots)
+    .set({ status: "rolled_back", rolledBackAt: new Date(), updatedAt: new Date() })
+    .where(eq(changeSnapshots.id, snapshotId));
+  revalidatePath("/changes/history");
+  return { success: true, status: "rolled_back" };
 }

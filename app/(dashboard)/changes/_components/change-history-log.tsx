@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
-import { rollbackChange, verifyChange } from "@/app/actions/changes.actions";
+import { rollbackChange, verifyChange, checkPrStatus } from "@/app/actions/changes.actions";
 import { flagPushQuality } from "@/app/actions/quality.actions";
 import { VERIFY_ERROR_LABELS } from "@/lib/cms/verify";
 import type { VerifyError } from "@/lib/cms/verify";
@@ -69,6 +69,8 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
   const [verifyStates, setVerifyStates] = useState<Record<string, "idle" | "checking" | "done">>({});
   const [verifyResults, setVerifyResults] = useState<Record<string, { matched: boolean; liveValue: string | null; error: string | null }>>({});
   const [, startVerifyTransition] = useTransition();
+  const [checkStates, setCheckStates] = useState<Record<string, "idle" | "checking">>({});
+  const [, startCheckTransition] = useTransition();
 
   function buildHref(params: Record<string, string | undefined>) {
     const p = new URLSearchParams(searchParams.toString());
@@ -91,6 +93,15 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
 
   function handleRollback(id: string) {
     setConfirmId(id);
+  }
+
+  function handleCheckPrStatus(id: string) {
+    setCheckStates((prev) => ({ ...prev, [id]: "checking" }));
+    startCheckTransition(async () => {
+      await checkPrStatus(id);
+      setCheckStates((prev) => ({ ...prev, [id]: "idle" }));
+      router.refresh();
+    });
   }
 
   function confirmRollback() {
@@ -210,6 +221,7 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
           const isVerifiable = (item.status === "applied" || item.status === "rolled_back") && !item.prUrl;
           const canRollback = item.status === "applied" || (item.status === "pending" && !!item.prUrl);
           const vState = verifyStates[item.id] ?? "idle";
+          const checkState = checkStates[item.id] ?? "idle";
           // Merge DB-stored result with in-session result (session wins)
           const vResult = verifyResults[item.id] ?? (item.verifiedAt
             ? { matched: !item.verifyError, liveValue: item.liveValue, error: item.verifyError }
@@ -268,6 +280,15 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                     </button>
                   )}
                   {vState === "checking" && <span className="text-xs text-muted-foreground">Checking live…</span>}
+                  {item.status === "pending" && item.prUrl && checkState === "idle" && (
+                    <button type="button" onClick={() => handleCheckPrStatus(item.id)}
+                      className="rounded-md border border-border px-2.5 py-1 text-xs text-muted-foreground hover:text-foreground">
+                      Check status
+                    </button>
+                  )}
+                  {checkState === "checking" && (
+                    <span className="text-xs text-muted-foreground">Checking…</span>
+                  )}
                   {canRollback && rbState === "idle" && (
                     <button type="button" onClick={() => handleRollback(item.id)}
                       className="rounded-md border border-yellow-500/30 px-2.5 py-1 text-xs text-yellow-400 hover:bg-yellow-500/10">

@@ -1,5 +1,7 @@
 "use server";
 
+import { randomBytes } from "crypto";
+import { headers } from "next/headers";
 import { eq, and, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { cmsConnections, scans, issues } from "@/lib/db/schema";
@@ -125,6 +127,20 @@ export async function connectWordPress(
 
 export async function disconnectCms(websiteId: string, cmsType: CmsType): Promise<void> {
   await getServerSession();
+
+  if (cmsType === "github") {
+    const creds = await loadCredentials(websiteId, "github").catch(() => null);
+    if (creds?.webhookId) {
+      await fetch(
+        `https://api.github.com/repos/${creds.repoOwner}/${creds.repoName}/hooks/${creds.webhookId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${creds.accessToken}`, "User-Agent": "SaleBoomSEO" },
+        },
+      ).catch(() => undefined);
+    }
+  }
+
   await deleteCredentials(websiteId, cmsType);
   await db
     .delete(cmsConnections)
@@ -202,17 +218,80 @@ export async function connectGitHub(
     () => "unknown" as GitHubFramework,
   );
 
-  const fullCreds = { accessToken: partial.accessToken, repoOwner, repoName, baseBranch, framework, subPath };
-  const storageKey = await storeCredentials(websiteId, "github", fullCreds);
-
-  // Retrieve credentialsRef to preserve the login hint stored during OAuth callback
+  // Retrieve connection id + existing credentialsRef before updating
   const [conn] = await db
-    .select({ credentialsRef: cmsConnections.credentialsRef })
+    .select({ id: cmsConnections.id, credentialsRef: cmsConnections.credentialsRef })
     .from(cmsConnections)
     .where(and(eq(cmsConnections.websiteId, websiteId), eq(cmsConnections.cmsType, "github")))
     .limit(1);
 
+  const connectionId = conn?.id;
   const loginHint = conn?.credentialsRef?.split("|")[1] ?? repoOwner;
+
+  // Register (or re-register) GitHub webhook for real-time PR events
+  let webhookSecret = partial.webhookSecret;
+  let webhookId = partial.webhookId;
+
+  if (connectionId) {
+    // Derive app URL from forwarded headers (server action has no request object)
+    const h = await headers();
+    const proto = h.get("x-forwarded-proto") ?? "https";
+    const host = h.get("x-forwarded-host") ?? h.get("host") ?? "localhost:3000";
+    const webhookUrl = `${proto}://${host}/api/github/webhook/${connectionId}`;
+
+    // Delete the old webhook if we have its ID (e.g. user is re-connecting)
+    if (webhookId) {
+      await fetch(
+        `https://api.github.com/repos/${repoOwner}/${repoName}/hooks/${webhookId}`,
+        {
+          method: "DELETE",
+          headers: { Authorization: `Bearer ${partial.accessToken}`, "User-Agent": "SaleBoomSEO" },
+        },
+      ).catch(() => undefined);
+    }
+
+    // Generate a fresh secret and register the webhook
+    webhookSecret = randomBytes(32).toString("hex");
+    const hookRes = await fetch(
+      `https://api.github.com/repos/${repoOwner}/${repoName}/hooks`,
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${partial.accessToken}`,
+          "User-Agent": "SaleBoomSEO",
+          "Content-Type": "application/json",
+          Accept: "application/vnd.github+json",
+        },
+        body: JSON.stringify({
+          name: "web",
+          active: true,
+          events: ["pull_request"],
+          config: { url: webhookUrl, content_type: "json", secret: webhookSecret, insecure_ssl: "0" },
+        }),
+      },
+    );
+
+    if (hookRes.ok) {
+      const hook = (await hookRes.json()) as { id: number };
+      webhookId = hook.id;
+    } else {
+      // Non-fatal — PR status can still be checked manually via "Check status" button
+      webhookSecret = undefined;
+      webhookId = undefined;
+    }
+  }
+
+  const fullCreds = {
+    accessToken: partial.accessToken,
+    repoOwner,
+    repoName,
+    baseBranch,
+    framework,
+    subPath,
+    webhookSecret,
+    webhookId,
+  };
+  const storageKey = await storeCredentials(websiteId, "github", fullCreds);
 
   await db
     .update(cmsConnections)
