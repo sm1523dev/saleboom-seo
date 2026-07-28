@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useTransition, useEffect, useRef } from "react";
-import { useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "motion/react";
 import { connectGitHub } from "@/app/actions/cms.actions";
 
@@ -22,7 +21,6 @@ type Repo = { fullName: string; owner: string; name: string; defaultBranch: stri
 type Props = { websiteId: string };
 
 export function GithubRepoForm({ websiteId }: Props) {
-  const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
@@ -80,7 +78,12 @@ export function GithubRepoForm({ websiteId }: Props) {
       const result = await connectGitHub(websiteId, selected.owner, selected.name, branch, subPath || undefined);
       if (result.success) {
         setDetectedFramework(result.framework ?? "unknown");
-        router.push(`/website/${websiteId}/cms`);
+        // Hard-navigate after a brief delay so the success state is visible.
+        // router.push() is not used here — the Next.js Router Cache can serve a
+        // stale render of /cms (with framework: "unknown") instead of re-fetching.
+        setTimeout(() => {
+          window.location.href = `/website/${websiteId}/cms`;
+        }, 1500);
       } else {
         setError(result.error ?? "Failed to save repository settings");
       }
