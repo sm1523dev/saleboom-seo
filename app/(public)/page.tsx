@@ -3,7 +3,7 @@ import { HeroSection } from "./_components/hero-section";
 import { FeatureSections } from "./_components/feature-sections";
 
 export const metadata: Metadata = {
-  title: "AI SEO & AEO Audit – 60‑Second Fast Results | SaleBoom",
+  title: "AI-Powered SEO & AEO Audit in 60 Seconds | SaleBoom",
   description:
     "SaleBoom SEO audits your website for SEO and Answer Engine Optimization (AEO) in under 60 seconds. Get cited by ChatGPT, Perplexity, and Gemini.",
   openGraph: {
