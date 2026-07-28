@@ -218,6 +218,8 @@ export const changeSnapshots = pgTable(
     prUrl: text("pr_url"),
     prNumber: integer("pr_number"),
     mergeSha: text("merge_sha"),
+    prCommentCount: integer("pr_comment_count"),
+    prReviewState: text("pr_review_state"),
     qualityFlagged: boolean("quality_flagged").notNull().default(false),
     qualityFlagComment: text("quality_flag_comment"),
     qualityFlaggedAt: timestamp("quality_flagged_at", { withTimezone: true }),

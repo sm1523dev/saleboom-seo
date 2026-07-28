@@ -49,6 +49,9 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifyError: changeSnapshots.verifyError,
       prUrl: changeSnapshots.prUrl,
       prNumber: changeSnapshots.prNumber,
+      mergeSha: changeSnapshots.mergeSha,
+      prCommentCount: changeSnapshots.prCommentCount,
+      prReviewState: changeSnapshots.prReviewState,
       qualityFlagged: changeSnapshots.qualityFlagged,
     })
     .from(changeSnapshots)
@@ -92,6 +95,9 @@ export default async function ChangeHistoryPage({ searchParams }: Props) {
       verifyError: r.verifyError ?? null,
       prUrl: r.prUrl ?? null,
       prNumber: r.prNumber ?? null,
+      mergeSha: r.mergeSha ?? null,
+      prCommentCount: r.prCommentCount ?? null,
+      prReviewState: r.prReviewState ?? null,
       qualityFlagged: r.qualityFlagged ?? false,
     }));
 

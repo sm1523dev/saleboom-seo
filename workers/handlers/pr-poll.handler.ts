@@ -77,7 +77,23 @@ async function pollOne(
     return;
   }
 
-  const pr = (await res.json()) as { state: string; merged: boolean; merge_commit_sha?: string };
+  const pr = (await res.json()) as {
+    state: string;
+    merged: boolean;
+    merge_commit_sha?: string;
+    comments?: number;
+    review_comments?: number;
+  };
+
+  if (pr.state === "open") {
+    const commentCount = (pr.comments ?? 0) + (pr.review_comments ?? 0);
+    const reviewState = await fetchTopReviewState(repoOwner, repoName, snapshot.prNumber!, accessToken, log);
+    await db
+      .update(changeSnapshots)
+      .set({ prCommentCount: commentCount, prReviewState: reviewState, updatedAt: new Date() })
+      .where(eq(changeSnapshots.id, snapshot.id));
+    return;
+  }
 
   if (pr.state === "closed" && pr.merged) {
     await db
@@ -123,5 +139,28 @@ async function pollOne(
 
     void persistDvsScore(conn.websiteId).catch(() => undefined);
     log.info("PR closed without merge → rolled_back", { snapshotId: snapshot.id });
+  }
+}
+
+async function fetchTopReviewState(
+  owner: string,
+  repo: string,
+  prNumber: number,
+  token: string,
+  log: { warn: (msg: string, meta?: Record<string, unknown>) => void },
+): Promise<string | null> {
+  try {
+    const res = await fetch(`https://api.github.com/repos/${owner}/${repo}/pulls/${prNumber}/reviews`, {
+      headers: { Authorization: `Bearer ${token}`, "User-Agent": "SaleBoomSEO", Accept: "application/vnd.github+json" },
+    });
+    if (!res.ok) return null;
+    const reviews = (await res.json()) as Array<{ state: string }>;
+    if (!reviews.length) return null;
+    if (reviews.some((r) => r.state === "CHANGES_REQUESTED")) return "CHANGES_REQUESTED";
+    if (reviews.some((r) => r.state === "APPROVED")) return "APPROVED";
+    return "COMMENTED";
+  } catch {
+    log.warn("Failed to fetch PR reviews", { owner, repo, prNumber });
+    return null;
   }
 }

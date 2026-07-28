@@ -23,6 +23,12 @@ const STATUS_CONFIG: Record<string, { label: string; className: string }> = {
   reverted: { label: "Rejected", className: "border-border bg-muted/40 text-muted-foreground" },
 };
 
+const REVIEW_STATE_CONFIG: Record<string, { label: string; className: string }> = {
+  APPROVED: { label: "Approved", className: "text-green-400" },
+  CHANGES_REQUESTED: { label: "Changes requested", className: "text-red-400" },
+  COMMENTED: { label: "Commented", className: "text-muted-foreground" },
+};
+
 type HistoryItem = {
   id: string;
   pageUrl: string;
@@ -39,6 +45,9 @@ type HistoryItem = {
   verifyError: string | null;
   prUrl: string | null;
   prNumber: number | null;
+  mergeSha: string | null;
+  prCommentCount: number | null;
+  prReviewState: string | null;
   qualityFlagged: boolean;
 };
 
@@ -215,18 +224,21 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                     {FIELD_LABELS[item.fieldChanged] ?? item.fieldChanged}
                   </span>
                   <span className="text-xs capitalize text-muted-foreground">{item.cmsType}</span>
-                  {/* PR Open badge (GitHub: pending + pr_url set) */}
+                  {/* Status badge */}
                   {item.status === "pending" && item.prUrl ? (
-                    <a
-                      href={item.prUrl}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400 hover:text-yellow-300"
-                    >
-                      PR Open #{item.prNumber}
-                      <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3" aria-hidden="true">
-                        <path d="M6.22 3.22a.75.75 0 011.06 0l4.25 4.25a.75.75 0 010 1.06l-4.25 4.25a.75.75 0 01-1.06-1.06L9.94 8 6.22 4.28a.75.75 0 010-1.06z" />
-                      </svg>
+                    <a href={item.prUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-yellow-500/30 bg-yellow-500/10 px-2 py-0.5 text-xs text-yellow-400 hover:text-yellow-300">
+                      PR Open #{item.prNumber}<ExternalLinkIcon />
+                    </a>
+                  ) : item.status === "applied" && item.mergeSha && item.prUrl ? (
+                    <a href={item.prUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-green-500/30 bg-green-500/10 px-2 py-0.5 text-xs text-green-400 hover:text-green-300">
+                      PR Merged<ExternalLinkIcon />
+                    </a>
+                  ) : item.status === "rolled_back" && item.prUrl ? (
+                    <a href={item.prUrl} target="_blank" rel="noopener noreferrer"
+                      className="inline-flex items-center gap-1 rounded-full border border-red-500/30 bg-red-500/10 px-2 py-0.5 text-xs text-red-400 hover:text-red-300">
+                      Rolled back · PR rejected<ExternalLinkIcon />
                     </a>
                   ) : (
                     <span className={cn("rounded-full border px-2 py-0.5 text-xs", statusCfg.className)}>
@@ -267,6 +279,22 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
                   {rbState === "error" && <span className="text-xs text-red-400">{rollbackErrors[item.id]}</span>}
                 </div>
               </div>
+
+              {/* Review state sub-line — shown for open PRs with comment/review data */}
+              {item.status === "pending" && item.prUrl && (!!item.prCommentCount || !!item.prReviewState) && (
+                <div className="mt-1.5 flex items-center gap-2 text-xs">
+                  {!!item.prCommentCount && (
+                    <span className="text-muted-foreground">
+                      {item.prCommentCount} comment{item.prCommentCount !== 1 ? "s" : ""}
+                    </span>
+                  )}
+                  {item.prReviewState && REVIEW_STATE_CONFIG[item.prReviewState] && (
+                    <span className={REVIEW_STATE_CONFIG[item.prReviewState].className}>
+                      {REVIEW_STATE_CONFIG[item.prReviewState].label}
+                    </span>
+                  )}
+                </div>
+              )}
 
               {/* Page URL */}
               <p className="mt-1.5 truncate font-mono text-xs text-muted-foreground" title={item.pageUrl}>
@@ -332,6 +360,14 @@ export function ChangeHistoryLog({ items, page, pageSize, cmsTypeFilter, statusF
         </div>
       </div>
     </div>
+  );
+}
+
+function ExternalLinkIcon() {
+  return (
+    <svg viewBox="0 0 16 16" fill="currentColor" className="h-3 w-3" aria-hidden="true">
+      <path d="M3.75 2h3.5a.75.75 0 010 1.5h-3.5a.25.25 0 00-.25.25v8.5c0 .138.112.25.25.25h8.5a.25.25 0 00.25-.25v-3.5a.75.75 0 011.5 0v3.5A1.75 1.75 0 0112.25 14h-8.5A1.75 1.75 0 012 12.25v-8.5C2 2.784 2.784 2 3.75 2zm6.854-1h4a.75.75 0 01.75.75v4a.75.75 0 01-1.5 0V3.56L7.28 10.13a.75.75 0 01-1.06-1.06L12.44 2.5H10.6a.75.75 0 010-1.5z" />
+    </svg>
   );
 }
 
