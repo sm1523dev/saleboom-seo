@@ -1,7 +1,21 @@
+import { eq } from "drizzle-orm";
+import { db } from "@/lib/db";
+import { systemSettings } from "@/lib/db/schema";
 import { getNotificationProvider } from "@/lib/notifications";
 
+async function resolveSlackWebhook(): Promise<string | null> {
+  const envUrl = process.env.SLACK_ALERT_WEBHOOK;
+  if (envUrl) return envUrl;
+  const [row] = await db
+    .select({ value: systemSettings.value })
+    .from(systemSettings)
+    .where(eq(systemSettings.key, "notification_slack_webhook"))
+    .limit(1);
+  return row?.value || null;
+}
+
 export async function notifyAlert(message: string): Promise<void> {
-  const slackWebhook = process.env.SLACK_ALERT_WEBHOOK;
+  const slackWebhook = await resolveSlackWebhook();
   const alertEmail = process.env.ALERT_EMAIL_TO;
 
   const tasks: Promise<void>[] = [];

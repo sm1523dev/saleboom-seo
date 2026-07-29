@@ -8,7 +8,6 @@ const QUEUE_DEPTH_THRESHOLD = 50;
 const ERROR_500_THRESHOLD = 5;
 
 export async function checkAndAlert(): Promise<void> {
-  if (!process.env.SLACK_ALERT_WEBHOOK && !process.env.ALERT_EMAIL_TO) return;
 
   const now = new Date();
   const oneHourAgo = new Date(now.getTime() - 60 * 60 * 1000);
