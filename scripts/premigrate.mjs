@@ -120,21 +120,49 @@ for (const [type, envValue] of Object.entries(ENV_OVERRIDES)) {
 
 // ── 4. Seed AEO providers ────────────────────────────────────────────────────
 //
-// aeo_providers tracks which LLM chatbots to query for AEO brand-mention checks.
-// Migration seeds nothing — seed here on first startup if the table is empty.
-// NIM (NVIDIA NIM) is the default AEO provider when NVIDIA_NIM_API_KEY is set.
+// 6 NIM models across 3 architecture families — all routed via a single NIM API key.
+// Upserts on display_name so re-runs are safe (rename = delete+insert via DEPRECATED list).
+// This runs on every container start so workers/index.ts seedGlobalProviders() is not needed.
 
-const [aeoCount] = await client`SELECT COUNT(*) AS count FROM aeo_providers`;
-if (Number(aeoCount.count) === 0 && process.env.NVIDIA_NIM_API_KEY) {
+const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1";
+
+const GLOBAL_PROVIDERS = [
+  { displayName: "GPT-OSS 120B (NIM)",  model: "openai/gpt-oss-120b" },
+  { displayName: "GPT-OSS 20B (NIM)",   model: "openai/gpt-oss-20b" },
+  { displayName: "Qwen 3.5 122B (NIM)", model: "qwen/qwen3.5-122b-a10b" },
+  { displayName: "Qwen 3 Next 80B (NIM)", model: "qwen/qwen3-next-80b-a3b-instruct" },
+  { displayName: "Kimi K2.6 (NIM)",     model: "moonshotai/kimi-k2.6" },
+  { displayName: "GLM 5.2 (NIM)",       model: "z-ai/glm-5.2" },
+];
+
+const DEPRECATED_AEO_NAMES = [
+  "NVIDIA NIM",
+  "Qwen 3 32B (via Groq)", "Qwen 3.6 27B (via Groq)",
+  "GPT-OSS 120B (via Groq)", "GPT-OSS 20B (via Groq)",
+  "GPT-OSS 120B (Groq)", "GPT-OSS 20B (Groq)",
+  "Gemini 2.0 Flash (Google)", "Gemini 1.5 Flash (Google)",
+  "Kimi K2.6 (NVIDIA NIM)", "GLM 5.2 (NVIDIA NIM)",
+];
+
+if (DEPRECATED_AEO_NAMES.length > 0) {
+  await client`
+    DELETE FROM aeo_providers WHERE display_name = ANY(${DEPRECATED_AEO_NAMES})
+  `;
+}
+
+for (const p of GLOBAL_PROVIDERS) {
   await client`
     INSERT INTO aeo_providers
       (display_name, provider_type, endpoint_url, api_key_env_var, model, enabled)
     VALUES
-      ('NVIDIA NIM', 'openai-compat', 'https://integrate.api.nvidia.com/v1',
-       'env:NVIDIA_NIM_API_KEY', 'meta/llama-3.3-70b-instruct', true)
-    ON CONFLICT DO NOTHING
+      (${p.displayName}, 'openai-compat', ${NIM_ENDPOINT}, 'NVIDIA_NIM_API_KEY', ${p.model}, true)
+    ON CONFLICT (display_name) DO UPDATE SET
+      model         = EXCLUDED.model,
+      endpoint_url  = EXCLUDED.endpoint_url,
+      api_key_env_var = EXCLUDED.api_key_env_var,
+      enabled       = true
   `;
-  console.log("[premigrate] seeded NVIDIA NIM as AEO provider");
 }
+console.log("[premigrate] AEO providers synced (6 NIM models)");
 
 await client.end();
