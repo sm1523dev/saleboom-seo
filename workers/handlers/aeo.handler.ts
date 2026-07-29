@@ -225,7 +225,9 @@ export async function handleAeoJob(
   } catch (err) {
     log.error("aeo scan failed", { error: String(err) });
     captureError(err, { websiteId });
-    throw err;
+    // Do NOT re-throw — AEO failures must not cause Azure to retry the message.
+    // Retrying with maxDequeueCount=5 would spawn up to 5 concurrent 500s invocations,
+    // consuming all Function instances and blocking the scan-worker queue.
   }
 }
 
