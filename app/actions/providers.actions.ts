@@ -66,6 +66,33 @@ export async function setAeoProviderKey(
   }
 }
 
+export async function addAeoProvider(data: {
+  displayName: string;
+  providerType: string;
+  model: string;
+  endpointUrl: string | null;
+  apiKeyEnvVar: string | null;
+  plainKey: string | null;
+}): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    const blob = data.plainKey?.trim() ? await encryptSecret(data.plainKey.trim()) : null;
+    await db.insert(aeoProviders).values({
+      displayName: data.displayName.trim(),
+      providerType: data.providerType.trim(),
+      model: data.model.trim(),
+      endpointUrl: data.endpointUrl?.trim() || null,
+      apiKeyEnvVar: data.apiKeyEnvVar?.trim() || null,
+      encryptedKeyBlob: blob,
+      enabled: true,
+    });
+    revalidatePath("/admin/providers");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to add provider" };
+  }
+}
+
 // ── Infra Providers ────────────────────────────────────────────────────────────
 
 export async function setInfraProviderKey(
