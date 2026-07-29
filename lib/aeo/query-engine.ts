@@ -26,6 +26,11 @@ function mockResponse(prompt: string): QueryResult {
   return { text, citations: [] };
 }
 
+// Per-query timeout — NIM large models (80B–122B) can be slow under load.
+// 18 queries run concurrently via Promise.allSettled; without a cap the Azure
+// Function (10-min limit) gets killed before any score is written.
+const QUERY_TIMEOUT_MS = 45_000;
+
 export async function queryAeoProvider(
   provider: AeoProvider,
   prompt: string
@@ -33,36 +38,51 @@ export async function queryAeoProvider(
   const apiKey = await resolveKey(provider);
   if (!apiKey) return mockResponse(prompt);
 
-  const { generateText } = await import("ai");
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), QUERY_TIMEOUT_MS);
 
-  if (provider.providerType === "anthropic") {
-    const { createAnthropic } = await import("@ai-sdk/anthropic");
-    const client = createAnthropic({ apiKey });
-    const { text } = await generateText({ model: client(provider.model), prompt });
-    return { text, citations: [] };
+  try {
+    const { generateText } = await import("ai");
+
+    if (provider.providerType === "anthropic") {
+      const { createAnthropic } = await import("@ai-sdk/anthropic");
+      const client = createAnthropic({ apiKey });
+      const { text } = await generateText({
+        model: client(provider.model),
+        prompt,
+        abortSignal: controller.signal,
+      });
+      return { text, citations: [] };
+    }
+
+    // openai-compat, perplexity, and google all use the OpenAI-compatible path
+    const { createOpenAI } = await import("@ai-sdk/openai");
+    const baseURL =
+      provider.providerType === "perplexity"
+        ? PERPLEXITY_BASE_URL
+        : provider.providerType === "google"
+          ? GOOGLE_BASE_URL
+          : (provider.endpointUrl ?? undefined);
+
+    const openai = createOpenAI({ baseURL, apiKey });
+    const result = await generateText({
+      model: openai(provider.model),
+      prompt,
+      abortSignal: controller.signal,
+    });
+
+    // Perplexity returns source URLs in experimental_providerMetadata
+    const meta = (result as unknown as Record<string, unknown>)
+      .experimental_providerMetadata as
+      | { perplexity?: { sources?: Array<{ url?: string }> } }
+      | undefined;
+    const citations =
+      meta?.perplexity?.sources
+        ?.map((s) => s.url)
+        .filter((u): u is string => !!u) ?? [];
+
+    return { text: result.text, citations };
+  } finally {
+    clearTimeout(timer);
   }
-
-  // openai-compat, perplexity, and google all use the OpenAI-compatible path
-  const { createOpenAI } = await import("@ai-sdk/openai");
-  const baseURL =
-    provider.providerType === "perplexity"
-      ? PERPLEXITY_BASE_URL
-      : provider.providerType === "google"
-        ? GOOGLE_BASE_URL
-        : (provider.endpointUrl ?? undefined);
-
-  const openai = createOpenAI({ baseURL, apiKey });
-  const result = await generateText({ model: openai(provider.model), prompt });
-
-  // Perplexity returns source URLs in experimental_providerMetadata
-  const meta = (result as unknown as Record<string, unknown>)
-    .experimental_providerMetadata as
-    | { perplexity?: { sources?: Array<{ url?: string }> } }
-    | undefined;
-  const citations =
-    meta?.perplexity?.sources
-      ?.map((s) => s.url)
-      .filter((u): u is string => !!u) ?? [];
-
-  return { text: result.text, citations };
 }
