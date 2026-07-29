@@ -132,12 +132,9 @@ for (const [type, envValue] of Object.entries(ENV_OVERRIDES)) {
 const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1";
 
 const GLOBAL_PROVIDERS = [
-  { displayName: "GPT-OSS 120B (NIM)",    model: "openai/gpt-oss-120b" },
-  { displayName: "GPT-OSS 20B (NIM)",     model: "openai/gpt-oss-20b" },
-  { displayName: "Qwen 3.5 122B (NIM)",   model: "qwen/qwen3.5-122b-a10b" },
-  { displayName: "Qwen 3 Next 80B (NIM)", model: "qwen/qwen3-next-80b-a3b-instruct" },
-  { displayName: "Kimi K2.6 (NIM)",       model: "moonshotai/kimi-k2.6" },
-  { displayName: "GLM 5.2 (NIM)",         model: "z-ai/glm-5.2" },
+  { displayName: "GPT-OSS 20B (NIM)", model: "openai/gpt-oss-20b" },
+  { displayName: "Kimi K2.6 (NIM)",   model: "moonshotai/kimi-k2.6" },
+  { displayName: "GLM 5.2 (NIM)",     model: "z-ai/glm-5.2" },
 ];
 
 // Remove stale display names one-by-one (avoids ANY($1) array binding issues)
@@ -148,9 +145,11 @@ const DEPRECATED_AEO_NAMES = [
   "GPT-OSS 120B (Groq)", "GPT-OSS 20B (Groq)",
   "Gemini 2.0 Flash (Google)", "Gemini 1.5 Flash (Google)",
   "Kimi K2.6 (NVIDIA NIM)", "GLM 5.2 (NVIDIA NIM)",
-  // Groq placeholders added in error — reverting back to NIM
+    // Groq placeholders added in error — reverting back to NIM
   "Llama 3.3 70B (Groq)", "Llama 3.1 70B (Groq)",
   "Qwen QwQ 32B (Groq)", "Mixtral 8x7B (Groq)",
+  // Large NIM models dropped — GPT-OSS 20B/Kimi/GLM are faster
+  "GPT-OSS 120B (NIM)", "Qwen 3.5 122B (NIM)", "Qwen 3 Next 80B (NIM)",
 ];
 
 for (const name of DEPRECATED_AEO_NAMES) {
@@ -170,6 +169,6 @@ for (const p of GLOBAL_PROVIDERS) {
       enabled        = true
   `;
 }
-console.log("[premigrate] AEO providers synced (6 NIM models)");
+console.log("[premigrate] AEO providers synced (3 NIM models)");
 
 await client.end();

@@ -10,14 +10,7 @@ import { aeoProviders, aeoQueries } from "@/lib/db/schema";
 const NIM = "https://integrate.api.nvidia.com/v1";
 
 const GLOBAL_PROVIDERS = [
-  // Family 1 — OpenAI GPT-OSS (via NVIDIA NIM)
-  {
-    displayName: "GPT-OSS 120B (NIM)",
-    providerType: "openai-compat",
-    endpointUrl: NIM,
-    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
-    model: "openai/gpt-oss-120b",
-  },
+  // OpenAI GPT-OSS small variant — fastest of the OSS family
   {
     displayName: "GPT-OSS 20B (NIM)",
     providerType: "openai-compat",
@@ -25,22 +18,7 @@ const GLOBAL_PROVIDERS = [
     apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "openai/gpt-oss-20b",
   },
-  // Family 2 — Qwen/Alibaba (via NVIDIA NIM)
-  {
-    displayName: "Qwen 3.5 122B (NIM)",
-    providerType: "openai-compat",
-    endpointUrl: NIM,
-    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
-    model: "qwen/qwen3.5-122b-a10b",
-  },
-  {
-    displayName: "Qwen 3 Next 80B (NIM)",
-    providerType: "openai-compat",
-    endpointUrl: NIM,
-    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
-    model: "qwen/qwen3-next-80b-a3b-instruct",
-  },
-  // Family 3 — Asian AI: Kimi (Moonshot) + GLM (Zhipu) via NVIDIA NIM
+  // Asian AI — Kimi (Moonshot) + GLM (Zhipu)
   {
     displayName: "Kimi K2.6 (NIM)",
     providerType: "openai-compat",
@@ -69,10 +47,10 @@ const DEPRECATED_PROVIDER_NAMES = [
   "Kimi K2.6 (NVIDIA NIM)",
   "GLM 5.2 (NVIDIA NIM)",
   // Groq placeholders added in error
-  "Llama 3.3 70B (Groq)",
-  "Llama 3.1 70B (Groq)",
-  "Qwen QwQ 32B (Groq)",
-  "Mixtral 8x7B (Groq)",
+  "Llama 3.3 70B (Groq)", "Llama 3.1 70B (Groq)",
+  "Qwen QwQ 32B (Groq)", "Mixtral 8x7B (Groq)",
+  // Large NIM models dropped — using smaller 3-provider set
+  "GPT-OSS 120B (NIM)", "Qwen 3.5 122B (NIM)", "Qwen 3 Next 80B (NIM)",
 ];
 
 export async function seedGlobalProviders(): Promise<void> {
