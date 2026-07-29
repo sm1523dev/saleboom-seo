@@ -1,8 +1,8 @@
 import { app, InvocationContext, Timer } from "@azure/functions";
-import { queueProvider } from "../../../lib/queue";
+import { getQueueProvider } from "../../../lib/queue";
 
 async function digestTimerHandler(_timer: Timer, context: InvocationContext): Promise<void> {
-  await queueProvider.enqueue("digest", { triggeredBy: "weekly-timer" });
+  await (await getQueueProvider()).enqueue("digest", { triggeredBy: "weekly-timer" });
   context.log("Weekly digest job enqueued");
 }
 

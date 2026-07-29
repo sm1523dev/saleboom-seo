@@ -2,7 +2,7 @@ import { app, InvocationContext, Timer } from "@azure/functions";
 import { and, eq, isNull, lt, sql } from "drizzle-orm";
 import { db } from "../lib/db";
 import { scans, websites } from "../../../lib/db/schema";
-import { queueProvider } from "../../../lib/queue";
+import { getQueueProvider } from "../../../lib/queue";
 
 async function rescanTimerHandler(_timer: Timer, context: InvocationContext): Promise<void> {
   const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
@@ -26,7 +26,7 @@ async function rescanTimerHandler(_timer: Timer, context: InvocationContext): Pr
       .values({ websiteId, status: "pending" })
       .returning({ id: scans.id });
 
-    await queueProvider.enqueue("scan", { scanId: newScan.id, websiteId });
+    await (await getQueueProvider()).enqueue("scan", { scanId: newScan.id, websiteId });
   }
 }
 

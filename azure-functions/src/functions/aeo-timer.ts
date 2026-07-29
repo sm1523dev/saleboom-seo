@@ -2,7 +2,7 @@ import { app, InvocationContext, Timer } from "@azure/functions";
 import { eq } from "drizzle-orm";
 import { db } from "../lib/db";
 import { aeoQueries } from "../../../lib/db/schema";
-import { queueProvider } from "../../../lib/queue";
+import { getQueueProvider } from "../../../lib/queue";
 
 async function aeoTimerHandler(_timer: Timer, context: InvocationContext): Promise<void> {
   // Find all distinct websites that have at least one active AEO query.
@@ -15,7 +15,7 @@ async function aeoTimerHandler(_timer: Timer, context: InvocationContext): Promi
   context.log(`Enqueueing AEO scans for ${rows.length} website(s)`);
 
   for (const { websiteId } of rows) {
-    await queueProvider.enqueue("aeo-scan", { websiteId });
+    await (await getQueueProvider()).enqueue("aeo-scan", { websiteId });
   }
 }
 
