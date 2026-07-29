@@ -26,10 +26,10 @@ function mockResponse(prompt: string): QueryResult {
   return { text, citations: [] };
 }
 
-// Per-query timeout — NIM large models (80B–122B) can be slow under load.
-// 18 queries run concurrently via Promise.allSettled; without a cap the Azure
-// Function (10-min limit) gets killed before any score is written.
-const QUERY_TIMEOUT_MS = 45_000;
+// Per-query timeout — NIM models can take several minutes under load.
+// 9 queries run concurrently (3 providers × 3 prompts); 500s leaves ~100s
+// buffer within the Azure Function 10-min (600s) execution limit.
+const QUERY_TIMEOUT_MS = 500_000;
 
 export async function queryAeoProvider(
   provider: AeoProvider,
