@@ -75,7 +75,9 @@ const { default: postgres } = await import("postgres");
 const { drizzle } = await import("drizzle-orm/postgres-js");
 const { migrate } = await import("drizzle-orm/postgres-js/migrator");
 
-const useSSL = connectionString.includes("sslmode=require");
+const useSSL =
+  connectionString.includes("sslmode=require") ||
+  connectionString.includes(".postgres.database.azure.com");
 const client = postgres(connectionString, { max: 1, onnotice: () => {}, ...(useSSL && { ssl: "require" }) });
 const db = drizzle(client);
 
