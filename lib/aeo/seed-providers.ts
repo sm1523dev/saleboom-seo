@@ -3,78 +3,76 @@ import { db } from "@/lib/db";
 import { aeoProviders, aeoQueries } from "@/lib/db/schema";
 
 // Platform-managed global providers — all free, no user configuration needed.
-// Groq: https://console.groq.com (free tier, OpenAI-compatible, LPU hardware = 1–3s responses)
-// NIM (NVIDIA) was previously used but 80B–122B models exceeded Azure Function 10-min limit.
-// Groq hosts the same model weights (GPT-OSS, Llama, Qwen, Mixtral) at ~100× the speed.
-const GROQ = "https://api.groq.com/openai/v1";
+// NVIDIA NIM: https://integrate.api.nvidia.com (free tier, OpenAI-compatible)
+// 3 architecture families × 2 models each = 6 AEO signal sources.
+// Azure Functions run all 18 queries concurrently with a 45s per-query abort;
+// scores are always written even when slow NIM models exceed the timeout.
+const NIM = "https://integrate.api.nvidia.com/v1";
 
 const GLOBAL_PROVIDERS = [
-  // OpenAI open-source models via Groq
+  // Family 1 — OpenAI GPT-OSS (via NVIDIA NIM)
   {
-    displayName: "GPT-OSS 120B (Groq)",
+    displayName: "GPT-OSS 120B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "openai/gpt-oss-120b",
   },
   {
-    displayName: "GPT-OSS 20B (Groq)",
+    displayName: "GPT-OSS 20B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
     model: "openai/gpt-oss-20b",
   },
-  // Meta Llama family
+  // Family 2 — Qwen/Alibaba (via NVIDIA NIM)
   {
-    displayName: "Llama 3.3 70B (Groq)",
+    displayName: "Qwen 3.5 122B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
-    model: "llama-3.3-70b-versatile",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "qwen/qwen3.5-122b-a10b",
   },
   {
-    displayName: "Llama 3.1 70B (Groq)",
+    displayName: "Qwen 3 Next 80B (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
-    model: "llama-3.1-70b-versatile",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "qwen/qwen3-next-80b-a3b-instruct",
   },
-  // Qwen reasoning model
+  // Family 3 — Asian AI: Kimi (Moonshot) + GLM (Zhipu) via NVIDIA NIM
   {
-    displayName: "Qwen QwQ 32B (Groq)",
+    displayName: "Kimi K2.6 (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
-    model: "qwen-qwq-32b",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "moonshotai/kimi-k2.6",
   },
-  // Mixtral (Mistral)
   {
-    displayName: "Mixtral 8x7B (Groq)",
+    displayName: "GLM 5.2 (NIM)",
     providerType: "openai-compat",
-    endpointUrl: GROQ,
-    apiKeyEnvVar: "GROQ_API_KEY",
-    model: "mixtral-8x7b-32768",
+    endpointUrl: NIM,
+    apiKeyEnvVar: "NVIDIA_NIM_API_KEY",
+    model: "z-ai/glm-5.2",
   },
 ] as const;
 
 const DEPRECATED_PROVIDER_NAMES = [
-  // old Groq names
   "Qwen 3 32B (via Groq)",
   "Qwen 3.6 27B (via Groq)",
   "GPT-OSS 120B (via Groq)",
   "GPT-OSS 20B (via Groq)",
-  // old Google
+  "GPT-OSS 120B (Groq)",
+  "GPT-OSS 20B (Groq)",
   "Gemini 2.0 Flash (Google)",
   "Gemini 1.5 Flash (Google)",
-  // NVIDIA NIM models being replaced
   "Kimi K2.6 (NVIDIA NIM)",
   "GLM 5.2 (NVIDIA NIM)",
-  "GPT-OSS 120B (NIM)",
-  "GPT-OSS 20B (NIM)",
-  "Qwen 3.5 122B (NIM)",
-  "Qwen 3 Next 80B (NIM)",
-  "Kimi K2.6 (NIM)",
-  "GLM 5.2 (NIM)",
+  // Groq placeholders added in error
+  "Llama 3.3 70B (Groq)",
+  "Llama 3.1 70B (Groq)",
+  "Qwen QwQ 32B (Groq)",
+  "Mixtral 8x7B (Groq)",
 ];
 
 export async function seedGlobalProviders(): Promise<void> {
