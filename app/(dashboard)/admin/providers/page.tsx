@@ -73,22 +73,24 @@ export default async function ProvidersPage() {
           Infrastructure Adapters
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {(Object.entries(INFRA_META) as [string, typeof INFRA_META[string]][]).map(([type, meta]) => {
-            const row = infraByType[type];
-            return (
-              <InfraProviderCard
-                key={type}
-                type={type as "ai" | "crawl" | "queue" | "storage" | "notifications"}
-                label={meta.label}
-                icon={meta.icon}
-                currentName={row?.name ?? ENV_PROVIDER_DEFAULTS[type] ?? "mock"}
-                hasKey={!!row?.encryptedKeyBlob}
-                switchMode={meta.switchMode}
-                options={PROVIDER_OPTIONS[type] ?? []}
-                config={(row?.config ?? {}) as Record<string, string>}
-              />
-            );
-          })}
+          {(Object.entries(INFRA_META) as [string, typeof INFRA_META[string]][])
+            .filter(([type]) => type !== "notifications")
+            .map(([type, meta]) => {
+              const row = infraByType[type];
+              return (
+                <InfraProviderCard
+                  key={type}
+                  type={type as "ai" | "crawl" | "queue" | "storage" | "notifications"}
+                  label={meta.label}
+                  icon={meta.icon}
+                  currentName={row?.name ?? ENV_PROVIDER_DEFAULTS[type] ?? "mock"}
+                  hasKey={!!row?.encryptedKeyBlob}
+                  switchMode={meta.switchMode}
+                  options={PROVIDER_OPTIONS[type] ?? []}
+                  config={(row?.config ?? {}) as Record<string, string>}
+                />
+              );
+            })}
 
           {/* Auth — always env-driven, read-only */}
           <div className="card-glow rounded-xl border border-border bg-card p-4">
@@ -108,19 +110,31 @@ export default async function ProvidersPage() {
             </p>
           </div>
         </div>
-      </section>
 
-      {/* Notification channels — multi-channel alert routing */}
-      <section className="space-y-3">
-        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground/60">
-          Notification Channels
-        </h2>
-        <NotificationChannels
-          channels={channelRows.map((r) => ({
-            ...r,
-            config: (r.config ?? {}) as Record<string, string>,
-          }))}
-        />
+        {/* Notifications — full-width, includes alert channel management */}
+        {(() => {
+          const meta = INFRA_META.notifications;
+          const row = infraByType.notifications;
+          return (
+            <InfraProviderCard
+              type="notifications"
+              label={meta.label}
+              icon={meta.icon}
+              currentName={row?.name ?? ENV_PROVIDER_DEFAULTS.notifications ?? "mock"}
+              hasKey={!!row?.encryptedKeyBlob}
+              switchMode={meta.switchMode}
+              options={PROVIDER_OPTIONS.notifications ?? []}
+              config={(row?.config ?? {}) as Record<string, string>}
+            >
+              <NotificationChannels
+                channels={channelRows.map((r) => ({
+                  ...r,
+                  config: (r.config ?? {}) as Record<string, string>,
+                }))}
+              />
+            </InfraProviderCard>
+          );
+        })()}
       </section>
 
       {/* AEO query providers */}

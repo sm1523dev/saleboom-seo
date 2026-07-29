@@ -16,7 +16,7 @@ interface EnvelopeBlob {
 
 function getKek(): Buffer {
   const hex = process.env.KEY_ENCRYPTION_KEY;
-  if (!hex) throw new Error("KEY_ENCRYPTION_KEY is required (32 bytes hex) — set SECRETS_PROVIDER=local");
+  if (!hex) throw new Error("KEY_ENCRYPTION_KEY is required (32 bytes hex) — set it in env or use SECRETS_PROVIDER=azure-keyvault");
   const buf = Buffer.from(hex, "hex");
   if (buf.length !== 32) throw new Error("KEY_ENCRYPTION_KEY must be exactly 32 bytes (64 hex chars)");
   return buf;

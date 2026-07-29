@@ -127,12 +127,12 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
   }
 
   return (
-    <div className="card-glow rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+    <div>
+      <div className="flex items-center justify-between px-4 py-3">
         <div>
-          <p className="text-sm font-semibold">Notification Channels</p>
-          <p className="text-xs text-muted-foreground mt-0.5">
-            Alert routing — email, Slack, and more. All credentials encrypted.
+          <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground/60">Alert Channels</p>
+          <p className="text-[10px] text-muted-foreground mt-0.5">
+            Email, Slack, and more — credentials encrypted at rest.
           </p>
         </div>
         {!isAdding && (
@@ -149,9 +149,9 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
 
       {/* Existing channels */}
       {channels.length > 0 && (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-border border-t border-border">
           {channels.map((ch) => (
-            <li key={ch.id} className="flex items-center gap-3 px-5 py-3">
+            <li key={ch.id} className="flex items-center gap-3 px-4 py-3">
               <span className="w-5 text-center font-mono text-sm text-muted-foreground select-none">
                 {CHANNEL_ICON[ch.channelType] ?? "○"}
               </span>
@@ -203,14 +203,14 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
       )}
 
       {channels.length === 0 && !isAdding && (
-        <p className="px-5 py-4 text-xs text-muted-foreground">
-          No channels configured. Alerts will use <code className="font-mono">SLACK_ALERT_WEBHOOK</code> / <code className="font-mono">ALERT_EMAIL_TO</code> env vars as fallback.
+        <p className="px-4 py-3 text-[10px] text-muted-foreground border-t border-border">
+          No channels — alerts fall back to <code className="font-mono">SLACK_ALERT_WEBHOOK</code> / <code className="font-mono">ALERT_EMAIL_TO</code> env vars.
         </p>
       )}
 
       {/* Add form */}
       {isAdding && (
-        <div className="px-5 py-4 space-y-4 border-t border-border">
+        <div className="px-4 py-4 space-y-4 border-t border-border">
           {/* Channel type selector */}
           <div className="flex gap-2">
             {(["slack", "email"] as ChannelType[]).map((t) => (

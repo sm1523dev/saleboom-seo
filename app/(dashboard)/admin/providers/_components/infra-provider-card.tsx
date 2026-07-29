@@ -13,6 +13,7 @@ type Props = {
   switchMode: "runtime" | "restart" | "redeploy";
   options: string[];
   config: Record<string, string>;
+  children?: React.ReactNode;
 };
 
 const SWITCH_MODE_LABEL: Record<string, string> = {
@@ -30,7 +31,7 @@ const SWITCH_MODE_COLOR: Record<string, string> = {
 const OPENAI_COMPAT_PROVIDERS = new Set(["nim", "openai", "groq", "ollama", "custom", "mock"]);
 
 export function InfraProviderCard({
-  type, label, icon, currentName, hasKey, switchMode, options, config,
+  type, label, icon, currentName, hasKey, switchMode, options, config, children,
 }: Props) {
   const [isEditing, setIsEditing] = useState(false);
   const [showKeyInput, setShowKeyInput] = useState(false);
@@ -303,6 +304,12 @@ export function InfraProviderCard({
           </div>
         )}
       </div>
+
+      {children && (
+        <div className="border-t border-border">
+          {children}
+        </div>
+      )}
     </div>
   );
 }
