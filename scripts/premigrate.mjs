@@ -123,19 +123,20 @@ for (const [type, envValue] of Object.entries(ENV_OVERRIDES)) {
 
 // ── 4. Seed AEO providers ────────────────────────────────────────────────────
 //
-// 6 NIM models across 3 architecture families — all routed via a single NIM API key.
+// 6 Groq-hosted models — fast LPU inference, same models as NIM but ~100× faster.
+// NVIDIA NIM (80B–122B) exceeded the Azure Function 10-minute execution limit;
+// Groq returns responses in 1–3 seconds for the same model weights.
 // Upserts on display_name so re-runs are safe (rename = delete+insert via DEPRECATED list).
-// This runs on every container start so workers/index.ts seedGlobalProviders() is not needed.
 
-const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1";
+const GROQ_ENDPOINT = "https://api.groq.com/openai/v1";
 
 const GLOBAL_PROVIDERS = [
-  { displayName: "GPT-OSS 120B (NIM)",    model: "openai/gpt-oss-120b" },
-  { displayName: "GPT-OSS 20B (NIM)",     model: "openai/gpt-oss-20b" },
-  { displayName: "Qwen 3.5 122B (NIM)",   model: "qwen/qwen3.5-122b-a10b" },
-  { displayName: "Qwen 3 Next 80B (NIM)", model: "qwen/qwen3-next-80b-a3b-instruct" },
-  { displayName: "Kimi K2.6 (NIM)",       model: "moonshotai/kimi-k2.6" },
-  { displayName: "GLM 5.2 (NIM)",         model: "z-ai/glm-5.2" },
+  { displayName: "GPT-OSS 120B (Groq)",  model: "openai/gpt-oss-120b" },
+  { displayName: "GPT-OSS 20B (Groq)",   model: "openai/gpt-oss-20b" },
+  { displayName: "Llama 3.3 70B (Groq)", model: "llama-3.3-70b-versatile" },
+  { displayName: "Llama 3.1 70B (Groq)", model: "llama-3.1-70b-versatile" },
+  { displayName: "Qwen QwQ 32B (Groq)",  model: "qwen-qwq-32b" },
+  { displayName: "Mixtral 8x7B (Groq)",  model: "mixtral-8x7b-32768" },
 ];
 
 // Remove stale display names one-by-one (avoids ANY($1) array binding issues)
@@ -143,9 +144,12 @@ const DEPRECATED_AEO_NAMES = [
   "NVIDIA NIM",
   "Qwen 3 32B (via Groq)", "Qwen 3.6 27B (via Groq)",
   "GPT-OSS 120B (via Groq)", "GPT-OSS 20B (via Groq)",
-  "GPT-OSS 120B (Groq)", "GPT-OSS 20B (Groq)",
   "Gemini 2.0 Flash (Google)", "Gemini 1.5 Flash (Google)",
   "Kimi K2.6 (NVIDIA NIM)", "GLM 5.2 (NVIDIA NIM)",
+  // NIM models being replaced by Groq
+  "GPT-OSS 120B (NIM)", "GPT-OSS 20B (NIM)",
+  "Qwen 3.5 122B (NIM)", "Qwen 3 Next 80B (NIM)",
+  "Kimi K2.6 (NIM)", "GLM 5.2 (NIM)",
 ];
 
 for (const name of DEPRECATED_AEO_NAMES) {
@@ -157,7 +161,7 @@ for (const p of GLOBAL_PROVIDERS) {
     INSERT INTO aeo_providers
       (display_name, provider_type, endpoint_url, api_key_env_var, model, enabled)
     VALUES
-      (${p.displayName}, 'openai-compat', ${NIM_ENDPOINT}, 'NVIDIA_NIM_API_KEY', ${p.model}, true)
+      (${p.displayName}, 'openai-compat', ${GROQ_ENDPOINT}, 'GROQ_API_KEY', ${p.model}, true)
     ON CONFLICT (display_name) DO UPDATE SET
       model          = EXCLUDED.model,
       endpoint_url   = EXCLUDED.endpoint_url,
@@ -165,6 +169,6 @@ for (const p of GLOBAL_PROVIDERS) {
       enabled        = true
   `;
 }
-console.log("[premigrate] AEO providers synced (6 NIM models)");
+console.log("[premigrate] AEO providers synced (6 Groq models)");
 
 await client.end();
