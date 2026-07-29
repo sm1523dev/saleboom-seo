@@ -1,7 +1,11 @@
 import type { NotificationProvider } from "./types";
 import { resolveInfraProvider } from "@/lib/providers/resolver";
 
-function createByName(name: string, apiKey: string | undefined, config: Record<string, string>): NotificationProvider {
+export function createNotificationProvider(
+  name: string,
+  apiKey: string | undefined,
+  config: Record<string, string>,
+): NotificationProvider {
   switch (name) {
     case "resend":
       return new (require("./providers/resend").ResendNotificationProvider)(apiKey, config);
@@ -19,6 +23,9 @@ function createByName(name: string, apiKey: string | undefined, config: Record<s
       throw new Error(`Unknown notification provider: "${name}". Valid: resend, sendgrid, twilio, ses, smtp, mock`);
   }
 }
+
+/** @deprecated Use createNotificationProvider with an explicit name */
+const createByName = createNotificationProvider;
 
 function createFromEnv(): NotificationProvider {
   return createByName(process.env.NOTIFICATION_PROVIDER ?? "mock", undefined, {});

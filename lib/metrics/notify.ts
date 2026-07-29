@@ -1,51 +1,46 @@
-import { eq } from "drizzle-orm";
-import { db } from "@/lib/db";
-import { systemSettings } from "@/lib/db/schema";
+import { getActiveChannels, dispatchToChannels } from "@/lib/notifications/channels";
 import { getNotificationProvider } from "@/lib/notifications";
 
-async function resolveSlackWebhook(): Promise<string | null> {
-  const envUrl = process.env.SLACK_ALERT_WEBHOOK;
-  if (envUrl) return envUrl;
-  const [row] = await db
-    .select({ value: systemSettings.value })
-    .from(systemSettings)
-    .where(eq(systemSettings.key, "notification_slack_webhook"))
-    .limit(1);
-  return row?.value || null;
-}
-
 export async function notifyAlert(message: string): Promise<void> {
-  const slackWebhook = await resolveSlackWebhook();
-  const alertEmail = process.env.ALERT_EMAIL_TO;
+  const html = `<p>${message.replace(/\n/g, "<br>")}</p>`;
+  const subject = "SaleBoom SEO Alert";
+  const text = `🚨 SaleBoom SEO Alert\n${message}`;
 
+  const channels = await getActiveChannels();
+
+  if (channels.length > 0) {
+    await dispatchToChannels(channels, {
+      text: `🚨 *SaleBoom SEO Alert*\n${message}`,
+      subject,
+      html,
+    });
+    return;
+  }
+
+  // Legacy fallback: env vars only, no channels configured yet
   const tasks: Promise<void>[] = [];
 
+  const slackWebhook = process.env.SLACK_ALERT_WEBHOOK;
   if (slackWebhook) {
     tasks.push(
       fetch(slackWebhook, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text: `🚨 *SaleBoom SEO Alert*\n${message}` }),
+        body: JSON.stringify({ text }),
       })
         .then(() => {})
-        .catch(() => {})
+        .catch(() => {}),
     );
   }
 
+  const alertEmail = process.env.ALERT_EMAIL_TO;
   if (alertEmail) {
     const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
     if (recipients.length > 0) {
       tasks.push(
         getNotificationProvider()
-          .then((p) =>
-            p.sendEmail({
-              to: recipients,
-              subject: "SaleBoom SEO Alert",
-              html: `<p>${message.replace(/\n/g, "<br>")}</p>`,
-              text: message,
-            })
-          )
-          .catch(() => {})
+          .then((p) => p.sendEmail({ to: recipients, subject, html, text: message }))
+          .catch(() => {}),
       );
     }
   }

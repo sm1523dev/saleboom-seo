@@ -19,7 +19,6 @@ export async function saveNotificationSettings(
   const session = await requireAdmin();
 
   const updates: { key: string; value: string }[] = [
-    { key: SETTINGS_KEYS.SLACK_WEBHOOK, value: (formData.get("slackWebhook") as string ?? "").trim() },
     { key: SETTINGS_KEYS.SUPPORT_EMAIL, value: (formData.get("supportEmail") as string ?? "").trim() },
     { key: SETTINGS_KEYS.RESPONSE_WINDOW, value: (formData.get("responseWindow") as string ?? "24-72 hours").trim() },
   ];

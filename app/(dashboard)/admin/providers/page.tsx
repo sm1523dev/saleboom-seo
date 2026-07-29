@@ -1,9 +1,10 @@
-import { eq, asc } from "drizzle-orm";
+import { asc } from "drizzle-orm";
 import { requireAdmin } from "@/lib/auth-utils";
 import { db } from "@/lib/db";
-import { aeoProviders, infraProviders } from "@/lib/db/schema";
+import { aeoProviders, infraProviders, notificationChannels } from "@/lib/db/schema";
 import { AeoProviderList } from "./_components/aeo-provider-list";
 import { InfraProviderCard } from "./_components/infra-provider-card";
+import { NotificationChannels } from "./_components/notification-channels";
 
 export const metadata = { title: "Provider Management" };
 
@@ -42,9 +43,17 @@ const ENV_PROVIDER_DEFAULTS: Record<string, string> = {
 export default async function ProvidersPage() {
   await requireAdmin();
 
-  const [infraRows, aeoRows] = await Promise.all([
+  const [infraRows, aeoRows, channelRows] = await Promise.all([
     db.select().from(infraProviders),
     db.select().from(aeoProviders).orderBy(asc(aeoProviders.displayName)),
+    db.select({
+      id: notificationChannels.id,
+      channelType: notificationChannels.channelType,
+      name: notificationChannels.name,
+      provider: notificationChannels.provider,
+      config: notificationChannels.config,
+      enabled: notificationChannels.enabled,
+    }).from(notificationChannels),
   ]);
 
   const infraByType = Object.fromEntries(infraRows.map((r) => [r.type, r]));
@@ -99,6 +108,19 @@ export default async function ProvidersPage() {
             </p>
           </div>
         </div>
+      </section>
+
+      {/* Notification channels — multi-channel alert routing */}
+      <section className="space-y-3">
+        <h2 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground/60">
+          Notification Channels
+        </h2>
+        <NotificationChannels
+          channels={channelRows.map((r) => ({
+            ...r,
+            config: (r.config ?? {}) as Record<string, string>,
+          }))}
+        />
       </section>
 
       {/* AEO query providers */}

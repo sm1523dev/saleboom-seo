@@ -8,11 +8,9 @@ import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 
 export function SettingsForm({
-  slackWebhook,
   supportEmail,
   responseWindow,
 }: {
-  slackWebhook: string;
   supportEmail: string;
   responseWindow: string;
 }) {
@@ -23,21 +21,6 @@ export function SettingsForm({
 
   return (
     <form action={action} className="card-glow rounded-xl border border-border bg-card p-6 space-y-5 max-w-xl">
-      <div className="space-y-2">
-        <Label htmlFor="slackWebhook">Slack Incoming Webhook URL</Label>
-        <Input
-          id="slackWebhook"
-          name="slackWebhook"
-          type="url"
-          defaultValue={slackWebhook}
-          placeholder="https://hooks.slack.com/services/..."
-          className="input-glow font-mono text-xs"
-        />
-        <p className="text-xs text-muted-foreground">
-          Connect with us requests and fix notifications will be posted here.
-        </p>
-      </div>
-
       <div className="space-y-2">
         <Label htmlFor="supportEmail">Support Email</Label>
         <Input

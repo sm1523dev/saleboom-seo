@@ -25,6 +25,21 @@ export const infraProviderTypeEnum = pgEnum("infra_provider_type", [
   "ai", "crawl", "queue", "storage", "notifications", "major_fix",
 ]);
 
+export const notificationChannelTypeEnum = pgEnum("notification_channel_type", [
+  "email", "slack", "whatsapp",
+]);
+
+export const notificationChannels = pgTable("notification_channels", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  channelType: notificationChannelTypeEnum("channel_type").notNull(),
+  name: varchar("name", { length: 100 }).notNull(),
+  provider: varchar("provider", { length: 50 }).notNull(),
+  encryptedKeyBlob: text("encrypted_key_blob"),
+  config: jsonb("config").$type<Record<string, string>>().notNull().default({}),
+  enabled: boolean("enabled").notNull().default(true),
+  ...timestamps,
+});
+
 export const infraSwitchModeEnum = pgEnum("infra_switch_mode", [
   "runtime", "restart", "redeploy",
 ]);

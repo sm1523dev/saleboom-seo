@@ -27,7 +27,6 @@ export default async function AdminSettingsPage() {
           Notifications
         </h2>
         <SettingsForm
-          slackWebhook={settings[SETTINGS_KEYS.SLACK_WEBHOOK] ?? ""}
           supportEmail={settings[SETTINGS_KEYS.SUPPORT_EMAIL] ?? ""}
           responseWindow={settings[SETTINGS_KEYS.RESPONSE_WINDOW] ?? "24-72 hours"}
         />
