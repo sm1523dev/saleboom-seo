@@ -7,9 +7,9 @@ import { and, eq, sql } from "drizzle-orm";
 export const dynamic = "force-dynamic";
 
 // POST /api/admin/scans/cleanup
-// Resets scans stuck in "running" (>15 min) or "pending" (>30 min) to "failed".
-// "pending" scans >30 min have their queue message in the poison queue or lost entirely —
-// they will never be processed and must be failed so users can re-trigger the scan.
+// Resets scans stuck in "running" (>10 min) or "pending" (>20 min) to "failed".
+// Azure Functions have a hard 10-min execution limit — any "running" scan older than
+// that is definitely orphaned. "pending" scans >20 min have a lost/poison-queued message.
 export async function POST(): Promise<NextResponse> {
   const session = await authProvider.getSession();
   if (!session) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
@@ -22,7 +22,7 @@ export async function POST(): Promise<NextResponse> {
       .where(
         and(
           eq(scans.status, "running"),
-          sql`${scans.updatedAt} < now() - interval '15 minutes'`
+          sql`${scans.updatedAt} < now() - interval '10 minutes'`
         )
       )
       .returning({ id: scans.id }),
@@ -32,7 +32,7 @@ export async function POST(): Promise<NextResponse> {
       .where(
         and(
           eq(scans.status, "pending"),
-          sql`${scans.updatedAt} < now() - interval '30 minutes'`
+          sql`${scans.updatedAt} < now() - interval '20 minutes'`
         )
       )
       .returning({ id: scans.id }),
