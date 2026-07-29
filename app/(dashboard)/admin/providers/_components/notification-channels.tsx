@@ -45,8 +45,6 @@ type FormState = {
   label: string;
   key: string;
   secret: string;
-  to: string;
-  from: string;
   smtpHost: string;
   smtpPort: string;
 };
@@ -58,8 +56,6 @@ function emptyForm(): FormState {
     label: "",
     key: "",
     secret: "",
-    to: "",
-    from: "",
     smtpHost: "smtp.gmail.com",
     smtpPort: "587",
   };
@@ -72,8 +68,6 @@ function formFromChannel(ch: Channel): FormState {
     label: ch.name,
     key: "",
     secret: "",
-    to: ch.config.to ?? "",
-    from: ch.config.from ?? "",
     smtpHost: ch.config.host ?? "smtp.gmail.com",
     smtpPort: ch.config.port ?? "587",
   };
@@ -112,15 +106,9 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
   function handleSubmit() {
     if (!form.label.trim()) { setError("Label is required."); return; }
     if (sheetMode === "add" && !form.key.trim()) { setError("Credential is required."); return; }
-    if (form.channelType === "email" && !form.to.trim()) {
-      setError("Recipient address is required.");
-      return;
-    }
 
     const config: Record<string, string> = {};
     if (form.channelType === "email") {
-      config.to = form.to.trim();
-      if (form.from.trim()) config.from = form.from.trim();
       if (form.emailProvider === "smtp") {
         config.host = form.smtpHost.trim();
         config.port = form.smtpPort.trim();
@@ -211,7 +199,7 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{ch.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {ch.provider}{ch.config.to ? ` · ${ch.config.to}` : ""}
+                    {ch.provider}{ch.config.host ? ` · ${ch.config.host}:${ch.config.port ?? "587"}` : ""}
                   </p>
                 </div>
                 <span
@@ -415,29 +403,6 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
                   </div>
                 )}
 
-                <div className="grid grid-cols-2 gap-3">
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">From address</Label>
-                    <Input
-                      type="email"
-                      value={form.from}
-                      onChange={(e) => patch({ from: e.target.value })}
-                      placeholder="alerts@saleboom.com"
-                      className="input-glow h-8 text-xs"
-                    />
-                  </div>
-                  <div className="space-y-1.5">
-                    <Label className="text-xs">To (recipients)</Label>
-                    <Input
-                      type="text"
-                      value={form.to}
-                      onChange={(e) => patch({ to: e.target.value })}
-                      placeholder="ops@company.com"
-                      className="input-glow h-8 text-xs"
-                    />
-                    <p className="text-[10px] text-muted-foreground">Comma-separated</p>
-                  </div>
-                </div>
               </div>
             )}
 
