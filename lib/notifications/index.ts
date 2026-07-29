@@ -11,10 +11,12 @@ function createByName(name: string, apiKey: string | undefined, config: Record<s
       return new (require(/* webpackIgnore: true */ "./providers/twilio").TwilioNotificationProvider)(apiKey, config);
     case "ses":
       return new (require(/* webpackIgnore: true */ "./providers/aws-ses").AwsSesNotificationProvider)(apiKey, config);
+    case "smtp":
+      return new (require("./providers/smtp").SmtpNotificationProvider)(apiKey, config);
     case "mock":
       return new (require("./providers/mock").MockNotificationProvider)();
     default:
-      throw new Error(`Unknown notification provider: "${name}". Valid: resend, sendgrid, twilio, ses, mock`);
+      throw new Error(`Unknown notification provider: "${name}". Valid: resend, sendgrid, twilio, ses, smtp, mock`);
   }
 }
 

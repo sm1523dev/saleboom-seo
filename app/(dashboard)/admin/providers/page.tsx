@@ -28,7 +28,7 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   crawl:         ["firecrawl", "mock"],
   queue:         ["bullmq", "azure-queue", "sqs", "mock"],
   storage:       ["local", "azure-blob", "s3", "mock"],
-  notifications: ["resend", "sendgrid", "twilio", "ses", "mock"],
+  notifications: ["resend", "sendgrid", "smtp", "twilio", "ses", "mock"],
 };
 
 const ENV_PROVIDER_DEFAULTS: Record<string, string> = {
