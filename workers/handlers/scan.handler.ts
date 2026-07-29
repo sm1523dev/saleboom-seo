@@ -1,7 +1,7 @@
 import { eq, and, sql } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites, issues, aiSuggestions, cmsConnections, aeoQueries } from "@/lib/db/schema";
-import { queueProvider } from "@/lib/queue";
+import { getQueueProvider } from "@/lib/queue";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { isArchiveUrl, ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
@@ -284,7 +284,7 @@ async function _runScanJob(
       .where(and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true)))
       .limit(1);
     if (hasAeoQueries) {
-      await queueProvider.enqueue("aeo-scan", { websiteId });
+      await (await getQueueProvider()).enqueue("aeo-scan", { websiteId });
       log.info("aeo scan enqueued");
     }
 

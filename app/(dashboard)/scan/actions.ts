@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { and, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { websites, scans } from "@/lib/db/schema";
-import { queueProvider } from "@/lib/queue";
+import { getQueueProvider } from "@/lib/queue";
 import { getServerSession } from "@/lib/auth-utils";
 import { parseWebsiteUrl } from "@/lib/form-validation";
 import { seedDefaultQueries } from "@/lib/aeo/seed-providers";
@@ -61,9 +61,10 @@ export async function startScanAction(
       .returning({ id: scans.id });
 
     // Enqueue SEO scan + AEO scan in parallel
+    const queue = await getQueueProvider();
     await Promise.all([
-      queueProvider.enqueue("scan", { scanId: scan.id, websiteId, url }),
-      queueProvider.enqueue("aeo-scan", { websiteId }),
+      queue.enqueue("scan", { scanId: scan.id, websiteId, url }),
+      queue.enqueue("aeo-scan", { websiteId }),
       recordEvent("scan.triggered", undefined, { scanId: scan.id, websiteId }),
     ]);
 

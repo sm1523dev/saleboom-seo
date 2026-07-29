@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { redirect } from "next/navigation";
 import { db } from "@/lib/db";
 import { websites, scans } from "@/lib/db/schema";
-import { queueProvider } from "@/lib/queue";
+import { getQueueProvider } from "@/lib/queue";
 import { getServerSession } from "@/lib/auth-utils";
 import { recordEvent } from "@/lib/metrics";
 
@@ -26,7 +26,7 @@ export async function quickRescanAction(websiteId: string): Promise<{ error?: st
       .values({ websiteId: site.id, status: "pending" })
       .returning({ id: scans.id });
 
-    await queueProvider.enqueue("scan", { scanId: scan.id, websiteId: site.id, url: site.url });
+    await (await getQueueProvider()).enqueue("scan", { scanId: scan.id, websiteId: site.id, url: site.url });
     await recordEvent("scan.triggered", undefined, { websiteId: site.id, scanId: scan.id });
     scanId = scan.id;
   } catch (err) {

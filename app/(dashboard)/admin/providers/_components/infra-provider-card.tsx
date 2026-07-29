@@ -43,6 +43,7 @@ export function InfraProviderCard({
   const [requestName, setRequestName] = useState("");
   const [requestReason, setRequestReason] = useState("");
   const [requestStatus, setRequestStatus] = useState<"idle" | "sent" | "error">("idle");
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [keyPending, startKeyTransition] = useTransition();
   const [requestPending, startRequestTransition] = useTransition();
@@ -56,11 +57,14 @@ export function InfraProviderCard({
     const providerConfig: Record<string, string> = isCustom
       ? { endpointUrl: customEndpoint.trim(), model: customModel.trim() }
       : {};
+    setSaveError(null);
     startTransition(async () => {
       const result = await switchInfraProvider(type, selectedName, providerConfig);
       if (result.success) {
         setLocalHasKey(false);
         setIsEditing(false);
+      } else {
+        setSaveError(result.error ?? "Failed to save — check you have admin access.");
       }
     });
   }
@@ -176,6 +180,7 @@ export function InfraProviderCard({
           <p className="text-[10px] text-yellow-500/80">
             ⚠ Switching clears the stored key — set a new key after saving.
           </p>
+          {saveError && <p className="text-[10px] text-red-400">{saveError}</p>}
           <div className="flex gap-2">
             <button
               onClick={handleSaveProvider}

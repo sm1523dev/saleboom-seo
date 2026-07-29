@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
+import { signOutAction } from "@/app/actions/auth.actions";
 
 export const NAV_ITEMS = [
   { href: "/dashboard", label: "Overview", icon: "◎" },
@@ -215,7 +216,7 @@ export function NavContent({
           </span>
         </Link>
 
-        <form method="POST" action="/api/sign-out">
+        <form action={signOutAction}>
           <button
             type="submit"
             className="flex w-full items-center gap-3 rounded-md border-l-2 border-transparent px-3 py-2 text-sm text-muted-foreground transition-colors duration-150 hover:bg-accent hover:text-foreground"

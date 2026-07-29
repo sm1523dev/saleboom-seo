@@ -1,7 +1,7 @@
 import { and, isNull, lt, sql, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { scans, websites } from "@/lib/db/schema";
-import { queueProvider } from "@/lib/queue";
+import { getQueueProvider } from "@/lib/queue";
 import type { JobContext } from "@/lib/queue";
 
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
@@ -31,6 +31,6 @@ export async function handleRescanJob(
       .values({ websiteId, status: "pending" })
       .returning({ id: scans.id });
 
-    await queueProvider.enqueue("scan", { scanId: newScan.id, websiteId });
+    await (await getQueueProvider()).enqueue("scan", { scanId: newScan.id, websiteId });
   }
 }

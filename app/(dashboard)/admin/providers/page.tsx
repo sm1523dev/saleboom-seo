@@ -9,11 +9,10 @@ import { NotificationChannels } from "./_components/notification-channels";
 export const metadata = { title: "Provider Management" };
 
 const INFRA_META: Record<string, { label: string; icon: string; switchMode: "runtime" | "restart" | "redeploy" }> = {
-  ai:            { label: "AI / LLM",        icon: "⊛", switchMode: "runtime"  },
-  crawl:         { label: "Web Crawl",        icon: "⊙", switchMode: "runtime"  },
-  queue:         { label: "Queue / Worker",   icon: "⊞", switchMode: "restart"  },
-  storage:       { label: "Storage",          icon: "⊟", switchMode: "restart"  },
-  notifications: { label: "Notifications",    icon: "⊡", switchMode: "runtime"  },
+  ai:      { label: "AI / LLM",      icon: "⊛", switchMode: "runtime" },
+  crawl:   { label: "Web Crawl",     icon: "⊙", switchMode: "runtime" },
+  queue:   { label: "Queue / Worker", icon: "⊞", switchMode: "restart" },
+  storage: { label: "Storage",       icon: "⊟", switchMode: "restart" },
 };
 
 const AUTH_CARD = {
@@ -39,6 +38,19 @@ const ENV_PROVIDER_DEFAULTS: Record<string, string> = {
   storage:       process.env.STORAGE_PROVIDER       ?? "mock",
   notifications: process.env.NOTIFICATION_PROVIDER  ?? "mock",
 };
+
+// Dev-seed defaults — used to detect unsynced DB rows
+const DEV_SEEDS: Record<string, string> = {
+  ai: "nim", crawl: "firecrawl", queue: "bullmq", storage: "local", notifications: "mock",
+};
+
+// Prefer env var when DB still holds the dev-seed default (premigrate not yet run)
+function effectiveName(type: string, row: { name: string } | undefined): string {
+  const dbName = row?.name;
+  const envName = ENV_PROVIDER_DEFAULTS[type] ?? "mock";
+  if (dbName === DEV_SEEDS[type] && envName !== DEV_SEEDS[type]) return envName;
+  return dbName ?? envName;
+}
 
 export default async function ProvidersPage() {
   await requireAdmin();
@@ -74,7 +86,6 @@ export default async function ProvidersPage() {
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
           {(Object.entries(INFRA_META) as [string, typeof INFRA_META[string]][])
-            .filter(([type]) => type !== "notifications")
             .map(([type, meta]) => {
               const row = infraByType[type];
               return (
@@ -83,7 +94,7 @@ export default async function ProvidersPage() {
                   type={type as "ai" | "crawl" | "queue" | "storage" | "notifications"}
                   label={meta.label}
                   icon={meta.icon}
-                  currentName={row?.name ?? ENV_PROVIDER_DEFAULTS[type] ?? "mock"}
+                  currentName={effectiveName(type, row)}
                   hasKey={!!row?.encryptedKeyBlob}
                   switchMode={meta.switchMode}
                   options={PROVIDER_OPTIONS[type] ?? []}
@@ -111,30 +122,13 @@ export default async function ProvidersPage() {
           </div>
         </div>
 
-        {/* Notifications — full-width, includes alert channel management */}
-        {(() => {
-          const meta = INFRA_META.notifications;
-          const row = infraByType.notifications;
-          return (
-            <InfraProviderCard
-              type="notifications"
-              label={meta.label}
-              icon={meta.icon}
-              currentName={row?.name ?? ENV_PROVIDER_DEFAULTS.notifications ?? "mock"}
-              hasKey={!!row?.encryptedKeyBlob}
-              switchMode={meta.switchMode}
-              options={PROVIDER_OPTIONS.notifications ?? []}
-              config={(row?.config ?? {}) as Record<string, string>}
-            >
-              <NotificationChannels
-                channels={channelRows.map((r) => ({
-                  ...r,
-                  config: (r.config ?? {}) as Record<string, string>,
-                }))}
-              />
-            </InfraProviderCard>
-          );
-        })()}
+        {/* Notification channels — standalone card (no InfraProviderCard wrapper) */}
+        <NotificationChannels
+          channels={channelRows.map((r) => ({
+            ...r,
+            config: (r.config ?? {}) as Record<string, string>,
+          }))}
+        />
       </section>
 
       {/* AEO query providers */}

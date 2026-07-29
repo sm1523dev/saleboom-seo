@@ -63,6 +63,49 @@ export async function removeNotificationChannel(
   }
 }
 
+type UpdateChannelInput = {
+  name: string;
+  config: Record<string, string>;
+  key?: string;
+  secret?: string;
+};
+
+export async function updateNotificationChannel(
+  id: string,
+  input: UpdateChannelInput,
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const updates: Record<string, any> = {
+      name: input.name,
+      config: input.config,
+      updatedAt: new Date(),
+    };
+
+    if (input.key?.trim()) {
+      const credJson = JSON.stringify(
+        input.secret?.trim()
+          ? { key: input.key.trim(), secret: input.secret.trim() }
+          : { key: input.key.trim() },
+      );
+      updates.encryptedKeyBlob = await encryptSecret(credJson);
+    }
+
+    await db
+      .update(notificationChannels)
+      .set(updates)
+      .where(eq(notificationChannels.id, id));
+
+    revalidatePath("/admin/providers");
+    return { success: true };
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : "Unknown error";
+    return { success: false, error: msg };
+  }
+}
+
 export async function toggleNotificationChannel(
   id: string,
   enabled: boolean,

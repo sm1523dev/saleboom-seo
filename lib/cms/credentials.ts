@@ -1,5 +1,5 @@
 import { createCipheriv, createDecipheriv, randomBytes } from "crypto";
-import { storageProvider } from "@/lib/storage";
+import { getStorageProvider } from "@/lib/storage";
 import type { CmsCredentials, CmsType } from "./types";
 
 const ALGO = "aes-256-gcm";
@@ -46,7 +46,7 @@ export async function storeCredentials<T extends CmsType>(
 ): Promise<string> {
   const key = storageKey(websiteId, cmsType);
   const encrypted = encrypt(JSON.stringify(credentials));
-  await storageProvider.upload(key, encrypted, { contentType: "application/octet-stream" });
+  await (await getStorageProvider()).upload(key, encrypted, { contentType: "application/octet-stream" });
   return key;
 }
 
@@ -55,12 +55,13 @@ export async function loadCredentials<T extends CmsType>(
   cmsType: T,
 ): Promise<CmsCredentials[T] | null> {
   const key = storageKey(websiteId, cmsType);
-  const exists = await storageProvider.exists(key);
+  const storage = await getStorageProvider();
+  const exists = await storage.exists(key);
   if (!exists) return null;
-  const data = await storageProvider.download(key);
+  const data = await storage.download(key);
   return JSON.parse(decrypt(data)) as CmsCredentials[T];
 }
 
 export async function deleteCredentials(websiteId: string, cmsType: CmsType): Promise<void> {
-  await storageProvider.delete(storageKey(websiteId, cmsType));
+  await (await getStorageProvider()).delete(storageKey(websiteId, cmsType));
 }

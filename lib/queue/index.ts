@@ -1,16 +1,15 @@
 import type { QueueProvider } from "./types";
+import { resolveInfraProvider } from "@/lib/providers/resolver";
 import { createAzureQueueProvider } from "./providers/azure-queue";
 import { SQSQueueProvider } from "./providers/sqs";
 import { MockQueueProvider } from "./providers/mock";
 
-function createProvider(): QueueProvider {
-  const name = process.env.QUEUE_PROVIDER ?? "mock";
-
+function createByName(name: string): QueueProvider {
   switch (name) {
     case "bullmq": {
       // Lazy require: bullmq is Pi-only and not installed in Azure. A top-level import would
       // cause esbuild to hoist require("bullmq") to module init, crashing the worker before
-      // GRPC function registration completes. Deferring to here means it only runs on Pi.
+      // handler registration completes.
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { BullMQProvider } = require("./providers/bullmq") as { BullMQProvider: new () => QueueProvider };
       return new BullMQProvider();
@@ -22,11 +21,18 @@ function createProvider(): QueueProvider {
     case "mock":
       return new MockQueueProvider();
     default:
-      throw new Error(
-        `Unknown QUEUE_PROVIDER: "${name}". Valid: bullmq, azure-queue, sqs, mock`
-      );
+      throw new Error(`Unknown queue provider: "${name}". Valid: bullmq, azure-queue, sqs, mock`);
   }
 }
 
-export const queueProvider: QueueProvider = createProvider();
+let _instance: QueueProvider | null = null;
+
+export async function getQueueProvider(): Promise<QueueProvider> {
+  if (_instance) return _instance;
+  const resolved = await resolveInfraProvider("queue");
+  const name = resolved?.name ?? process.env.QUEUE_PROVIDER ?? "mock";
+  _instance = createByName(name);
+  return _instance;
+}
+
 export type { QueueProvider, JobHandler, EnqueueOpts, JobContext } from "./types";

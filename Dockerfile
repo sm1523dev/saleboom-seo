@@ -29,6 +29,7 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
+COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
 # Create storage directory for local credential files (writable by nextjs user)
 RUN mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
@@ -38,4 +39,6 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 
-CMD ["node", "server.js"]
+# Run pending DB migrations before starting the server.
+# premigrate.mjs auto-registers hand-written .sql files then calls drizzle migrate().
+CMD ["sh", "-c", "node scripts/premigrate.mjs && node server.js"]
