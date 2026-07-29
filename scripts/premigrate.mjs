@@ -127,14 +127,15 @@ for (const [type, envValue] of Object.entries(ENV_OVERRIDES)) {
 const NIM_ENDPOINT = "https://integrate.api.nvidia.com/v1";
 
 const GLOBAL_PROVIDERS = [
-  { displayName: "GPT-OSS 120B (NIM)",  model: "openai/gpt-oss-120b" },
-  { displayName: "GPT-OSS 20B (NIM)",   model: "openai/gpt-oss-20b" },
-  { displayName: "Qwen 3.5 122B (NIM)", model: "qwen/qwen3.5-122b-a10b" },
+  { displayName: "GPT-OSS 120B (NIM)",    model: "openai/gpt-oss-120b" },
+  { displayName: "GPT-OSS 20B (NIM)",     model: "openai/gpt-oss-20b" },
+  { displayName: "Qwen 3.5 122B (NIM)",   model: "qwen/qwen3.5-122b-a10b" },
   { displayName: "Qwen 3 Next 80B (NIM)", model: "qwen/qwen3-next-80b-a3b-instruct" },
-  { displayName: "Kimi K2.6 (NIM)",     model: "moonshotai/kimi-k2.6" },
-  { displayName: "GLM 5.2 (NIM)",       model: "z-ai/glm-5.2" },
+  { displayName: "Kimi K2.6 (NIM)",       model: "moonshotai/kimi-k2.6" },
+  { displayName: "GLM 5.2 (NIM)",         model: "z-ai/glm-5.2" },
 ];
 
+// Remove stale display names one-by-one (avoids ANY($1) array binding issues)
 const DEPRECATED_AEO_NAMES = [
   "NVIDIA NIM",
   "Qwen 3 32B (via Groq)", "Qwen 3.6 27B (via Groq)",
@@ -144,10 +145,8 @@ const DEPRECATED_AEO_NAMES = [
   "Kimi K2.6 (NVIDIA NIM)", "GLM 5.2 (NVIDIA NIM)",
 ];
 
-if (DEPRECATED_AEO_NAMES.length > 0) {
-  await client`
-    DELETE FROM aeo_providers WHERE display_name = ANY(${DEPRECATED_AEO_NAMES})
-  `;
+for (const name of DEPRECATED_AEO_NAMES) {
+  await client`DELETE FROM aeo_providers WHERE display_name = ${name}`;
 }
 
 for (const p of GLOBAL_PROVIDERS) {
@@ -157,10 +156,10 @@ for (const p of GLOBAL_PROVIDERS) {
     VALUES
       (${p.displayName}, 'openai-compat', ${NIM_ENDPOINT}, 'NVIDIA_NIM_API_KEY', ${p.model}, true)
     ON CONFLICT (display_name) DO UPDATE SET
-      model         = EXCLUDED.model,
-      endpoint_url  = EXCLUDED.endpoint_url,
+      model          = EXCLUDED.model,
+      endpoint_url   = EXCLUDED.endpoint_url,
       api_key_env_var = EXCLUDED.api_key_env_var,
-      enabled       = true
+      enabled        = true
   `;
 }
 console.log("[premigrate] AEO providers synced (6 NIM models)");
