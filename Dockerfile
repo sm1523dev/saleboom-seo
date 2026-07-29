@@ -31,6 +31,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder --chown=nextjs:nodejs /app/drizzle ./drizzle
 COPY --from=builder --chown=nextjs:nodejs /app/scripts ./scripts
 
+# premigrate.mjs runs as a plain Node script (outside the Next.js bundle) and
+# needs postgres + drizzle-orm on disk. Standalone output only includes what
+# Next.js itself uses at runtime; copy these directly from the deps stage.
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/postgres ./node_modules/postgres
+COPY --from=deps --chown=nextjs:nodejs /app/node_modules/drizzle-orm ./node_modules/drizzle-orm
+
 # Create storage directory for local credential files (writable by nextjs user)
 RUN mkdir -p /app/storage && chown -R nextjs:nodejs /app/storage
 
