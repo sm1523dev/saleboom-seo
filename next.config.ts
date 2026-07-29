@@ -26,6 +26,10 @@ const nextConfig: NextConfig = {
   // selects them. Exclude from the Next.js bundle so unused providers don't cause
   // "module not found" errors at build time.
   serverExternalPackages: [
+    // premigrate.mjs runs as a plain node script before the Next.js server
+    // starts — it needs these packages on disk, not bundled into server chunks.
+    "postgres",
+    "drizzle-orm",
     "@opentelemetry/sdk-node",
     "@opentelemetry/sdk-trace-node",
     "@opentelemetry/exporter-trace-otlp-http",
