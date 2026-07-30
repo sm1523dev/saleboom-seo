@@ -1,8 +1,8 @@
 "use server";
 
 import { z } from "zod";
+import { getActiveChannels, dispatchToChannels } from "@/lib/notifications/channels";
 import { getNotificationProvider } from "@/lib/notifications";
-import { notifyAlert } from "@/lib/metrics/notify";
 import { contactFormTemplate } from "@/lib/notifications/email-templates";
 
 const ContactSchema = z.object({
@@ -30,20 +30,52 @@ export async function submitContactAction(
   }
 
   const { name, email, message } = parsed.data;
-
-  const adminEmail = process.env.ADMIN_CONTACT_EMAIL ?? process.env.ALERT_EMAIL_TO ?? "";
-  const recipients = adminEmail.split(",").map((e) => e.trim()).filter(Boolean);
-
   const tpl = contactFormTemplate({ name, email, message });
+  const slackText = `📬 *New contact form submission*\nFrom: ${name} <${email}>\n\n${message}`;
 
-  await Promise.all([
-    recipients.length > 0
-      ? getNotificationProvider()
-          .then((p) => p.sendEmail({ to: recipients, subject: tpl.subject, html: tpl.html, text: tpl.text }))
-          .catch(() => {})
-      : Promise.resolve(),
-    notifyAlert(`New contact form submission from ${name} <${email}>\n\n${message}`).catch(() => {}),
-  ]);
+  void (async () => {
+    try {
+      const channels = await getActiveChannels();
+
+      if (channels.length > 0) {
+        // Dispatch to all configured channels (Slack + email) using the HTML template
+        await dispatchToChannels(channels, { text: slackText, subject: tpl.subject, html: tpl.html });
+        return;
+      }
+
+      // Fallback: env-var Slack webhook + ALERT_EMAIL_TO (the no-reply inbox)
+      const tasks: Promise<void>[] = [];
+
+      const slackWebhook = process.env.SLACK_ALERT_WEBHOOK;
+      if (slackWebhook) {
+        tasks.push(
+          fetch(slackWebhook, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ text: slackText }),
+          })
+            .then(() => {})
+            .catch(() => {})
+        );
+      }
+
+      const alertEmail = process.env.ALERT_EMAIL_TO;
+      if (alertEmail) {
+        const recipients = alertEmail.split(",").map((e) => e.trim()).filter(Boolean);
+        if (recipients.length > 0) {
+          tasks.push(
+            getNotificationProvider()
+              .then((p) => p.sendEmail({ to: recipients, subject: tpl.subject, html: tpl.html, text: tpl.text }))
+              .catch(() => {})
+          );
+        }
+      }
+
+      await Promise.all(tasks);
+    } catch {
+      // Non-fatal — form submission still succeeds
+    }
+  })();
 
   return { success: true };
 }
