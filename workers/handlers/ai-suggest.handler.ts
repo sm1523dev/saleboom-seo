@@ -1,6 +1,6 @@
 import { eq, and } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, issues, aiSuggestions, websites } from "@/lib/db/schema";
+import { scans, issues, aiSuggestions, websites, users } from "@/lib/db/schema";
 import { buildPageContext } from "@/lib/seo-rules";
 import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import type { CrawlResult, PageResult } from "@/lib/crawl/types";
@@ -8,6 +8,8 @@ import type { ParsedPage } from "@/lib/seo-rules/types";
 import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
+import { getNotificationProvider } from "@/lib/notifications";
+import { aiSuggestionsTemplate } from "@/lib/notifications/email-templates";
 
 export type AiSuggestJobData = { scanId: string; websiteId: string };
 
@@ -136,5 +138,32 @@ async function generateAndPersistSuggestions(
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     await db.insert(aiSuggestions).values(rows as any[]);
     log.info("ai suggestions generated", { count: rows.length });
+
+    // Notify user that suggestions are ready — fire-and-forget
+    void (async () => {
+      try {
+        const [[siteRow]] = await Promise.all([
+          db
+            .select({ url: websites.url, userName: users.name, userEmail: users.email })
+            .from(websites)
+            .innerJoin(users, eq(websites.userId, users.id))
+            .where(eq(websites.id, websiteId))
+            .limit(1),
+        ]);
+        if (!siteRow) return;
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleboomseo.com";
+        const tpl = aiSuggestionsTemplate({
+          userName: siteRow.userName,
+          websiteUrl: siteRow.url,
+          suggestionCount: rows.length,
+          scanId,
+          appUrl,
+        });
+        const provider = await getNotificationProvider();
+        await provider.sendEmail({ to: siteRow.userEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      } catch (notifyErr) {
+        log.warn("ai suggestions email failed", { error: String(notifyErr) });
+      }
+    })();
   }
 }

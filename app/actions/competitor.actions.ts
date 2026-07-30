@@ -2,10 +2,12 @@
 
 import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, aeoProviders, aeoQueries } from "@/lib/db/schema";
+import { websites, aeoProviders, aeoQueries, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { queryAeoProvider } from "@/lib/aeo/query-engine";
 import { parseMention } from "@/lib/aeo/mention-parser";
+import { getNotificationProvider } from "@/lib/notifications";
+import { competitiveAnalysisTemplate } from "@/lib/notifications/email-templates";
 
 export type CompetitorResult = {
   domain: string;
@@ -111,5 +113,32 @@ export async function runCompetitorAnalysis(
   );
 
   const [own, ...competitors] = results;
+
+  // Notify user — fire-and-forget, non-fatal
+  void (async () => {
+    try {
+      const [userRow] = await db
+        .select({ email: users.email, name: users.name })
+        .from(users)
+        .where(eq(users.id, session.user.id))
+        .limit(1);
+      if (!userRow || !own) return;
+      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleboomseo.com";
+      const tpl = competitiveAnalysisTemplate({
+        userName: userRow.name,
+        websiteName: site.name ?? site.url,
+        websiteUrl: site.url,
+        ownMentionRate: own.mentionRate,
+        competitorCount: competitors.length,
+        appUrl,
+        websiteId,
+      });
+      const provider = await getNotificationProvider();
+      await provider.sendEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+    } catch {
+      // Non-fatal
+    }
+  })();
+
   return { own, competitors };
 }

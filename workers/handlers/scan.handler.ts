@@ -1,6 +1,6 @@
-import { eq, and, sql, or, isNull, isNotNull } from "drizzle-orm";
+import { eq, and, sql, or, isNull, isNotNull, desc } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, cmsConnections } from "@/lib/db/schema";
+import { scans, websites, issues, cmsConnections, users, dvsScores } from "@/lib/db/schema";
 import { getQueueProvider } from "@/lib/queue";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
@@ -15,6 +15,8 @@ import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import { detectPlatformFromCrawl } from "@/lib/platform-detect";
 import type { SeoIssue } from "@/lib/seo-rules";
+import { getNotificationProvider } from "@/lib/notifications";
+import { scanCompletionTemplate } from "@/lib/notifications/email-templates";
 
 export type ScanJobData = {
   scanId: string;
@@ -230,6 +232,50 @@ async function _runScanJob(
     span.setAttribute("scan.issues_found", seoIssues.length);
     await persistDvsScore(websiteId);
     await recordEvent("scan.completed", durationMs, { scanId, websiteId, ...bySeverity });
+
+    // Notify user: fetch user email + last 2 DVS scores for delta
+    void (async () => {
+      try {
+        const [[siteRow], recentScores] = await Promise.all([
+          db
+            .select({ url: websites.url, userName: users.name, userEmail: users.email })
+            .from(websites)
+            .innerJoin(users, eq(websites.userId, users.id))
+            .where(eq(websites.id, websiteId))
+            .limit(1),
+          db
+            .select({ compositeScore: dvsScores.compositeScore })
+            .from(dvsScores)
+            .where(eq(dvsScores.websiteId, websiteId))
+            .orderBy(desc(dvsScores.scoredAt))
+            .limit(2),
+        ]);
+        if (!siteRow) return;
+        const currentScore = recentScores[0]?.compositeScore ?? null;
+        const previousScore = recentScores[1]?.compositeScore ?? null;
+        const issueCounts = { critical: 0, high: 0, medium: 0, low: 0 };
+        for (const i of seoIssues) {
+          if (i.severity === "critical") issueCounts.critical++;
+          else if (i.severity === "high") issueCounts.high++;
+          else if (i.severity === "medium") issueCounts.medium++;
+          else if (i.severity === "low") issueCounts.low++;
+        }
+        const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleboomseo.com";
+        const tpl = scanCompletionTemplate({
+          userName: siteRow.userName,
+          websiteUrl: siteRow.url,
+          dvsScore: currentScore,
+          previousScore,
+          issueCounts,
+          scanId,
+          appUrl,
+        });
+        const provider = await getNotificationProvider();
+        await provider.sendEmail({ to: siteRow.userEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      } catch (notifyErr) {
+        log.warn("scan completion email failed", { error: String(notifyErr) });
+      }
+    })();
 
     // DB join lock: enqueue ai-suggest once both phases are done.
     // SEO fires immediately if aeoExpected=false; waits for AEO otherwise.

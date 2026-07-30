@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { HeroSection } from "./_components/hero-section";
 import { FeatureSections } from "./_components/feature-sections";
+import { ContactSection } from "./_components/contact-section";
 
 export const metadata: Metadata = {
   title: "AI-Powered SEO & AEO Audit in 60 Seconds | SaleBoom",
@@ -30,6 +31,7 @@ export default function HomePage() {
     <main>
       <HeroSection />
       <FeatureSections />
+      <ContactSection />
     </main>
   );
 }

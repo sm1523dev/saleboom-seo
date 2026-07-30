@@ -9,6 +9,18 @@ import { authProvider } from "@/lib/auth";
 import { getServerSession } from "@/lib/auth-utils";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { parseEmail, parseRequiredString } from "@/lib/form-validation";
+import { getNotificationProvider } from "@/lib/notifications";
+import { profileUpdateTemplate } from "@/lib/notifications/email-templates";
+
+async function sendProfileUpdateEmail(to: string, updateType: "name" | "email" | "password"): Promise<void> {
+  try {
+    const tpl = profileUpdateTemplate({ updateType });
+    const provider = await getNotificationProvider();
+    await provider.sendEmail({ to, subject: tpl.subject, html: tpl.html, text: tpl.text });
+  } catch {
+    // Non-fatal
+  }
+}
 
 export type ProfileActionState = { error?: string; success?: string } | null;
 
@@ -20,12 +32,19 @@ export async function updateNameAction(
   const name = formData.get("name");
   const nameStr = typeof name === "string" ? name.trim() || null : null;
 
+  const [userRow] = await db
+    .select({ email: users.email })
+    .from(users)
+    .where(eq(users.id, session.user.id))
+    .limit(1);
+
   await db
     .update(users)
     .set({ name: nameStr, updatedAt: new Date() })
     .where(eq(users.id, session.user.id));
 
   revalidatePath("/profile");
+  if (userRow) void sendProfileUpdateEmail(userRow.email, "name");
   return { success: "Name updated." };
 }
 
@@ -65,6 +84,7 @@ export async function updateEmailAction(
     .where(eq(users.id, session.user.id));
 
   revalidatePath("/profile");
+  void sendProfileUpdateEmail(newEmail, "email");
   return { success: "Email updated. Sign in again to refresh your session." };
 }
 
@@ -90,13 +110,18 @@ export async function updatePasswordAction(
   const valid = await verifyPassword(currentPassword, user.passwordHash);
   if (!valid) return { error: "Current password is incorrect." };
 
-  const passwordHash = await hashPassword(newPassword);
+  const [[emailRow], newHash] = await Promise.all([
+    db.select({ email: users.email }).from(users).where(eq(users.id, session.user.id)).limit(1),
+    hashPassword(newPassword),
+  ]);
+
   await db
     .update(users)
-    .set({ passwordHash, updatedAt: new Date() })
+    .set({ passwordHash: newHash, updatedAt: new Date() })
     .where(eq(users.id, session.user.id));
 
   revalidatePath("/profile");
+  if (emailRow) void sendProfileUpdateEmail(emailRow.email, "password");
   return { success: "Password updated." };
 }
 

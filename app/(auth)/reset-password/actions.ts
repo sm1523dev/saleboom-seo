@@ -7,6 +7,8 @@ import { users } from "@/lib/db/schema";
 import { verifyResetToken } from "@/lib/auth/reset-token";
 import { hashPassword } from "@/lib/auth/password";
 import { parseRequiredString } from "@/lib/form-validation";
+import { getNotificationProvider } from "@/lib/notifications";
+import { resetPasswordConfirmationTemplate } from "@/lib/notifications/email-templates";
 
 export async function resetPassword(formData: FormData) {
   const token = parseRequiredString(formData.get("token"), "Token");
@@ -22,11 +24,23 @@ export async function resetPassword(formData: FormData) {
     throw new Error("Invalid reset link.");
   }
 
+  const [userRow] = await db.select({ email: users.email }).from(users).where(eq(users.id, result.userId)).limit(1);
   const passwordHash = await hashPassword(password);
   await db
     .update(users)
     .set({ passwordHash, updatedAt: new Date() })
     .where(eq(users.id, result.userId));
+
+  // Send confirmation email — non-blocking, must complete before redirect throws
+  if (userRow) {
+    try {
+      const tpl = resetPasswordConfirmationTemplate();
+      const provider = await getNotificationProvider();
+      await provider.sendEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+    } catch {
+      // Non-fatal — do not block sign-in redirect
+    }
+  }
 
   redirect("/sign-in?reset=success");
 }
