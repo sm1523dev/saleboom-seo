@@ -1,6 +1,6 @@
 import { and, isNull, lt, sql, eq } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites } from "@/lib/db/schema";
+import { scans, websites, aeoQueries } from "@/lib/db/schema";
 import { getQueueProvider } from "@/lib/queue";
 import type { JobContext } from "@/lib/queue";
 
@@ -25,12 +25,23 @@ export async function handleRescanJob(
 
   context.log(`enqueueing rescans for ${staleWebsites.length} website(s)`);
 
+  const queue = await getQueueProvider();
   for (const { websiteId } of staleWebsites) {
+    const [hasAeoQ] = await db
+      .select({ id: aeoQueries.id })
+      .from(aeoQueries)
+      .where(and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true)))
+      .limit(1);
+    const aeoExpected = !!hasAeoQ;
+
     const [newScan] = await db
       .insert(scans)
-      .values({ websiteId, status: "pending" })
+      .values({ websiteId, status: "pending", aeoExpected })
       .returning({ id: scans.id });
 
-    await (await getQueueProvider()).enqueue("scan", { scanId: newScan.id, websiteId });
+    await Promise.all([
+      queue.enqueue("scan", { scanId: newScan.id, websiteId }),
+      ...(aeoExpected ? [queue.enqueue("aeo-scan", { websiteId, scanId: newScan.id })] : []),
+    ]);
   }
 }

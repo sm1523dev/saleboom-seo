@@ -1,6 +1,7 @@
-import { eq, and, desc } from "drizzle-orm";
+import { eq, and, desc, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { websites, aeoProviders, aeoQueries, aeoMentions, aeoCitations, aeoScores, userAlerts } from "@/lib/db/schema";
+import { websites, aeoProviders, aeoQueries, aeoMentions, aeoCitations, aeoScores, userAlerts, scans } from "@/lib/db/schema";
+import { getQueueProvider } from "@/lib/queue";
 import { queryAeoProvider } from "@/lib/aeo/query-engine";
 import { parseMention, extractCitations } from "@/lib/aeo/mention-parser";
 import { computeAeoScore } from "@/lib/aeo/score";
@@ -8,14 +9,14 @@ import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 
-export type AeoJobData = { websiteId: string };
+export type AeoJobData = { websiteId: string; scanId?: string };
 
 export async function handleAeoJob(
   data: AeoJobData,
   context: JobContext
 ): Promise<void> {
-  const { websiteId } = data;
-  const log = logger.child({ component: "aeo-worker", websiteId });
+  const { websiteId, scanId } = data;
+  const log = logger.child({ component: "aeo-worker", websiteId, scanId });
   log.info("aeo scan started");
 
   try {
@@ -46,6 +47,7 @@ export async function handleAeoJob(
 
     if (providers.length === 0 || queries.length === 0) {
       log.info("aeo scan skipped — no providers or queries configured");
+      if (scanId) await tryCompleteAeoPhase(scanId, websiteId, log);
       return;
     }
 
@@ -222,12 +224,40 @@ export async function handleAeoJob(
 
     await context.updateProgress(100);
     log.info("aeo scan completed", { mentionsFound, citationsFound, score });
+
+    if (scanId) await tryCompleteAeoPhase(scanId, websiteId, log);
   } catch (err) {
     log.error("aeo scan failed", { error: String(err) });
     captureError(err, { websiteId });
+    // Set aeoCompletedAt even on failure so the DB join lock in scan.handler can
+    // still fire ai-suggest once SEO completes — AEO failure shouldn't block suggestions.
+    if (scanId) {
+      await tryCompleteAeoPhase(scanId, websiteId, log).catch((e) =>
+        log.error("failed to set aeoCompletedAt after error", { error: String(e) })
+      );
+    }
     // Do NOT re-throw — AEO failures must not cause Azure to retry the message.
-    // Retrying with maxDequeueCount=5 would spawn up to 5 concurrent 500s invocations,
-    // consuming all Function instances and blocking the scan-worker queue.
+    // maxDequeueCount=1 + no-rethrow = dead-lettered on first failure, scan-worker unblocked.
+  }
+}
+
+async function tryCompleteAeoPhase(
+  scanId: string,
+  websiteId: string,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  log: any
+): Promise<void> {
+  await db.update(scans).set({ aeoCompletedAt: new Date() }).where(eq(scans.id, scanId));
+
+  const [acquired] = await db
+    .update(scans)
+    .set({ aiTriggeredAt: new Date() })
+    .where(and(eq(scans.id, scanId), isNull(scans.aiTriggeredAt), isNotNull(scans.seoCompletedAt)))
+    .returning({ id: scans.id });
+
+  if (acquired) {
+    await (await getQueueProvider()).enqueue("ai-suggest", { scanId, websiteId });
+    log.info("ai-suggest enqueued by aeo completion");
   }
 }
 

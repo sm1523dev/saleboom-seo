@@ -49,6 +49,14 @@ export type ScanJobMessage = z.infer<typeof ScanJobMessageSchema>;
 
 export const AeoJobMessageSchema = z.object({
   websiteId: z.string().uuid(),
+  scanId: z.string().uuid().optional(),
   enqueuedAt: z.string().datetime(),
 });
 export type AeoJobMessage = z.infer<typeof AeoJobMessageSchema>;
+
+export const AiSuggestJobMessageSchema = z.object({
+  scanId: z.string().uuid(),
+  websiteId: z.string().uuid(),
+  enqueuedAt: z.string().datetime(),
+});
+export type AiSuggestJobMessage = z.infer<typeof AiSuggestJobMessageSchema>;

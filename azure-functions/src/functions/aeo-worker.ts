@@ -12,16 +12,16 @@ async function aeoWorkerHandler(message: unknown, context: InvocationContext): P
     return;
   }
 
-  const { websiteId } = parsed.data;
+  const { websiteId, scanId } = parsed.data;
 
   const jobContext: JobContext = {
     jobId: context.invocationId,
     attemptNumber: 1,
     log: (msg: string) => context.log(msg),
-    updateProgress: async (_pct: number) => { /* no-op: Azure Functions has no progress API */ },
+    updateProgress: async () => { /* no-op: Azure Functions has no progress API */ },
   };
 
-  await handleAeoJob({ websiteId }, jobContext);
+  await handleAeoJob({ websiteId, ...(scanId ? { scanId } : {}) }, jobContext);
 }
 
 app.storageQueue("aeo-worker", {

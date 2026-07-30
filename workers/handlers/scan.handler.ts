@@ -1,12 +1,11 @@
-import { eq, and, sql } from "drizzle-orm";
+import { eq, and, sql, or, isNull, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
-import { scans, websites, issues, aiSuggestions, cmsConnections, aeoQueries } from "@/lib/db/schema";
+import { scans, websites, issues, cmsConnections } from "@/lib/db/schema";
 import { getQueueProvider } from "@/lib/queue";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
 import { isArchiveUrl, ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
 import type { CmsCapabilities } from "@/lib/cms/probe";
-import { generateSeoSuggestion } from "@/lib/ai/suggest-seo";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
 import { withSpan } from "@/lib/telemetry";
@@ -16,7 +15,6 @@ import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import { detectPlatformFromCrawl } from "@/lib/platform-detect";
 import type { SeoIssue } from "@/lib/seo-rules";
-import type { ParsedPage } from "@/lib/seo-rules/types";
 
 export type ScanJobData = {
   scanId: string;
@@ -61,7 +59,7 @@ async function _runScanJob(
       and(
         eq(scans.status, "running"),
         sql`${scans.id} != ${scanId}`,
-        sql`${scans.updatedAt} < now() - interval '15 minutes'`
+        sql`${scans.updatedAt} < now() - interval '10 minutes'`
       )
     );
 
@@ -216,53 +214,10 @@ async function _runScanJob(
 
     await context.updateProgress(85);
 
-    // Generate AI suggestions for pages with critical/high issues (up to 10 pages)
-    // Skip pages the user already dismissed in a previous scan for this website
-    const dismissedPages = await db
-      .select({ pageUrl: aiSuggestions.pageUrl })
-      .from(aiSuggestions)
-      .where(and(
-        eq(aiSuggestions.websiteId, websiteId),
-        eq(aiSuggestions.status, "dismissed"),
-      ));
-    const dismissedUrls = new Set(dismissedPages.map((d) => d.pageUrl));
-
-    const pagesNeedingSuggestions = siteCtx.pages
-      .filter((p) =>
-        !dismissedUrls.has(p.url) &&
-        seoIssues.some((i) => i.pageUrl === p.url && (i.severity === "critical" || i.severity === "high"))
-      )
-      .slice(0, 10);
-
-    if (pagesNeedingSuggestions.length > 0) {
-      // Non-fatal 2-minute timeout — AI suggestions are best-effort; a slow model
-      // response shouldn't fail an otherwise complete scan.
-      let aiTimeoutId: ReturnType<typeof setTimeout> | undefined;
-      await Promise.race([
-        generateAndPersistSuggestions(scanId, websiteId, pagesNeedingSuggestions, log),
-        new Promise<never>((_, reject) => {
-          aiTimeoutId = setTimeout(
-            () => reject(new Error("ai_timeout")),
-            2 * 60_000
-          );
-        }),
-      ])
-        .catch((err: unknown) => {
-          if (err instanceof Error && err.message === "ai_timeout") {
-            log.warn("AI suggestions timed out after 2 minutes, scan will complete without them");
-          } else {
-            log.error("AI suggestions failed", { error: String(err) });
-          }
-        })
-        .finally(() => clearTimeout(aiTimeoutId));
-    }
-
-    await context.updateProgress(95);
-
     await withSpan("db.scan.setCompleted", { "scan.id": scanId, "issues.count": seoIssues.length }, () =>
       db
         .update(scans)
-        .set({ status: "completed", completedAt: new Date(), updatedAt: new Date() })
+        .set({ status: "completed", completedAt: new Date(), seoCompletedAt: new Date(), updatedAt: new Date() })
         .where(eq(scans.id, scanId))
     );
 
@@ -276,16 +231,23 @@ async function _runScanJob(
     await persistDvsScore(websiteId);
     await recordEvent("scan.completed", durationMs, { scanId, websiteId, ...bySeverity });
 
-    // Trigger AEO analysis for this website if it has active queries.
-    // This runs AEO immediately after each manual scan rather than waiting for the 3am timer.
-    const [hasAeoQueries] = await db
-      .select({ websiteId: aeoQueries.websiteId })
-      .from(aeoQueries)
-      .where(and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true)))
-      .limit(1);
-    if (hasAeoQueries) {
-      await (await getQueueProvider()).enqueue("aeo-scan", { websiteId });
-      log.info("aeo scan enqueued");
+    // DB join lock: enqueue ai-suggest once both phases are done.
+    // SEO fires immediately if aeoExpected=false; waits for AEO otherwise.
+    const [acquired] = await db
+      .update(scans)
+      .set({ aiTriggeredAt: new Date() })
+      .where(
+        and(
+          eq(scans.id, scanId),
+          isNull(scans.aiTriggeredAt),
+          or(eq(scans.aeoExpected, false), isNotNull(scans.aeoCompletedAt))
+        )
+      )
+      .returning({ id: scans.id });
+
+    if (acquired) {
+      await (await getQueueProvider()).enqueue("ai-suggest", { scanId, websiteId });
+      log.info("ai-suggest enqueued by seo completion");
     }
 
     await context.updateProgress(100);
@@ -334,46 +296,6 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[], capabilities
   const BATCH = 500;
   for (let i = 0; i < rows.length; i += BATCH) {
     await db.insert(issues).values(rows.slice(i, i + BATCH));
-  }
-}
-
-async function generateAndPersistSuggestions(
-  scanId: string,
-  websiteId: string,
-  pages: ParsedPage[],
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  log: any
-): Promise<void> {
-  const results = await Promise.allSettled(
-    pages.map((p) => generateSeoSuggestion(p, scanId))
-  );
-
-  // Build page lookup for current values
-  const pageMap = new Map(pages.map((p) => [p.url, p]));
-
-  const rows = results
-    .flatMap((r) => (r.status === "fulfilled" && r.value ? [r.value] : []))
-    .map((r) => {
-      const page = pageMap.get(r.pageUrl);
-      return {
-        scanId,
-        websiteId,
-        pageUrl: r.pageUrl,
-        currentMetaTitle: page?.title ?? null,
-        currentMetaDescription: page?.description ?? null,
-        currentH1: page?.h1s?.[0] ?? null,
-        metaTitle: r.suggestion.metaTitle,
-        metaDescription: r.suggestion.metaDescription,
-        h1: r.suggestion.h1,
-        latencyMs: r.latencyMs,
-        status: "pending" as const,
-      };
-    });
-
-  if (rows.length > 0) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    await db.insert(aiSuggestions).values(rows as any[]);
-    log.info("ai suggestions generated", { count: rows.length });
   }
 }
 

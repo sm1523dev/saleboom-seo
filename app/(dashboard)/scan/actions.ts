@@ -9,6 +9,7 @@ import { getServerSession } from "@/lib/auth-utils";
 import { parseWebsiteUrl } from "@/lib/form-validation";
 import { seedDefaultQueries } from "@/lib/aeo/seed-providers";
 import { recordEvent } from "@/lib/metrics";
+import { aeoQueries } from "@/lib/db/schema";
 
 export type ScanActionState = { error: string } | null;
 
@@ -54,17 +55,25 @@ export async function startScanAction(
     const hostnameString = new URL(url).hostname;
     await seedDefaultQueries(websiteId, hostnameString, url);
 
+    // Check if there are active AEO queries to determine parallel phase tracking
+    const [hasAeoQ] = await db
+      .select({ id: aeoQueries.id })
+      .from(aeoQueries)
+      .where(and(eq(aeoQueries.websiteId, websiteId), eq(aeoQueries.active, true)))
+      .limit(1);
+    const aeoExpected = !!hasAeoQ;
+
     // Create scan record
     const [scan] = await db
       .insert(scans)
-      .values({ websiteId, status: "pending", startedAt: new Date() })
+      .values({ websiteId, status: "pending", startedAt: new Date(), aeoExpected })
       .returning({ id: scans.id });
 
-    // Enqueue SEO scan + AEO scan in parallel
+    // Enqueue SEO + AEO in parallel; AEO carries scanId so the join lock can coordinate
     const queue = await getQueueProvider();
     await Promise.all([
       queue.enqueue("scan", { scanId: scan.id, websiteId, url }),
-      queue.enqueue("aeo-scan", { websiteId }),
+      ...(aeoExpected ? [queue.enqueue("aeo-scan", { websiteId, scanId: scan.id })] : []),
       recordEvent("scan.triggered", undefined, { scanId: scan.id, websiteId }),
     ]);
 
