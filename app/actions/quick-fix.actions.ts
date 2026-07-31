@@ -4,6 +4,7 @@ import { inArray, eq, and, isNotNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { issues, changeSnapshots, aiSuggestions } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
+import { revalidatePath } from "next/cache";
 import { getAiProvider } from "@/lib/ai";
 import type { CmsField } from "@/lib/cms/types";
 
@@ -106,7 +107,6 @@ export async function generateAndQueueIssueFixes(
       });
       const result = await (await getAiProvider()).generateText(prompt, {
         system: "You are an SEO expert. Reply with ONLY the requested text value — no explanations, no quotes, no labels. Be direct and concise.",
-        maxTokens: 2000,
       });
       const value = result.trim();
       if (!value) { failed++; return; }
@@ -147,6 +147,8 @@ export async function generateAndQueueIssueFixes(
     .update(issues)
     .set({ updatedAt: new Date() })
     .where(inArray(issues.id, fixes.map((f) => f.issueId)));
+
+  revalidatePath("/changes");
 
   return { queued: fixes.length, failed };
 }

@@ -21,6 +21,8 @@ export class AzureAIProvider implements AIProvider {
       baseURL: process.env.AZURE_OPENAI_ENDPOINT,
       apiKey: process.env.AZURE_OPENAI_API_KEY,
       apiVersion: process.env.AZURE_OPENAI_API_VERSION,
+      // Classic deployment URLs (required for api-version e.g. 2024-02-15-preview)
+      useDeploymentBasedUrls: true,
     });
 
     this.defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
@@ -41,7 +43,7 @@ export class AzureAIProvider implements AIProvider {
       system: opts?.system,
       prompt,
       temperature: opts?.temperature,
-      maxOutputTokens: opts?.maxTokens,
+      ...(opts?.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
     });
     return result.output as T;
   }
@@ -52,7 +54,7 @@ export class AzureAIProvider implements AIProvider {
       system: opts?.system,
       prompt,
       temperature: opts?.temperature,
-      maxOutputTokens: opts?.maxTokens,
+      ...(opts?.maxTokens != null ? { maxOutputTokens: opts.maxTokens } : {}),
     });
     return result.text;
   }

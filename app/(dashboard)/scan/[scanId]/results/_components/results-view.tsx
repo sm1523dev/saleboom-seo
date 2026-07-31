@@ -763,6 +763,7 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, scanId, cmsC
   const [isPending, startTransition] = useTransition();
   const [generating, setGenerating] = useState(false);
   const [totalGenerating, setTotalGenerating] = useState(0);
+  const [generateError, setGenerateError] = useState<string | null>(null);
 
   // No CMS connected — show a direct link to the CMS settings page, no dialog
   if (!cmsConnected) {
@@ -808,14 +809,26 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, scanId, cmsC
           </motion.div>
         </div>
       )}
+      {generateError && (
+        <p className="text-xs text-destructive">{generateError}</p>
+      )}
       <button
         type="button"
         disabled={isPending || generating}
         onClick={() => startTransition(async () => {
+          setGenerateError(null);
           setTotalGenerating(targetIds.length);
           setGenerating(true);
-          await generateAndQueueIssueFixes(targetIds);
+          const { queued, failed } = await generateAndQueueIssueFixes(targetIds);
           setGenerating(false);
+          if (queued === 0) {
+            setGenerateError(
+              failed > 0
+                ? `Could not generate fixes (${failed} failed). Check AI provider settings.`
+                : "No fixes were queued. They may already be in the approval queue.",
+            );
+            return;
+          }
           router.push("/changes");
         })}
         className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90 disabled:opacity-50"
