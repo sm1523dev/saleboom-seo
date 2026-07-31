@@ -42,7 +42,7 @@ const ISSUE_FIX_MAP: Record<string, { field: CmsField; buildPrompt: (issue: { ti
 
 export async function generateAndQueueIssueFixes(
   issueIds: string[],
-): Promise<{ queued: number; failed: number }> {
+): Promise<{ queued: number; failed: number; error?: string }> {
   if (issueIds.length === 0) return { queued: 0, failed: 0 };
   const session = await getServerSession();
   const userId = session.user.id as string;
@@ -88,6 +88,16 @@ export async function generateAndQueueIssueFixes(
 
   const fixes: IssueFix[] = [];
   let failed = 0;
+  let lastError: string | undefined;
+
+  let ai: Awaited<ReturnType<typeof getAiProvider>>;
+  try {
+    ai = await getAiProvider();
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "AI provider unavailable";
+    console.error("[quick-fix] AI provider init failed:", message);
+    return { queued: 0, failed: issueIds.length, error: message };
+  }
 
   const processIssue = async (issue: typeof rows[0]) => {
     if (!issue.pageUrl) { failed++; return; }
@@ -105,11 +115,15 @@ export async function generateAndQueueIssueFixes(
         description: issue.description,
         pageUrl: issue.pageUrl,
       });
-      const result = await (await getAiProvider()).generateText(prompt, {
+      const result = await ai.generateText(prompt, {
         system: "You are an SEO expert. Reply with ONLY the requested text value — no explanations, no quotes, no labels. Be direct and concise.",
       });
       const value = result.trim();
-      if (!value) { failed++; return; }
+      if (!value) {
+        lastError = "AI returned an empty response";
+        failed++;
+        return;
+      }
       fixes.push({
         issueId: issue.id,
         pageUrl: issue.pageUrl,
@@ -117,7 +131,9 @@ export async function generateAndQueueIssueFixes(
         beforeValue,
         afterValue: value,
       });
-    } catch {
+    } catch (err) {
+      lastError = err instanceof Error ? err.message : "AI generation failed";
+      console.error("[quick-fix] AI generation failed:", lastError, { issueId: issue.id, type: issue.type });
       failed++;
     }
   };
@@ -128,7 +144,7 @@ export async function generateAndQueueIssueFixes(
     await Promise.allSettled(rows.slice(i, i + BATCH).map(processIssue));
   }
 
-  if (fixes.length === 0) return { queued: 0, failed };
+  if (fixes.length === 0) return { queued: 0, failed, error: lastError };
 
   await db.insert(changeSnapshots).values(
     fixes.map((f) => ({

@@ -9,7 +9,7 @@ function createFromEnv(): AIProvider {
 function createByName(name: string, apiKey: string | undefined, config: Record<string, string>): AIProvider {
   switch (name) {
     case "azure":
-      return new (require("./providers/azure").AzureAIProvider)(apiKey);
+      return new (require("./providers/azure").AzureAIProvider)(apiKey, config);
     case "openai":
       return new (require("./providers/openai").OpenAIProvider)(apiKey);
     case "anthropic":

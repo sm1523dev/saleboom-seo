@@ -819,12 +819,14 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, scanId, cmsC
           setGenerateError(null);
           setTotalGenerating(targetIds.length);
           setGenerating(true);
-          const { queued, failed } = await generateAndQueueIssueFixes(targetIds);
+          const { queued, failed, error } = await generateAndQueueIssueFixes(targetIds);
           setGenerating(false);
           if (queued === 0) {
             setGenerateError(
               failed > 0
-                ? `Could not generate fixes (${failed} failed). Check AI provider settings.`
+                ? error
+                  ? `Could not generate fixes (${failed} failed): ${error}`
+                  : `Could not generate fixes (${failed} failed). Check AI provider settings.`
                 : "No fixes were queued. They may already be in the approval queue.",
             );
             return;

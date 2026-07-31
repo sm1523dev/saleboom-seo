@@ -3,29 +3,44 @@ import { generateText, Output, embed } from "ai";
 import type { z } from "zod";
 import type { AIProvider, GenerateOpts } from "../types";
 
+function normalizeAzureBaseUrl(endpoint: string): string {
+  const trimmed = endpoint.replace(/\/+$/, "");
+  return trimmed.endsWith("/openai") ? trimmed : `${trimmed}/openai`;
+}
+
 export class AzureAIProvider implements AIProvider {
   private readonly azure: ReturnType<typeof createAzure>;
   private readonly defaultDeployment: string;
 
-  constructor() {
-    if (!process.env.AZURE_OPENAI_ENDPOINT || !process.env.AZURE_OPENAI_API_KEY) {
+  constructor(apiKey?: string, config?: Record<string, string>) {
+    const endpoint =
+      process.env.AZURE_OPENAI_ENDPOINT ?? config?.endpointUrl ?? config?.endpoint;
+    const key = apiKey ?? process.env.AZURE_OPENAI_API_KEY;
+    const deployment =
+      process.env.AZURE_OPENAI_DEPLOYMENT ?? config?.deployment;
+    const apiVersion =
+      process.env.AZURE_OPENAI_API_VERSION ??
+      config?.apiVersion ??
+      "2024-02-15-preview";
+
+    if (!endpoint || !key) {
       throw new Error(
-        "AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY are required for AI_PROVIDER=azure"
+        "AZURE_OPENAI_ENDPOINT and AZURE_OPENAI_API_KEY are required for AI_PROVIDER=azure",
       );
     }
-    if (!process.env.AZURE_OPENAI_DEPLOYMENT) {
+    if (!deployment) {
       throw new Error("AZURE_OPENAI_DEPLOYMENT is required for AI_PROVIDER=azure");
     }
 
     this.azure = createAzure({
-      baseURL: process.env.AZURE_OPENAI_ENDPOINT,
-      apiKey: process.env.AZURE_OPENAI_API_KEY,
-      apiVersion: process.env.AZURE_OPENAI_API_VERSION,
+      baseURL: normalizeAzureBaseUrl(endpoint),
+      apiKey: key,
+      apiVersion,
       // Classic deployment URLs (required for api-version e.g. 2024-02-15-preview)
       useDeploymentBasedUrls: true,
     });
 
-    this.defaultDeployment = process.env.AZURE_OPENAI_DEPLOYMENT;
+    this.defaultDeployment = deployment;
   }
 
   private getModel(override?: string) {
@@ -35,7 +50,7 @@ export class AzureAIProvider implements AIProvider {
   async generateStructured<T>(
     schema: z.ZodSchema<T>,
     prompt: string,
-    opts?: GenerateOpts
+    opts?: GenerateOpts,
   ): Promise<T> {
     const result = await generateText({
       model: this.getModel(opts?.modelOverride),
