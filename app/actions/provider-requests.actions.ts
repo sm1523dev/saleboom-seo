@@ -1,11 +1,37 @@
 "use server";
 
-import { and, eq, isNull } from "drizzle-orm";
+import { eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { providerRequests, users } from "@/lib/db/schema";
 import { getServerSession, requireAdmin } from "@/lib/auth-utils";
-import { sendTransactionalEmail } from "@/lib/notifications/send";
+import type { AuthSession } from "@/lib/auth";
+import { majorFixHelpTemplate } from "@/lib/notifications/email-templates";
+import { sendAdminAlert, sendTransactionalEmail } from "@/lib/notifications/send";
 import { revalidatePath } from "next/cache";
+
+function fireMajorFixAdminAlert(
+  session: AuthSession,
+  websiteUrl: string,
+  issues: { issueTitle: string }[],
+): void {
+  if (issues.length === 0) return;
+  const tpl = majorFixHelpTemplate({
+    requesterName: session.user.name,
+    requesterEmail: session.user.email,
+    websiteUrl,
+    issues: issues.map((i) => i.issueTitle),
+  });
+  const issueBullets = issues.map((i) => `• ${i.issueTitle}`).join("\n");
+  const from = session.user.name ?? session.user.email;
+  const slackText = `🔧 *Major fix help requested* (${issues.length})\nFrom: ${from} <${session.user.email}>\nSite: ${websiteUrl}\n\n${issueBullets}`;
+  void sendAdminAlert({
+    text: slackText,
+    subject: tpl.subject,
+    html: tpl.html,
+  }).catch(() => {
+    // Non-fatal — request row is already saved
+  });
+}
 
 export async function requestMajorFixHelpBulk(issues: {
   issueId: string;
@@ -27,6 +53,7 @@ export async function requestMajorFixHelpBulk(issues: {
         status: "pending" as const,
       }))
     );
+    fireMajorFixAdminAlert(session, issues[0].websiteUrl, issues);
     revalidatePath("/admin/requests");
     return { success: true, count: issues.length };
   } catch {
@@ -51,6 +78,9 @@ export async function requestMajorFixHelp(data: {
       websiteId: data.websiteId,
       status: "pending",
     });
+    fireMajorFixAdminAlert(session, data.websiteUrl, [
+      { issueTitle: data.issueTitle },
+    ]);
     revalidatePath("/admin/requests");
     return { success: true };
   } catch {

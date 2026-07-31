@@ -307,6 +307,7 @@ Before marking any task complete:
 - Scan completion should email the website owner only; Slack alert channels are for admin/ops events, not product scan completion.
 - Prefer a unified notification model: fixed transactional from address with dynamic per-event recipients, plus separate Slack and admin-email routing channels.
 - Notifications transport (SMTP/Resend/SendGrid) should be configurable in Admin Providers, not only via Alert Channels.
+- Do not run `db:push` against Azure Postgres; use versioned migrations (`db:generate` + `premigrate`) or idempotent query-console SQL.
 
 ## Learned Workspace Facts
 
@@ -317,3 +318,8 @@ Before marking any task complete:
 - `notifications` infra provider is absent from Admin Providers `INFRA_META`; unset DB row defaults to `mock` (console-only, no real delivery).
 - Quick-fix badge means inherent rule-based fixes (meta, H1, alt, etc.) even without CMS; Apply/Fix-all stays blocked until CMS is connected.
 - `probeAndReclassify` on CMS connect only reclassifies issues on the latest completed scan.
+- Azure production deploys from `SaleBoomSEO/SEO_Integration` (git remote `azure`); push `main` triggers `deploy-prod.yml` (Container App + Functions). Pi dev uses `sm1523dev/saleboom-seo` + `deploy-dev.yml`.
+- Azure workers are queue-triggered Functions, not a separate worker container.
+- Container App startup runs `scripts/premigrate.mjs` for DB migrations; the Azure GitHub workflow does not run migrations.
+- `npm run db:push` syncs schema directly and does not create migration files; production path is `db:generate` + `premigrate`/`db:migrate`.
+- Drizzle migration tracking uses `drizzle.__drizzle_migrations` (not `public`); create `drizzle` schema if the table is missing.

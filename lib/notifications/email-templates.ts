@@ -210,6 +210,37 @@ export function profileUpdateTemplate(opts: {
   };
 }
 
+export function majorFixHelpTemplate(opts: {
+  requesterName?: string;
+  requesterEmail: string;
+  websiteUrl: string;
+  issues: string[];
+}): { subject: string; html: string; text: string } {
+  const count = opts.issues.length;
+  const displayName = opts.requesterName ?? opts.requesterEmail;
+  const escape = (s: string) => s.replace(/</g, "&lt;").replace(/>/g, "&gt;");
+  const issueItems = opts.issues
+    .map((title) => `<li style="margin:4px 0;color:#e5e7eb">${escape(title)}</li>`)
+    .join("");
+  const issueText = opts.issues.map((t) => `• ${t}`).join("\n");
+  const subjectIssue = opts.issues[0]?.slice(0, 60) ?? "major fix";
+  return {
+    subject:
+      count === 1
+        ? `Major fix help requested — ${subjectIssue}`
+        : `${count} major fix help requests — ${opts.websiteUrl}`,
+    html: `<div style="font-family:sans-serif;max-width:600px;margin:0 auto;background:#09090b;color:#e5e7eb;padding:32px;border-radius:12px">
+      <h2 style="color:#8b5cf6;margin:0 0 16px">Major fix help requested</h2>
+      <p style="margin:0 0 8px;color:#9ca3af">From: <strong style="color:#e5e7eb">${escape(displayName)}</strong> &lt;${escape(opts.requesterEmail)}&gt;</p>
+      <p style="margin:0 0 16px;color:#9ca3af">Website: <strong style="color:#e5e7eb">${escape(opts.websiteUrl)}</strong></p>
+      <p style="margin:0 0 8px;color:#9ca3af;font-size:12px">${count} ISSUE${count !== 1 ? "S" : ""}</p>
+      <ul style="margin:0;padding-left:16px">${issueItems}</ul>
+      <p style="margin:24px 0 0;color:#6b7280;font-size:12px">SaleBoom SEO — Admin Requests</p>
+    </div>`,
+    text: `Major fix help requested (${count})\nFrom: ${displayName} <${opts.requesterEmail}>\nWebsite: ${opts.websiteUrl}\n\n${issueText}`,
+  };
+}
+
 export function contactFormTemplate(opts: {
   name: string;
   email: string;
