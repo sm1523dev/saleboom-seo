@@ -8,7 +8,7 @@ import type { ParsedPage } from "@/lib/seo-rules/types";
 import { logger } from "@/lib/logger";
 import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { aiSuggestionsTemplate } from "@/lib/notifications/email-templates";
 
 export type AiSuggestJobData = { scanId: string; websiteId: string };
@@ -139,18 +139,17 @@ async function generateAndPersistSuggestions(
     await db.insert(aiSuggestions).values(rows as any[]);
     log.info("ai suggestions generated", { count: rows.length });
 
-    // Notify user that suggestions are ready — fire-and-forget
-    void (async () => {
-      try {
-        const [[siteRow]] = await Promise.all([
-          db
-            .select({ url: websites.url, userName: users.name, userEmail: users.email })
-            .from(websites)
-            .innerJoin(users, eq(websites.userId, users.id))
-            .where(eq(websites.id, websiteId))
-            .limit(1),
-        ]);
-        if (!siteRow) return;
+    // Notify user that suggestions are ready
+    try {
+      const [[siteRow]] = await Promise.all([
+        db
+          .select({ url: websites.url, userName: users.name, userEmail: users.email })
+          .from(websites)
+          .innerJoin(users, eq(websites.userId, users.id))
+          .where(eq(websites.id, websiteId))
+          .limit(1),
+      ]);
+      if (siteRow) {
         const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleboomseo.com";
         const tpl = aiSuggestionsTemplate({
           userName: siteRow.userName,
@@ -159,11 +158,15 @@ async function generateAndPersistSuggestions(
           scanId,
           appUrl,
         });
-        const provider = await getNotificationProvider();
-        await provider.sendEmail({ to: siteRow.userEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
-      } catch (notifyErr) {
-        log.warn("ai suggestions email failed", { error: String(notifyErr) });
+        await sendTransactionalEmail({
+          to: siteRow.userEmail,
+          subject: tpl.subject,
+          html: tpl.html,
+          text: tpl.text,
+        });
       }
-    })();
+    } catch (notifyErr) {
+      log.warn("ai suggestions email failed", { error: String(notifyErr) });
+    }
   }
 }

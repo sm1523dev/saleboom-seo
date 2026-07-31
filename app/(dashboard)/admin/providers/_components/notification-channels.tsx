@@ -47,6 +47,7 @@ type FormState = {
   secret: string;
   smtpHost: string;
   smtpPort: string;
+  alertTo: string;
 };
 
 function emptyForm(): FormState {
@@ -58,6 +59,7 @@ function emptyForm(): FormState {
     secret: "",
     smtpHost: "smtp.gmail.com",
     smtpPort: "587",
+    alertTo: "",
   };
 }
 
@@ -70,6 +72,7 @@ function formFromChannel(ch: Channel): FormState {
     secret: "",
     smtpHost: ch.config.host ?? "smtp.gmail.com",
     smtpPort: ch.config.port ?? "587",
+    alertTo: ch.config.to ?? "",
   };
 }
 
@@ -106,9 +109,14 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
   function handleSubmit() {
     if (!form.label.trim()) { setError("Label is required."); return; }
     if (sheetMode === "add" && !form.key.trim()) { setError("Credential is required."); return; }
+    if (form.channelType === "email" && !form.alertTo.trim()) {
+      setError("Alert recipients (to) are required for email channels.");
+      return;
+    }
 
     const config: Record<string, string> = {};
     if (form.channelType === "email") {
+      config.to = form.alertTo.trim();
       if (form.emailProvider === "smtp") {
         config.host = form.smtpHost.trim();
         config.port = form.smtpPort.trim();
@@ -177,9 +185,9 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
           <div className="flex items-center gap-2">
             <span className="font-mono text-primary">⊡</span>
             <div>
-              <p className="text-sm font-semibold">Alert Channels</p>
+              <p className="text-sm font-semibold">Admin Alert Channels</p>
               <p className="text-[10px] text-muted-foreground">
-                Email and Slack — credentials encrypted at rest
+                Where admin/ops alerts go (Slack + admin inbox). Email transport is configured in the Notifications card above.
               </p>
             </div>
           </div>
@@ -199,7 +207,9 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-medium">{ch.name}</p>
                   <p className="truncate text-xs text-muted-foreground">
-                    {ch.provider}{ch.config.host ? ` · ${ch.config.host}:${ch.config.port ?? "587"}` : ""}
+                    {ch.provider}
+                    {ch.config.host ? ` · ${ch.config.host}:${ch.config.port ?? "587"}` : ""}
+                    {ch.config.to ? ` · to: ${ch.config.to}` : ch.channelType === "email" ? " · missing recipients" : ""}
                   </p>
                 </div>
                 <span
@@ -321,9 +331,22 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
             {/* Email */}
             {form.channelType === "email" && (
               <div className="space-y-3">
+                <div className="space-y-1.5">
+                  <Label className="text-xs">Alert recipients (to)</Label>
+                  <Input
+                    value={form.alertTo}
+                    onChange={(e) => patch({ alertTo: e.target.value })}
+                    placeholder="admin@example.com, ops@example.com"
+                    className="input-glow h-8 text-xs"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    Comma-separated admin emails for ops alerts (contact form, health thresholds). Not used for user transactional mail.
+                  </p>
+                </div>
+
                 {!isEditing && (
                   <div className="space-y-1.5">
-                    <Label className="text-xs">Email Provider</Label>
+                    <Label className="text-xs">Email Provider (transport fallback)</Label>
                     <div className="flex gap-2">
                       {(["smtp", "resend", "sendgrid"] as EmailProvider[]).map((p) => (
                         <button
@@ -341,6 +364,9 @@ export function NotificationChannels({ channels: initial }: { channels: Channel[
                         </button>
                       ))}
                     </div>
+                    <p className="text-[10px] text-muted-foreground">
+                      Prefer configuring the Notifications infra card. Channel credentials are only a fallback.
+                    </p>
                   </div>
                 )}
 

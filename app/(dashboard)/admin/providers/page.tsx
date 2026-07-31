@@ -9,10 +9,11 @@ import { NotificationChannels } from "./_components/notification-channels";
 export const metadata = { title: "Provider Management" };
 
 const INFRA_META: Record<string, { label: string; icon: string; switchMode: "runtime" | "restart" | "redeploy" }> = {
-  ai:      { label: "AI / LLM",      icon: "⊛", switchMode: "runtime" },
-  crawl:   { label: "Web Crawl",     icon: "⊙", switchMode: "runtime" },
-  queue:   { label: "Queue / Worker", icon: "⊞", switchMode: "restart" },
-  storage: { label: "Storage",       icon: "⊟", switchMode: "restart" },
+  ai:            { label: "AI / LLM",      icon: "⊛", switchMode: "runtime" },
+  crawl:         { label: "Web Crawl",     icon: "⊙", switchMode: "runtime" },
+  queue:         { label: "Queue / Worker", icon: "⊞", switchMode: "restart" },
+  storage:       { label: "Storage",       icon: "⊟", switchMode: "restart" },
+  notifications: { label: "Notifications", icon: "⊡", switchMode: "runtime" },
 };
 
 const AUTH_CARD = {
@@ -28,7 +29,7 @@ const PROVIDER_OPTIONS: Record<string, string[]> = {
   crawl:         ["firecrawl", "mock"],
   queue:         ["bullmq", "azure-queue", "sqs", "mock"],
   storage:       ["local", "azure-blob", "s3", "mock"],
-  notifications: ["resend", "sendgrid", "smtp", "twilio", "ses", "mock"],
+  notifications: ["smtp", "resend", "sendgrid", "mock"],
 };
 
 const ENV_PROVIDER_DEFAULTS: Record<string, string> = {

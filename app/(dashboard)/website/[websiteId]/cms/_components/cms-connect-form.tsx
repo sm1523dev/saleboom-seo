@@ -7,6 +7,7 @@ import { connectWordPress, connectShopify, connectWebflow, disconnectCms } from 
 import type { CmsConnectionState } from "@/app/actions/cms.actions";
 import { updateGitHubFramework } from "@/app/actions/quality.actions";
 import type { GitHubFramework } from "@/lib/cms/types";
+import { ReassessFixesOverlay } from "@/components/shared/reassess-fixes-overlay";
 import { GithubRepoForm } from "./github-repo-form";
 
 type CmsType = "wordpress" | "shopify" | "webflow" | "github";
@@ -15,6 +16,7 @@ type Props = {
   websiteId: string;
   initialState: CmsConnectionState;
   githubStep?: string | null;
+  returnScanId?: string | null;
 };
 
 const CMS_LABELS: Record<CmsType, string> = {
@@ -36,31 +38,60 @@ const FRAMEWORK_LABELS: Record<string, string> = {
   unknown: "Unknown framework",
 };
 
-export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
+function resultsReturnUrl(returnScanId: string | null | undefined): string | null {
+  if (!returnScanId) return null;
+  return `/scan/${returnScanId}/results?reassessed=1`;
+}
+
+export function CmsConnectForm({ websiteId, initialState, githubStep, returnScanId }: Props) {
   const router = useRouter();
   const [state, setState] = useState(initialState);
   const [cmsType, setCmsType] = useState<CmsType>(githubStep ? "github" : "wordpress");
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
 
-  // WordPress fields
   const [wpUrl, setWpUrl] = useState("");
   const [wpUsername, setWpUsername] = useState("");
   const [wpPassword, setWpPassword] = useState("");
 
-  // Shopify fields
   const [shopifyUrl, setShopifyUrl] = useState("");
   const [shopifyToken, setShopifyToken] = useState("");
 
-  // Webflow fields
   const [wfToken, setWfToken] = useState("");
   const [wfCollectionId, setWfCollectionId] = useState("");
+
+  function finishConnect(quickCount: number | undefined) {
+    const n = quickCount ?? 0;
+    const msg = n === 1 ? "1 quick fix unlocked" : `${n} quick fixes unlocked`;
+    setSuccessMessage(msg);
+    const returnUrl = resultsReturnUrl(returnScanId);
+    if (returnUrl) {
+      setTimeout(() => {
+        window.location.href = returnUrl;
+      }, 900);
+      return;
+    }
+    setTimeout(() => {
+      setConnecting(false);
+      setSuccessMessage(null);
+      router.refresh();
+    }, 900);
+  }
 
   function handleConnect(e: React.FormEvent) {
     e.preventDefault();
     setError(null);
+    setConnecting(true);
     startTransition(async () => {
-      let result: { success: boolean; error?: string; connectedAs?: string };
+      let result: {
+        success: boolean;
+        error?: string;
+        connectedAs?: string;
+        quickCount?: number;
+        majorCount?: number;
+      };
 
       if (cmsType === "wordpress") {
         result = await connectWordPress(websiteId, wpUrl, wpUsername, wpPassword);
@@ -71,7 +102,6 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
       }
 
       if (result.success) {
-        router.refresh();
         setState({
           connected: true,
           cmsType,
@@ -79,7 +109,9 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
           connectedAt: new Date().toISOString(),
           connectionId: "",
         });
+        finishConnect(result.quickCount);
       } else {
+        setConnecting(false);
         setError(result.error ?? "Connection failed");
       }
     });
@@ -94,51 +126,58 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
     });
   }
 
-  // GitHub step 2: OAuth token stored but repo details not yet entered.
-  // Show the repo form even though the connection record already exists.
   if (githubStep === "2" && (!state.connected || (state.connected && state.cmsType === "github"))) {
     return (
       <div className="rounded-xl border border-border bg-card p-6">
-        <GithubRepoForm websiteId={websiteId} />
+        <GithubRepoForm websiteId={websiteId} returnScanId={returnScanId} />
       </div>
     );
   }
 
   if (state.connected) {
     return (
-      <div className="rounded-xl border border-border bg-card p-6">
-        <div className="flex items-start justify-between gap-4">
-          <div>
-            <div className="flex items-center gap-2">
-              <span className="inline-block h-2 w-2 rounded-full bg-green-400" aria-hidden="true" />
-              <p className="text-sm font-medium">{CMS_LABELS[state.cmsType as CmsType] ?? state.cmsType} connected</p>
+      <>
+        <ReassessFixesOverlay
+          active={connecting && !successMessage}
+          successMessage={successMessage}
+        />
+        <div className="rounded-xl border border-border bg-card p-6">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block h-2 w-2 rounded-full bg-green-400" aria-hidden="true" />
+                <p className="text-sm font-medium">{CMS_LABELS[state.cmsType as CmsType] ?? state.cmsType} connected</p>
+              </div>
+              <p className="mt-1 font-mono text-xs text-muted-foreground">{state.connectedAs}</p>
+              {state.cmsType === "github" && (
+                <FrameworkEditor
+                  websiteId={websiteId}
+                  currentFramework={state.framework ?? "unknown"}
+                />
+              )}
+              <p className="mt-0.5 text-xs text-muted-foreground">
+                Connected {new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(state.connectedAt))}
+              </p>
             </div>
-            <p className="mt-1 font-mono text-xs text-muted-foreground">{state.connectedAs}</p>
-            {state.cmsType === "github" && (
-              <FrameworkEditor
-                websiteId={websiteId}
-                currentFramework={state.framework ?? "unknown"}
-              />
-            )}
-            <p className="mt-0.5 text-xs text-muted-foreground">
-              Connected {new Intl.DateTimeFormat("en", { dateStyle: "medium" }).format(new Date(state.connectedAt))}
-            </p>
+            <button
+              onClick={handleDisconnect}
+              disabled={isPending}
+              className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
+            >
+              {isPending ? "Disconnecting…" : "Disconnect"}
+            </button>
           </div>
-          <button
-            onClick={handleDisconnect}
-            disabled={isPending}
-            className="shrink-0 rounded-lg border border-border px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:border-red-500/50 hover:text-red-400 disabled:opacity-50"
-          >
-            {isPending ? "Disconnecting…" : "Disconnect"}
-          </button>
         </div>
-      </div>
+      </>
     );
   }
 
   return (
-    <div className="rounded-xl border border-border bg-card p-6">
-      {/* CMS type selector */}
+    <div className="relative rounded-xl border border-border bg-card p-6">
+      <ReassessFixesOverlay
+        active={connecting && !successMessage}
+        successMessage={successMessage}
+      />
       <div className="mb-5 flex flex-wrap gap-2">
         {(["wordpress", "shopify", "webflow", "github"] as CmsType[]).map((type) => (
           <button
@@ -157,11 +196,10 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
         ))}
       </div>
 
-      {/* GitHub: OAuth redirect step OR repo config step */}
       {cmsType === "github" && (
         <div className="space-y-4">
           {githubStep === "2" ? (
-            <GithubRepoForm websiteId={websiteId} />
+            <GithubRepoForm websiteId={websiteId} returnScanId={returnScanId} />
           ) : (
             <>
               <p className="text-sm text-muted-foreground">
@@ -169,7 +207,7 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
                 SaleBoom will create a branch, commit the change, and open a PR for your team to review.
               </p>
               <a
-                href={`/api/github/connect?websiteId=${websiteId}`}
+                href={`/api/github/connect?websiteId=${websiteId}${returnScanId ? `&returnScanId=${encodeURIComponent(returnScanId)}` : ""}`}
                 className="btn-press flex w-full items-center justify-center gap-2 rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
               >
                 <svg viewBox="0 0 16 16" fill="currentColor" className="h-4 w-4" aria-hidden="true">
@@ -183,7 +221,6 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
       )}
 
       <form onSubmit={handleConnect} className={["space-y-4", cmsType === "github" ? "hidden" : ""].join(" ")}>
-        {/* WordPress fields */}
         {cmsType === "wordpress" && (
           <>
             <Field id="wp-url" label="WordPress site URL" type="url" required placeholder="https://yoursite.com" value={wpUrl} onChange={setWpUrl} />
@@ -203,7 +240,6 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
           </>
         )}
 
-        {/* Shopify fields */}
         {cmsType === "shopify" && (
           <>
             <Field id="shopify-url" label="Shopify store URL" type="url" required placeholder="https://yourstore.myshopify.com" value={shopifyUrl} onChange={setShopifyUrl} hint="Use your .myshopify.com URL, e.g. https://seo-test-1qwtfiyp.myshopify.com — not the admin.shopify.com URL" />
@@ -222,7 +258,6 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
           </>
         )}
 
-        {/* Webflow fields */}
         {cmsType === "webflow" && (
           <>
             <Field
@@ -267,10 +302,10 @@ export function CmsConnectForm({ websiteId, initialState, githubStep }: Props) {
 
         <button
           type="submit"
-          disabled={isPending}
+          disabled={isPending || connecting}
           className="btn-press w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
-          {isPending ? "Validating connection…" : `Connect ${CMS_LABELS[cmsType]}`}
+          {connecting ? "Connecting…" : `Connect ${CMS_LABELS[cmsType]}`}
         </button>
       </form>
     </div>
@@ -317,7 +352,7 @@ function Field({
 
 const FRAMEWORK_OPTIONS: { value: GitHubFramework; label: string }[] = [
   { value: "nextjs-app", label: "Next.js (App Router)" },
-  { value: "nextjs-pages", label: "Next.js (Pages Router)" },
+  { value: "nextjs-pages", label: "Next.js Pages Router" },
   { value: "hugo", label: "Hugo" },
   { value: "jekyll", label: "Jekyll" },
   { value: "gatsby", label: "Gatsby" },

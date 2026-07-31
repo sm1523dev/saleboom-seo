@@ -34,3 +34,71 @@ When working on any task in this project, always use available tools proactively
 - Auth: NextAuth v5 (Auth.js) with Microsoft Entra ID only
 - Azure infra: Azure Queue Storage + Azure Functions (Node.js v4 model)
 - No Co-authored-by in commits (see AGENTS.md §7.3)
+
+
+## 💰 Spending Cap: $50 per Task Session
+
+### Pricing (based on actual account data)
+| Model              | Input      | Output     | Cache Read | Cache Write |
+|--------------------|------------|------------|------------|-------------|
+| Claude 4.6 Sonnet  | $3.00/1M   | $15.00/1M  | $0.30/1M   | $3.75/1M    |
+| Claude 5 Sonnet    | $2.00/1M   | $10.00/1M  | $0.20/1M   | —           |
+| Claude 4.5 Haiku   | $1.00/1M   | $4.76/1M   | $0.10/1M   | $1.25/1M    |
+
+### ⚠️ Cache Cost Warning
+Cache writes are the dominant cost driver in this account.
+Assume every large file/context loaded costs ~$3.75 per 1M tokens written to cache.
+Estimate cache write cost BEFORE loading large files or long contexts.
+
+### Before Starting Any Task
+1. Estimate total cost:
+   - Output tokens dominate execution cost → budget ~$15/1M output tokens
+   - Cache writes dominate context cost → budget ~$3.75/1M cache-write tokens
+2. If estimated cost > $50: DO NOT proceed.
+   Instead, present a scoped plan: what fits in $50 and what does not.
+3. If estimated cost ≤ $50: Proceed, tracking spend after each major step.
+
+### During Execution
+- After each major step, estimate cumulative spend.
+- At $45 spent (~90% of budget): STOP and generate HANDOVER.md immediately.
+  (The remaining $5 covers the handover document itself.)
+
+### Handover Document (auto-generate at $45)
+Save as `HANDOVER.md`:
+
+```
+# Task Handover
+
+## 📋 Original Request
+[Exact user ask]
+
+## 💰 Budget Used
+Estimated: ~$XX of $50
+
+## ✅ Completed Work
+- [What was done]
+- [Files created/modified with paths]
+
+## 🔄 Remaining Work
+1. [Next step]
+2. [Following step]
+
+## 🧠 Context & State
+- Key decisions made:
+- Current code/data state:
+- Known issues or blockers:
+- Important variables/configs:
+
+## 💵 Estimated Cost to Complete
+~$XX additional needed | Recommended model: [Haiku/Sonnet/etc.]
+
+## ▶️ Resume Prompt
+Paste this to continue in a new session:
+> "Read HANDOVER.md and continue from step [N].
+>  Context: [key state]. Files are at [paths]."
+```
+
+### Cost-Saving Tips
+- Prefer **Claude 4.5 Haiku** for planning, search, and simple edits (3x cheaper output)
+- Avoid reloading large files repeatedly (cache writes are expensive)
+- Break large tasks into smaller sessions with explicit checkpoints

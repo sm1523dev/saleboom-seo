@@ -299,3 +299,21 @@ Before marking any task complete:
 - Do NOT skip structured data on public-facing pages
 - Do NOT add comments that describe WHAT the code does (only WHY if non-obvious)
 - Do NOT add Co-authored-by or AI attribution to commits
+
+---
+
+## Learned User Preferences
+
+- Scan completion should email the website owner only; Slack alert channels are for admin/ops events, not product scan completion.
+- Prefer a unified notification model: fixed transactional from address with dynamic per-event recipients, plus separate Slack and admin-email routing channels.
+- Notifications transport (SMTP/Resend/SendGrid) should be configurable in Admin Providers, not only via Alert Channels.
+
+## Learned Workspace Facts
+
+- Transactional emails (scan complete, digest, auth, CMS push) use `infra_providers` type `notifications` via `getNotificationProvider()`; they do not use `notification_channels`.
+- Admin/ops alerts (contact form, quality flags, health thresholds) use `notification_channels` via `dispatchToChannels()` (Slack webhook + email with `config.to`).
+- Default transactional from address: `no-reply@saleboomllc.com`.
+- `notification_channels` email dispatch silently skips when `config.to` is missing; Alert Channels UI historically saved SMTP transport without recipient addresses.
+- `notifications` infra provider is absent from Admin Providers `INFRA_META`; unset DB row defaults to `mock` (console-only, no real delivery).
+- Quick-fix badge means inherent rule-based fixes (meta, H1, alt, etc.) even without CMS; Apply/Fix-all stays blocked until CMS is connected.
+- `probeAndReclassify` on CMS connect only reclassifies issues on the latest completed scan.

@@ -285,14 +285,14 @@ export async function pushChangeTocms(
         .where(eq(users.id, snapshot.userId!))
         .limit(1);
       if (userRecord?.email) {
-        const { getNotificationProvider } = await import("@/lib/notifications");
+        const { sendTransactionalEmail } = await import("@/lib/notifications/send");
         const { pushSuccessTemplate } = await import("@/lib/notifications/email-templates");
         const tmpl = pushSuccessTemplate({
           pageUrl: snapshot.pageUrl,
           fieldChanged: snapshot.fieldChanged,
           afterValue: afterValue,
         });
-        void getNotificationProvider().then((p) => p.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text }));
+        void sendTransactionalEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
       }
     } catch { /* non-critical */ }
 
@@ -314,14 +314,14 @@ export async function pushChangeTocms(
         .where(eq(users.id, snapshot.userId!))
         .limit(1);
       if (userRecord?.email) {
-        const { getNotificationProvider } = await import("@/lib/notifications");
+        const { sendTransactionalEmail } = await import("@/lib/notifications/send");
         const { pushFailureTemplate } = await import("@/lib/notifications/email-templates");
         const tmpl = pushFailureTemplate({
           pageUrl: snapshot.pageUrl,
           fieldChanged: snapshot.fieldChanged,
           error: message,
         });
-        void getNotificationProvider().then((p) => p.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text }));
+        void sendTransactionalEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
       }
     } catch { /* non-critical */ }
 
@@ -449,14 +449,14 @@ export async function rollbackChange(
         .where(eq(users.id, snapshot.userId!))
         .limit(1);
       if (userRecord?.email) {
-        const { getNotificationProvider } = await import("@/lib/notifications");
+        const { sendTransactionalEmail } = await import("@/lib/notifications/send");
         const { rollbackTemplate } = await import("@/lib/notifications/email-templates");
         const tmpl = rollbackTemplate({
           pageUrl: snapshot.pageUrl,
           fieldChanged: snapshot.fieldChanged,
           beforeValue: beforeState?.value ?? null,
         });
-        void getNotificationProvider().then((p) => p.sendEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text }));
+        void sendTransactionalEmail({ to: userRecord.email, subject: tmpl.subject, html: tmpl.html, text: tmpl.text });
       }
     } catch { /* non-critical */ }
 

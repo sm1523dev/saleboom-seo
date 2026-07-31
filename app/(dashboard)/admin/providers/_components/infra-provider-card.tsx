@@ -1,7 +1,11 @@
 "use client";
 
 import { useState, useTransition } from "react";
-import { switchInfraProvider, setInfraProviderKey } from "@/app/actions/providers.actions";
+import {
+  switchInfraProvider,
+  setInfraProviderKey,
+  setInfraProviderCredentials,
+} from "@/app/actions/providers.actions";
 import { submitProviderRequest } from "@/app/actions/provider-requests.actions";
 
 type Props = {
@@ -29,6 +33,7 @@ const SWITCH_MODE_COLOR: Record<string, string> = {
 };
 
 const OPENAI_COMPAT_PROVIDERS = new Set(["nim", "openai", "groq", "ollama", "custom", "mock"]);
+const DEFAULT_FROM_DISPLAY = "SaleBoom SEO <no-reply@saleboomllc.com>";
 
 export function InfraProviderCard({
   type, label, icon, currentName, hasKey, switchMode, options, config, children,
@@ -37,9 +42,13 @@ export function InfraProviderCard({
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [showRequestForm, setShowRequestForm] = useState(false);
   const [keyValue, setKeyValue] = useState("");
+  const [smtpSecret, setSmtpSecret] = useState("");
   const [selectedName, setSelectedName] = useState(currentName);
   const [customEndpoint, setCustomEndpoint] = useState(config.endpointUrl ?? "");
   const [customModel, setCustomModel] = useState(config.model ?? "");
+  const [smtpHost, setSmtpHost] = useState(config.host ?? "smtp.gmail.com");
+  const [smtpPort, setSmtpPort] = useState(config.port ?? "587");
+  const [smtpFrom, setSmtpFrom] = useState(config.from ?? DEFAULT_FROM_DISPLAY);
   const [requestName, setRequestName] = useState("");
   const [requestReason, setRequestReason] = useState("");
   const [requestStatus, setRequestStatus] = useState<"idle" | "sent" | "error">("idle");
@@ -52,16 +61,30 @@ export function InfraProviderCard({
 
   const isCustom = selectedName === "custom";
   const isNonCompat = type === "ai" && !OPENAI_COMPAT_PROVIDERS.has(selectedName);
+  const isNotifications = type === "notifications";
+  const isSmtp = isNotifications && selectedName === "smtp";
+  const currentIsSmtp = isNotifications && currentName === "smtp";
 
   function handleSaveProvider() {
-    const providerConfig: Record<string, string> = isCustom
-      ? { endpointUrl: customEndpoint.trim(), model: customModel.trim() }
-      : {};
+    let providerConfig: Record<string, string> = {};
+    if (isCustom) {
+      providerConfig = { endpointUrl: customEndpoint.trim(), model: customModel.trim() };
+    } else if (isNotifications) {
+      providerConfig = {
+        from: smtpFrom.trim() || DEFAULT_FROM_DISPLAY,
+        ...(isSmtp
+          ? { host: smtpHost.trim() || "smtp.gmail.com", port: smtpPort.trim() || "587" }
+          : {}),
+      };
+    }
+    const nameUnchanged = selectedName === currentName;
     setSaveError(null);
     startTransition(async () => {
-      const result = await switchInfraProvider(type, selectedName, providerConfig);
+      const result = await switchInfraProvider(type, selectedName, providerConfig, {
+        keepKey: nameUnchanged,
+      });
       if (result.success) {
-        setLocalHasKey(false);
+        if (!nameUnchanged) setLocalHasKey(false);
         setIsEditing(false);
       } else {
         setSaveError(result.error ?? "Failed to save — check you have admin access.");
@@ -71,11 +94,17 @@ export function InfraProviderCard({
 
   function handleSaveKey() {
     startKeyTransition(async () => {
-      const result = await setInfraProviderKey(type, keyValue);
+      const result = isSmtp || currentIsSmtp
+        ? await setInfraProviderCredentials(type, {
+            key: keyValue,
+            secret: smtpSecret,
+          })
+        : await setInfraProviderKey(type, keyValue);
       if (result.success) {
         setLocalHasKey(true);
         setKeyStatus("saved");
         setKeyValue("");
+        setSmtpSecret("");
         setShowKeyInput(false);
         setTimeout(() => setKeyStatus("idle"), 2500);
       } else {
@@ -86,7 +115,9 @@ export function InfraProviderCard({
 
   function handleClearKey() {
     startKeyTransition(async () => {
-      const result = await setInfraProviderKey(type, "");
+      const result = isSmtp || currentIsSmtp
+        ? await setInfraProviderCredentials(type, { key: "" })
+        : await setInfraProviderKey(type, "");
       if (result.success) {
         setLocalHasKey(false);
         setKeyStatus("idle");
@@ -112,9 +143,12 @@ export function InfraProviderCard({
     });
   }
 
+  const keySaveDisabled = currentIsSmtp
+    ? keyPending || !keyValue.trim() || !smtpSecret.trim()
+    : keyPending || !keyValue.trim();
+
   return (
     <div className="card-glow rounded-xl border border-border bg-card p-4">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-2">
           <span className="font-mono text-primary">{icon}</span>
@@ -125,7 +159,6 @@ export function InfraProviderCard({
         </span>
       </div>
 
-      {/* Provider selector */}
       {isEditing ? (
         <div className="mt-3 space-y-2">
           <select
@@ -138,7 +171,6 @@ export function InfraProviderCard({
             ))}
           </select>
 
-          {/* Custom config fields */}
           {isCustom && (
             <div className="space-y-2">
               <label className="flex flex-col gap-1">
@@ -167,7 +199,46 @@ export function InfraProviderCard({
             </div>
           )}
 
-          {/* Non-OpenAI-compat warning */}
+          {isNotifications && selectedName !== "mock" && (
+            <div className="space-y-2">
+              <label className="flex flex-col gap-1">
+                <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">From address</span>
+                <input
+                  type="text"
+                  value={smtpFrom}
+                  onChange={(e) => setSmtpFrom(e.target.value)}
+                  placeholder={DEFAULT_FROM_DISPLAY}
+                  className="rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
+                />
+              </label>
+              {isSmtp && (
+                <div className="grid grid-cols-2 gap-2">
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">SMTP Host</span>
+                    <input
+                      type="text"
+                      value={smtpHost}
+                      onChange={(e) => setSmtpHost(e.target.value)}
+                      className="rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary/50"
+                    />
+                  </label>
+                  <label className="flex flex-col gap-1">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground/60">Port</span>
+                    <input
+                      type="text"
+                      value={smtpPort}
+                      onChange={(e) => setSmtpPort(e.target.value)}
+                      className="rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground outline-none focus:border-primary/50"
+                    />
+                  </label>
+                </div>
+              )}
+              <p className="text-[10px] text-muted-foreground/60">
+                Transport for transactional email (scan complete, digest, auth). Alert Channels route admin/ops alerts separately.
+              </p>
+            </div>
+          )}
+
           {isNonCompat && (
             <div className="rounded-md border border-yellow-500/30 bg-yellow-500/10 p-3">
               <p className="text-xs text-yellow-400 font-medium">Not OpenAI-compatible</p>
@@ -177,9 +248,11 @@ export function InfraProviderCard({
             </div>
           )}
 
-          <p className="text-[10px] text-yellow-500/80">
-            ⚠ Switching clears the stored key — set a new key after saving.
-          </p>
+          {selectedName !== currentName && (
+            <p className="text-[10px] text-yellow-500/80">
+              Switching providers clears the stored key — set a new key after saving.
+            </p>
+          )}
           {saveError && <p className="text-[10px] text-red-400">{saveError}</p>}
           <div className="flex gap-2">
             <button
@@ -205,60 +278,94 @@ export function InfraProviderCard({
               change
             </button>
           </div>
-          {/* Show custom config when active */}
           {currentName === "custom" && config.endpointUrl && (
             <div className="mt-1.5 space-y-0.5">
               <p className="font-mono text-[10px] text-muted-foreground/60 truncate">{config.endpointUrl}</p>
               {config.model && <p className="font-mono text-[10px] text-muted-foreground/40">{config.model}</p>}
             </div>
           )}
+          {isNotifications && (
+            <div className="mt-1.5 space-y-0.5">
+              <p className="font-mono text-[10px] text-muted-foreground/60 truncate">
+                from: {config.from ?? DEFAULT_FROM_DISPLAY}
+              </p>
+              {currentIsSmtp && config.host && (
+                <p className="font-mono text-[10px] text-muted-foreground/40">
+                  {config.host}:{config.port ?? "587"}
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Key management */}
-      <div className="mt-3 border-t border-border pt-3">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-1.5">
-            <span className={`h-1.5 w-1.5 rounded-full ${localHasKey ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
-            <span className="text-[10px] text-muted-foreground">
-              {localHasKey ? "Key stored (encrypted)" : "No key — using env var fallback"}
-            </span>
-          </div>
-          <div className="flex items-center gap-2">
-            {localHasKey && (
-              <button onClick={handleClearKey} disabled={keyPending} className="text-[10px] text-muted-foreground/50 hover:text-red-400 disabled:opacity-40">
-                clear
+      {currentName !== "mock" && (
+        <div className="mt-3 border-t border-border pt-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-1.5">
+              <span className={`h-1.5 w-1.5 rounded-full ${localHasKey ? "bg-emerald-400" : "bg-muted-foreground/40"}`} />
+              <span className="text-[10px] text-muted-foreground">
+                {localHasKey
+                  ? "Credentials stored (encrypted)"
+                  : isNotifications
+                    ? "No credentials — using Alert Channel / env fallback"
+                    : "No key — using env var fallback"}
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              {localHasKey && (
+                <button onClick={handleClearKey} disabled={keyPending} className="text-[10px] text-muted-foreground/50 hover:text-red-400 disabled:opacity-40">
+                  clear
+                </button>
+              )}
+              <button onClick={() => setShowKeyInput((v) => !v)} className="text-[10px] text-muted-foreground/50 hover:text-primary">
+                {showKeyInput ? "cancel" : localHasKey ? "rotate" : currentIsSmtp ? "set credentials" : "set key"}
               </button>
-            )}
-            <button onClick={() => setShowKeyInput((v) => !v)} className="text-[10px] text-muted-foreground/50 hover:text-primary">
-              {showKeyInput ? "cancel" : localHasKey ? "rotate" : "set key"}
-            </button>
+            </div>
           </div>
+
+          {showKeyInput && (
+            <div className="mt-2 space-y-2">
+              {currentIsSmtp ? (
+                <>
+                  <input
+                    type="text"
+                    value={keyValue}
+                    onChange={(e) => setKeyValue(e.target.value)}
+                    placeholder="SMTP user (e.g. you@gmail.com)"
+                    className="w-full rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
+                  />
+                  <input
+                    type="password"
+                    value={smtpSecret}
+                    onChange={(e) => setSmtpSecret(e.target.value)}
+                    placeholder="App password"
+                    className="w-full rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
+                  />
+                </>
+              ) : (
+                <input
+                  type="password"
+                  value={keyValue}
+                  onChange={(e) => setKeyValue(e.target.value)}
+                  placeholder="Paste API key or connection string…"
+                  className="w-full rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
+                />
+              )}
+              <button
+                onClick={handleSaveKey}
+                disabled={keySaveDisabled}
+                className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-40"
+              >
+                {keyPending ? "Encrypting…" : currentIsSmtp ? "Save credentials" : "Save key"}
+              </button>
+            </div>
+          )}
+          {keyStatus === "saved" && <p className="mt-1 text-[10px] text-emerald-400">Credentials encrypted and saved.</p>}
+          {keyStatus === "error" && <p className="mt-1 text-[10px] text-red-400">Failed to save credentials.</p>}
         </div>
+      )}
 
-        {showKeyInput && (
-          <div className="mt-2 space-y-2">
-            <input
-              type="password"
-              value={keyValue}
-              onChange={(e) => setKeyValue(e.target.value)}
-              placeholder="Paste API key or connection string…"
-              className="w-full rounded-md border border-border bg-muted/40 px-3 py-1.5 font-mono text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
-            />
-            <button
-              onClick={handleSaveKey}
-              disabled={keyPending || !keyValue.trim()}
-              className="rounded-md border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-medium text-primary hover:bg-primary/20 disabled:opacity-40"
-            >
-              {keyPending ? "Encrypting…" : "Save key"}
-            </button>
-          </div>
-        )}
-        {keyStatus === "saved" && <p className="mt-1 text-[10px] text-emerald-400">Key encrypted and saved.</p>}
-        {keyStatus === "error" && <p className="mt-1 text-[10px] text-red-400">Failed to save key.</p>}
-      </div>
-
-      {/* Request new provider */}
       <div className="mt-3 border-t border-border pt-3">
         {!showRequestForm ? (
           <button
@@ -279,7 +386,7 @@ export function InfraProviderCard({
               type="text"
               value={requestName}
               onChange={(e) => setRequestName(e.target.value)}
-              placeholder={`Provider name (e.g. ${type === "ai" ? "AWS Bedrock" : type === "crawl" ? "Apify" : type === "queue" ? "RabbitMQ" : type === "storage" ? "Cloudflare R2" : "SendGrid"})`}
+              placeholder={`Provider name (e.g. ${type === "ai" ? "AWS Bedrock" : type === "crawl" ? "Apify" : type === "queue" ? "RabbitMQ" : type === "storage" ? "Cloudflare R2" : "Postmark"})`}
               className="w-full rounded-md border border-border bg-muted/40 px-3 py-1.5 text-xs text-foreground placeholder-muted-foreground/40 outline-none focus:border-primary/50"
             />
             <textarea

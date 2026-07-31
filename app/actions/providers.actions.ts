@@ -114,17 +114,82 @@ export async function setInfraProviderKey(
   }
 }
 
+/** Store SMTP user+password (or API key + optional secret) as JSON in encrypted_key_blob. */
+export async function setInfraProviderCredentials(
+  type: "ai" | "crawl" | "queue" | "storage" | "notifications",
+  creds: { key: string; secret?: string },
+): Promise<{ success: boolean; error?: string }> {
+  try {
+    await requireAdmin();
+    const key = creds.key.trim();
+    if (!key) {
+      await db
+        .update(infraProviders)
+        .set({ encryptedKeyBlob: null, updatedAt: new Date() })
+        .where(eq(infraProviders.type, type));
+    } else {
+      const payload = JSON.stringify(
+        creds.secret?.trim()
+          ? { key, secret: creds.secret.trim() }
+          : { key },
+      );
+      const blob = await encryptSecret(payload);
+      await db
+        .update(infraProviders)
+        .set({ encryptedKeyBlob: blob, updatedAt: new Date() })
+        .where(eq(infraProviders.type, type));
+    }
+    invalidateProviderCache(type);
+    revalidatePath("/admin/providers");
+    return { success: true };
+  } catch {
+    return { success: false, error: "Failed to save credentials" };
+  }
+}
+
 export async function switchInfraProvider(
   type: "ai" | "crawl" | "queue" | "storage" | "notifications",
   name: string,
   config: Record<string, string>,
+  options?: { keepKey?: boolean },
 ): Promise<{ success: boolean; error?: string }> {
   try {
     await requireAdmin();
-    await db
-      .update(infraProviders)
-      .set({ name, config, encryptedKeyBlob: null, updatedAt: new Date() })
-      .where(eq(infraProviders.type, type));
+
+    const [existing] = await db
+      .select({ id: infraProviders.id })
+      .from(infraProviders)
+      .where(eq(infraProviders.type, type))
+      .limit(1);
+
+    if (existing) {
+      const updates: {
+        name: string;
+        config: Record<string, string>;
+        encryptedKeyBlob?: null;
+        updatedAt: Date;
+      } = {
+        name,
+        config,
+        updatedAt: new Date(),
+      };
+      if (!options?.keepKey) {
+        updates.encryptedKeyBlob = null;
+      }
+      await db
+        .update(infraProviders)
+        .set(updates)
+        .where(eq(infraProviders.type, type));
+    } else {
+      await db.insert(infraProviders).values({
+        type,
+        name,
+        config,
+        encryptedKeyBlob: null,
+        switchMode: "runtime",
+      });
+    }
+
     invalidateProviderCache(type);
     revalidatePath("/admin/providers");
     return { success: true };
@@ -132,3 +197,4 @@ export async function switchInfraProvider(
     return { success: false, error: "Failed to switch provider" };
   }
 }
+

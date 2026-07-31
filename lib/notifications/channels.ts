@@ -2,9 +2,14 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { notificationChannels } from "@/lib/db/schema";
 import { decryptSecret } from "@/lib/secrets";
+import { logger } from "@/lib/logger";
+import { DEFAULT_FROM, getNotificationProvider } from "./index";
+
+const log = logger.child({ component: "notification-channels" });
 
 export type ResolvedChannel = {
   id: string;
+  name: string;
   channelType: "email" | "slack" | "whatsapp";
   provider: string;
   key: string;
@@ -26,6 +31,7 @@ export async function getActiveChannels(): Promise<ResolvedChannel[]> {
         const creds = JSON.parse(decrypted) as { key: string; secret?: string };
         const resolved: ResolvedChannel = {
           id: row.id,
+          name: row.name,
           channelType: row.channelType,
           provider: row.provider,
           key: creds.key,
@@ -60,18 +66,40 @@ export async function dispatchToChannels(
 
         if (ch.channelType === "email") {
           const to = ch.config.to;
-          if (!to) return;
+          if (!to) {
+            log.warn("email channel missing config.to — skipping", {
+              channelId: ch.id,
+              channelName: ch.name,
+            });
+            return;
+          }
           const recipients = to.split(",").map((e) => e.trim()).filter(Boolean);
-          const { createNotificationProvider } = await import("./index");
-          const provider = createNotificationProvider(ch.provider, ch.key, {
-            ...ch.config,
-            ...(ch.secret ? { pass: ch.secret } : {}),
+          if (recipients.length === 0) {
+            log.warn("email channel config.to empty after parse — skipping", {
+              channelId: ch.id,
+              channelName: ch.name,
+            });
+            return;
+          }
+          // Use shared transport (infra / channel fallback / env), not per-channel SMTP
+          const provider = await getNotificationProvider();
+          const from = ch.config.from?.trim() || DEFAULT_FROM;
+          await provider.sendEmail({
+            to: recipients,
+            subject: opts.subject,
+            html: opts.html,
+            text: opts.text,
+            from,
           });
-          await provider.sendEmail({ to: recipients, subject: opts.subject, html: opts.html, text: opts.text });
           return;
         }
-      } catch {
-        // fire and forget — individual channel failures must not block others
+      } catch (err) {
+        log.warn("channel dispatch failed", {
+          channelId: ch.id,
+          channelName: ch.name,
+          channelType: ch.channelType,
+          error: String(err),
+        });
       }
     }),
   );

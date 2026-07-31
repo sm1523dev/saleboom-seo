@@ -1,9 +1,10 @@
 import type { SeoIssue } from "@/lib/seo-rules";
+import type { CmsCapabilities } from "@/lib/cms/probe";
 
 /**
- * Quick Fix — AI can generate and apply the change in one click.
- * The fix is a text field update (meta title, description, H1, alt tag, etc.)
- * with a clear right answer derivable from the page content.
+ * Quick Fix — AI can generate a one-click-style text change (meta title,
+ * description, H1, alt tag, etc.) with a clear right answer from page content.
+ * Apply/push still requires a connected CMS with the matching capability.
  *
  * Major Fix — requires human judgment or structural site changes.
  * Examples: adding structured data, fixing redirect chains, HTTPS migration.
@@ -19,6 +20,7 @@ const QUICK_FIX_TYPES = new Set([
   "meta-description-too-long",
   "h1-missing",
   "h1-too-long",
+  "h1-matches-title",
   // Open Graph — Yoast sets og: from meta title/desc when pushed
   "og-title-missing",
   "og-description-missing",
@@ -26,6 +28,12 @@ const QUICK_FIX_TYPES = new Set([
   // Images — AI generates alt text from context
   "images-missing-alt",
   "images-empty-alt",
+  // Duplicates — AI can rewrite each page uniquely
+  "duplicate-meta-title",
+  "duplicate-meta-description",
+  "duplicate-h1",
+  "duplicate-og-title",
+  "h1-title-identical-sitewide",
   // og-image-missing → needs image URL, Major Fix
   // lang-missing → HTML tag attribute, theme-level, Major Fix
   // charset-missing → HTML tag attribute, theme-level, Major Fix
@@ -74,6 +82,26 @@ export function isArchiveUrl(url: string): boolean {
 export function classifyFix(issueType: string, pageUrl?: string): FixType {
   if (pageUrl && isArchiveUrl(pageUrl) && QUICK_FIX_TYPES.has(issueType)) return "major";
   return QUICK_FIX_TYPES.has(issueType) ? "quick" : "major";
+}
+
+/**
+ * Final fix type for persist/reclassify.
+ * Inherent quick stays quick when no CMS is connected (Apply is gated in UI).
+ * With capabilities, missing/false field flags downgrade to major.
+ */
+export function resolveFixType(
+  issueType: string,
+  pageUrl: string | null | undefined,
+  capabilities: CmsCapabilities | null,
+): FixType {
+  if (classifyFix(issueType, pageUrl ?? undefined) !== "quick") return "major";
+  if (!capabilities) return "quick";
+  const field = ISSUE_TYPE_TO_FIELD[issueType];
+  if (!field) return "major";
+  if (field === "meta_title" && !capabilities.meta_title) return "major";
+  if (field === "meta_description" && !capabilities.meta_description) return "major";
+  if (field === "h1" && !capabilities.h1) return "major";
+  return "quick";
 }
 
 export function classifyIssues(issues: SeoIssue[]): SeoIssue[] {

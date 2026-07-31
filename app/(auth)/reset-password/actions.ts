@@ -7,7 +7,7 @@ import { users } from "@/lib/db/schema";
 import { verifyResetToken } from "@/lib/auth/reset-token";
 import { hashPassword } from "@/lib/auth/password";
 import { parseRequiredString } from "@/lib/form-validation";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { resetPasswordConfirmationTemplate } from "@/lib/notifications/email-templates";
 
 export async function resetPassword(formData: FormData) {
@@ -31,12 +31,11 @@ export async function resetPassword(formData: FormData) {
     .set({ passwordHash, updatedAt: new Date() })
     .where(eq(users.id, result.userId));
 
-  // Send confirmation email — non-blocking, must complete before redirect throws
+  // Send confirmation email — must complete before redirect throws
   if (userRow) {
     try {
       const tpl = resetPasswordConfirmationTemplate();
-      const provider = await getNotificationProvider();
-      await provider.sendEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      await sendTransactionalEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
     } catch {
       // Non-fatal — do not block sign-in redirect
     }

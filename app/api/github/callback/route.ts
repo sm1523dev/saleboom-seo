@@ -39,6 +39,8 @@ export async function GET(req: Request): Promise<NextResponse> {
   }
 
   cookieStore.delete("gh_oauth_state");
+  const returnScanId = cookieStore.get("gh_return_scan")?.value;
+  if (returnScanId) cookieStore.delete("gh_return_scan");
 
   const clientId = process.env.GITHUB_OAUTH_CLIENT_ID;
   const clientSecret = process.env.GITHUB_OAUTH_CLIENT_SECRET;
@@ -102,5 +104,7 @@ export async function GET(req: Request): Promise<NextResponse> {
       },
     });
 
-  return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?github_step=2`);
+  const stepQs = new URLSearchParams({ github_step: "2" });
+  if (returnScanId) stepQs.set("returnScanId", returnScanId);
+  return NextResponse.redirect(`${appUrl}/website/${websiteId}/cms?${stepQs.toString()}`);
 }

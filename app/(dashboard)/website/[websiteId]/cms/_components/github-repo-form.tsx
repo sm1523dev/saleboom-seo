@@ -3,6 +3,7 @@
 import { useState, useTransition, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { connectGitHub } from "@/app/actions/cms.actions";
+import { ReassessFixesOverlay } from "@/components/shared/reassess-fixes-overlay";
 
 const FRAMEWORK_LABELS: Record<string, string> = {
   "nextjs-app": "Next.js (App Router)",
@@ -18,12 +19,14 @@ const FRAMEWORK_LABELS: Record<string, string> = {
 
 type Repo = { fullName: string; owner: string; name: string; defaultBranch: string; private: boolean };
 
-type Props = { websiteId: string };
+type Props = { websiteId: string; returnScanId?: string | null };
 
-export function GithubRepoForm({ websiteId }: Props) {
+export function GithubRepoForm({ websiteId, returnScanId }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
   const [detectedFramework, setDetectedFramework] = useState<string | null>(null);
+  const [connecting, setConnecting] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const [repos, setRepos] = useState<Repo[]>([]);
   const [reposLoading, setReposLoading] = useState(true);
@@ -74,17 +77,21 @@ export function GithubRepoForm({ websiteId }: Props) {
     e.preventDefault();
     if (!selected) return;
     setError(null);
+    setConnecting(true);
     startTransition(async () => {
       const result = await connectGitHub(websiteId, selected.owner, selected.name, branch, subPath || undefined);
       if (result.success) {
         setDetectedFramework(result.framework ?? "unknown");
-        // Hard-navigate after a brief delay so the success state is visible.
-        // router.push() is not used here — the Next.js Router Cache can serve a
-        // stale render of /cms (with framework: "unknown") instead of re-fetching.
+        const n = result.quickCount ?? 0;
+        setSuccessMessage(n === 1 ? "1 quick fix unlocked" : `${n} quick fixes unlocked`);
+        const nextUrl = returnScanId
+          ? `/scan/${returnScanId}/results?reassessed=1`
+          : `/website/${websiteId}/cms`;
         setTimeout(() => {
-          window.location.href = `/website/${websiteId}/cms`;
-        }, 1500);
+          window.location.href = nextUrl;
+        }, 1200);
       } else {
+        setConnecting(false);
         setError(result.error ?? "Failed to save repository settings");
       }
     });
@@ -92,28 +99,38 @@ export function GithubRepoForm({ websiteId }: Props) {
 
   if (detectedFramework) {
     return (
-      <motion.div
-        initial={{ opacity: 0, y: 8 }}
-        animate={{ opacity: 1, y: 0 }}
-        className="rounded-xl border border-green-500/30 bg-green-500/10 p-6"
-      >
-        <div className="flex items-center gap-2">
-          <span className="inline-block h-2 w-2 rounded-full bg-green-400" aria-hidden="true" />
-          <p className="text-sm font-medium text-green-400">GitHub repository connected</p>
-        </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          <span className="font-medium">{selected?.fullName}</span> — detected framework:{" "}
-          <span className="font-medium">{FRAMEWORK_LABELS[detectedFramework] ?? detectedFramework}</span>
-        </p>
-        <p className="mt-2 text-xs text-muted-foreground">
-          SaleBoom will push SEO fixes as pull requests on this repository.
-        </p>
-      </motion.div>
+      <>
+        <ReassessFixesOverlay
+          active={connecting && !successMessage}
+          successMessage={successMessage}
+        />
+        <motion.div
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="rounded-xl border border-green-500/30 bg-green-500/10 p-6"
+        >
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-2 w-2 rounded-full bg-green-400" aria-hidden="true" />
+            <p className="text-sm font-medium text-green-400">GitHub repository connected</p>
+          </div>
+          <p className="mt-2 text-xs text-muted-foreground">
+            <span className="font-medium">{selected?.fullName}</span> — detected framework:{" "}
+            <span className="font-medium">{FRAMEWORK_LABELS[detectedFramework] ?? detectedFramework}</span>
+          </p>
+          <p className="mt-2 text-xs text-muted-foreground">
+            SaleBoom will push SEO fixes as pull requests on this repository.
+          </p>
+        </motion.div>
+      </>
     );
   }
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
+    <form onSubmit={handleSubmit} className="relative space-y-4">
+      <ReassessFixesOverlay
+        active={connecting && !successMessage}
+        successMessage={successMessage}
+      />
       <p className="text-sm text-muted-foreground">
         {"GitHub authorized. Select the repository that contains this site's code."}
       </p>
@@ -243,10 +260,10 @@ export function GithubRepoForm({ websiteId }: Props) {
 
       <button
         type="submit"
-        disabled={isPending || !selected}
+        disabled={isPending || connecting || !selected}
         className="btn-press w-full rounded-lg bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
       >
-        {isPending ? "Detecting framework…" : "Save repository settings"}
+        {connecting ? "Connecting…" : isPending ? "Detecting framework…" : "Save repository settings"}
       </button>
     </form>
   );

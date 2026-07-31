@@ -23,6 +23,7 @@ export default async function CmsConnectionPage({ params, searchParams }: Props)
   const { websiteId } = await params;
   const sp = await searchParams;
   const githubStep = typeof sp.github_step === "string" ? sp.github_step : null;
+  const returnScanId = typeof sp.returnScanId === "string" ? sp.returnScanId : null;
   await getServerSession();
 
   const [website] = await db
@@ -60,12 +61,18 @@ export default async function CmsConnectionPage({ params, searchParams }: Props)
       </header>
 
       <section className="max-w-lg" aria-label="CMS connection form">
-        <CmsConnectForm websiteId={websiteId} initialState={connectionState} githubStep={githubStep} />
+        <CmsConnectForm
+          websiteId={websiteId}
+          initialState={connectionState}
+          githubStep={githubStep}
+          returnScanId={returnScanId}
+        />
         {(githubFramework === "django" || githubFramework === "laravel") && (
           <GithubTemplatePaths
             websiteId={websiteId}
             framework={githubFramework}
             initialPaths={githubTemplatePaths}
+            returnScanId={returnScanId}
           />
         )}
       </section>

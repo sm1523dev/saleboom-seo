@@ -4,7 +4,7 @@ import { scans, websites, issues, cmsConnections, users, dvsScores } from "@/lib
 import { getQueueProvider } from "@/lib/queue";
 import { getCrawlProvider } from "@/lib/crawl";
 import { buildSiteContext, runSeoRules } from "@/lib/seo-rules";
-import { isArchiveUrl, ISSUE_TYPE_TO_FIELD } from "@/lib/fix-classifier";
+import { resolveFixType } from "@/lib/fix-classifier";
 import type { CmsCapabilities } from "@/lib/cms/probe";
 import { persistDvsScore } from "@/lib/dvs/score";
 import { logger } from "@/lib/logger";
@@ -15,7 +15,7 @@ import { captureError } from "@/lib/monitoring/capture";
 import type { JobContext } from "@/lib/queue";
 import { detectPlatformFromCrawl } from "@/lib/platform-detect";
 import type { SeoIssue } from "@/lib/seo-rules";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { scanCompletionTemplate } from "@/lib/notifications/email-templates";
 
 export type ScanJobData = {
@@ -233,24 +233,23 @@ async function _runScanJob(
     await persistDvsScore(websiteId);
     await recordEvent("scan.completed", durationMs, { scanId, websiteId, ...bySeverity });
 
-    // Notify user: fetch user email + last 2 DVS scores for delta
-    void (async () => {
-      try {
-        const [[siteRow], recentScores] = await Promise.all([
-          db
-            .select({ url: websites.url, userName: users.name, userEmail: users.email })
-            .from(websites)
-            .innerJoin(users, eq(websites.userId, users.id))
-            .where(eq(websites.id, websiteId))
-            .limit(1),
-          db
-            .select({ compositeScore: dvsScores.compositeScore })
-            .from(dvsScores)
-            .where(eq(dvsScores.websiteId, websiteId))
-            .orderBy(desc(dvsScores.scoredAt))
-            .limit(2),
-        ]);
-        if (!siteRow) return;
+    // Notify user: fetch user email + last 2 DVS scores for delta (awaited so worker stays alive)
+    try {
+      const [[siteRow], recentScores] = await Promise.all([
+        db
+          .select({ url: websites.url, userName: users.name, userEmail: users.email })
+          .from(websites)
+          .innerJoin(users, eq(websites.userId, users.id))
+          .where(eq(websites.id, websiteId))
+          .limit(1),
+        db
+          .select({ compositeScore: dvsScores.compositeScore })
+          .from(dvsScores)
+          .where(eq(dvsScores.websiteId, websiteId))
+          .orderBy(desc(dvsScores.scoredAt))
+          .limit(2),
+      ]);
+      if (siteRow) {
         const currentScore = recentScores[0]?.compositeScore ?? null;
         const previousScore = recentScores[1]?.compositeScore ?? null;
         const issueCounts = { critical: 0, high: 0, medium: 0, low: 0 };
@@ -270,12 +269,16 @@ async function _runScanJob(
           scanId,
           appUrl,
         });
-        const provider = await getNotificationProvider();
-        await provider.sendEmail({ to: siteRow.userEmail, subject: tpl.subject, html: tpl.html, text: tpl.text });
-      } catch (notifyErr) {
-        log.warn("scan completion email failed", { error: String(notifyErr) });
+        await sendTransactionalEmail({
+          to: siteRow.userEmail,
+          subject: tpl.subject,
+          html: tpl.html,
+          text: tpl.text,
+        });
       }
-    })();
+    } catch (notifyErr) {
+      log.warn("scan completion email failed", { error: String(notifyErr) });
+    }
 
     // DB join lock: enqueue ai-suggest once both phases are done.
     // SEO fires immediately if aeoExpected=false; waits for AEO otherwise.
@@ -311,21 +314,6 @@ async function _runScanJob(
   }
 }
 
-function resolveFixType(issue: SeoIssue, capabilities: CmsCapabilities | null): "quick" | "major" {
-  if (issue.fixType !== "quick") return (issue.fixType as "major") ?? "major";
-  // Archive pages (category/tag/author/date) are never patchable via REST
-  if (issue.pageUrl && isArchiveUrl(issue.pageUrl)) return "major";
-  // No CMS connected — nothing can be pushed automatically
-  if (!capabilities) return "major";
-  // Downgrade if the specific field this issue maps to isn't writable
-  const field = ISSUE_TYPE_TO_FIELD[issue.type];
-  if (!field) return "major";
-  if (field === "meta_title" && !capabilities.meta_title) return "major";
-  if (field === "meta_description" && !capabilities.meta_description) return "major";
-  if (field === "h1" && !capabilities.h1) return "major";
-  return "quick";
-}
-
 async function persistIssues(scanId: string, seoIssues: SeoIssue[], capabilities: CmsCapabilities | null): Promise<void> {
   const rows = seoIssues.map((issue) => ({
     scanId,
@@ -334,7 +322,11 @@ async function persistIssues(scanId: string, seoIssues: SeoIssue[], capabilities
     severity: issue.severity,
     title: issue.title,
     description: issue.description,
-    fixType: resolveFixType(issue, capabilities),
+    // Prefer rule-engine major; otherwise resolve from type + CMS capabilities
+    fixType:
+      issue.fixType === "major"
+        ? "major"
+        : resolveFixType(issue.type, issue.pageUrl, capabilities),
   }));
 
   // Drizzle insert accepts multiple rows; split into batches to avoid

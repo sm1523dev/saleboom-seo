@@ -3,11 +3,13 @@
 import { useState, useTransition } from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { updateGitHubTemplatePaths } from "@/app/actions/cms.actions";
+import { ReassessFixesOverlay } from "@/components/shared/reassess-fixes-overlay";
 
 type Props = {
   websiteId: string;
   framework: "django" | "laravel";
   initialPaths: Record<string, string>;
+  returnScanId?: string | null;
 };
 
 const FRAMEWORK_HINTS: Record<"django" | "laravel", { pathHint: string; example: string }> = {
@@ -21,13 +23,15 @@ const FRAMEWORK_HINTS: Record<"django" | "laravel", { pathHint: string; example:
   },
 };
 
-export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Props) {
+export function GithubTemplatePaths({ websiteId, framework, initialPaths, returnScanId }: Props) {
   const [paths, setPaths] = useState<Record<string, string>>(initialPaths);
   const [newPageUrl, setNewPageUrl] = useState("");
   const [newFilePath, setNewFilePath] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [saved, setSaved] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const [reassessing, setReassessing] = useState(false);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const { pathHint, example } = FRAMEWORK_HINTS[framework];
 
@@ -35,7 +39,6 @@ export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Prop
     const key = newPageUrl.trim();
     const val = newFilePath.trim();
     if (!key || !val) return;
-    // Normalize page URL to pathname
     let normalized = key;
     try { normalized = new URL(key).pathname; } catch { /* use as-is */ }
     if (!normalized.startsWith("/")) normalized = `/${normalized}`;
@@ -57,18 +60,37 @@ export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Prop
   function handleSave() {
     setError(null);
     setSaved(false);
+    setReassessing(true);
     startTransition(async () => {
       const result = await updateGitHubTemplatePaths(websiteId, paths);
       if (result.success) {
+        const n = result.quickCount ?? 0;
+        setSuccessMessage(n === 1 ? "1 quick fix unlocked" : `${n} quick fixes unlocked`);
         setSaved(true);
+        if (returnScanId) {
+          setTimeout(() => {
+            window.location.href = `/scan/${returnScanId}/results?reassessed=1`;
+          }, 900);
+        } else {
+          setTimeout(() => {
+            setReassessing(false);
+            setSuccessMessage(null);
+          }, 900);
+        }
       } else {
+        setReassessing(false);
         setError(result.error ?? "Save failed");
       }
     });
   }
 
   return (
-    <div className="mt-6 space-y-4 rounded-xl border border-border bg-muted/20 p-5">
+    <div className="relative mt-6 space-y-4 rounded-xl border border-border bg-muted/20 p-5">
+      <ReassessFixesOverlay
+        active={reassessing && !successMessage}
+        phase="reassessing"
+        successMessage={successMessage}
+      />
       <div>
         <h2 className="text-sm font-semibold">Template path configuration</h2>
         <p className="mt-1 text-xs text-muted-foreground">
@@ -78,7 +100,6 @@ export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Prop
         </p>
       </div>
 
-      {/* Existing mappings */}
       {Object.keys(paths).length > 0 && (
         <div className="space-y-1.5">
           {Object.entries(paths).map(([pageUrl, filePath]) => (
@@ -99,7 +120,6 @@ export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Prop
         </div>
       )}
 
-      {/* Add new mapping */}
       <div className="space-y-2">
         <div className="grid grid-cols-[1fr_auto_1fr] items-end gap-2">
           <div>
@@ -154,12 +174,14 @@ export function GithubTemplatePaths({ websiteId, framework, initialPaths }: Prop
         <button
           type="button"
           onClick={handleSave}
-          disabled={isPending}
+          disabled={isPending || reassessing}
           className="btn-press rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:opacity-50"
         >
-          {isPending ? "Saving…" : "Save template paths"}
+          {reassessing ? "Reassessing…" : isPending ? "Saving…" : "Save template paths"}
         </button>
-        {saved && <span className="text-xs text-green-400">Saved — quick-fix classification updated</span>}
+        {saved && !reassessing && (
+          <span className="text-xs text-green-400">Saved — quick-fix classification updated</span>
+        )}
       </div>
     </div>
   );

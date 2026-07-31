@@ -9,14 +9,13 @@ import { authProvider } from "@/lib/auth";
 import { getServerSession } from "@/lib/auth-utils";
 import { hashPassword, verifyPassword } from "@/lib/auth/password";
 import { parseEmail, parseRequiredString } from "@/lib/form-validation";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { profileUpdateTemplate } from "@/lib/notifications/email-templates";
 
 async function sendProfileUpdateEmail(to: string, updateType: "name" | "email" | "password"): Promise<void> {
   try {
     const tpl = profileUpdateTemplate({ updateType });
-    const provider = await getNotificationProvider();
-    await provider.sendEmail({ to, subject: tpl.subject, html: tpl.html, text: tpl.text });
+    await sendTransactionalEmail({ to, subject: tpl.subject, html: tpl.html, text: tpl.text });
   } catch {
     // Non-fatal
   }

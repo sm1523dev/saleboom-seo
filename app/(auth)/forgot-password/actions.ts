@@ -4,7 +4,7 @@ import { eq } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
 import { createResetToken } from "@/lib/auth/reset-token";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { parseEmail } from "@/lib/form-validation";
 
 export async function requestPasswordReset(formData: FormData) {
@@ -23,7 +23,7 @@ export async function requestPasswordReset(formData: FormData) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
   const resetUrl = `${appUrl}/reset-password?token=${token}`;
 
-  await (await getNotificationProvider()).sendEmail({
+  await sendTransactionalEmail({
     to: email,
     subject: "Reset your SaleBoom SEO password",
     html: `

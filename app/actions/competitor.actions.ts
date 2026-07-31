@@ -6,7 +6,7 @@ import { websites, aeoProviders, aeoQueries, users } from "@/lib/db/schema";
 import { getServerSession } from "@/lib/auth-utils";
 import { queryAeoProvider } from "@/lib/aeo/query-engine";
 import { parseMention } from "@/lib/aeo/mention-parser";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { competitiveAnalysisTemplate } from "@/lib/notifications/email-templates";
 
 export type CompetitorResult = {
@@ -133,8 +133,7 @@ export async function runCompetitorAnalysis(
         appUrl,
         websiteId,
       });
-      const provider = await getNotificationProvider();
-      await provider.sendEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
+      await sendTransactionalEmail({ to: userRow.email, subject: tpl.subject, html: tpl.html, text: tpl.text });
     } catch {
       // Non-fatal
     }

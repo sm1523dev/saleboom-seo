@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "motion/react";
 import { ignoreSuggestions, unignoreSuggestions } from "@/app/actions/suggestions.actions";
@@ -21,6 +21,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { scoreColorClass, scoreGrade } from "@/lib/seo-score";
+import { ReassessFixesOverlay } from "@/components/shared/reassess-fixes-overlay";
 
 type Severity = "critical" | "high" | "medium" | "low" | "info";
 type FixType = "quick" | "major" | null;
@@ -72,6 +73,7 @@ type Props = {
   approvedSnapshots: ApprovedSnapshot[];
   cmsConnected: boolean;
   majorFixRequests: Record<string, string>; // issueId → requestedAt ISO string
+  reassessed?: boolean;
 };
 
 const SEVERITY_ORDER: Severity[] = ["critical", "high", "medium", "low", "info"];
@@ -127,6 +129,7 @@ export function ResultsView({
   approvedSnapshots,
   cmsConnected,
   majorFixRequests,
+  reassessed = false,
 }: Props) {
   const router = useRouter();
   const [filter, setFilter] = useState<Severity | null>(null);
@@ -142,6 +145,33 @@ export function ResultsView({
   const [showQueuedIssues, setShowQueuedIssues] = useState(false);
   const [showFixedIssues, setShowFixedIssues] = useState(false);
   const [isUnignoringIssues, startUnignoreIssuesTransition] = useTransition();
+  const [reassessOverlay, setReassessOverlay] = useState(reassessed);
+  const [reassessSuccess, setReassessSuccess] = useState<string | null>(null);
+
+  const cmsHref = `/website/${websiteId}/cms?returnScanId=${encodeURIComponent(scanId)}`;
+
+  useEffect(() => {
+    if (!reassessed) return;
+    let cancelled = false;
+    setReassessOverlay(true);
+    void (async () => {
+      router.refresh();
+      await new Promise((r) => setTimeout(r, 700));
+      if (cancelled) return;
+      const n = fixCounts.quick;
+      setReassessSuccess(n === 1 ? "1 quick fix ready" : `${n} quick fixes ready`);
+      await new Promise((r) => setTimeout(r, 900));
+      if (cancelled) return;
+      setReassessOverlay(false);
+      setReassessSuccess(null);
+      router.replace(`/scan/${scanId}/results`);
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // Intentionally run once on mount when returning from CMS connect
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reassessed]);
 
   // Active = not queued, not fixed, not ignored (locally or from server)
   const activeIssues = issues.filter((i) => !queuedSet.has(i.id) && !fixedSet.has(i.id) && !localIgnoredIds.has(i.id));
@@ -168,6 +198,11 @@ export function ResultsView({
 
   return (
     <div className="flex flex-col gap-8">
+      <ReassessFixesOverlay
+        active={reassessOverlay && !reassessSuccess}
+        phase="reassessing"
+        successMessage={reassessSuccess}
+      />
       {/* Header */}
       <header>
         <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
@@ -319,7 +354,7 @@ export function ResultsView({
             >
               <h3 className="font-semibold">Connect your CMS to push fixes</h3>
               <p className="mt-2 text-sm text-muted-foreground">
-                Quick fixes can be applied directly to your website with one click once your CMS is connected.
+                Quick fixes can be drafted by AI anytime. Connect your CMS to apply them to your website in one click.
                 Supports WordPress, Shopify, and Webflow.
               </p>
               <div className="mt-5 flex gap-3">
@@ -327,7 +362,7 @@ export function ResultsView({
                   Not now
                 </button>
                 <Link
-                  href={`/website/${websiteId}/cms`}
+                  href={cmsHref}
                   onClick={() => setShowIssueCmsPrompt(false)}
                   className="btn-press flex-1 rounded-lg bg-primary px-4 py-2 text-center text-sm font-medium text-primary-foreground hover:bg-primary/90"
                 >
@@ -398,6 +433,7 @@ export function ResultsView({
                 selectedIssues={selectedIssues}
                 allQuickIssues={filtered.filter((i) => i.fixType === "quick" && !queuedSet.has(i.id) && !fixedSet.has(i.id))}
                 websiteId={websiteId}
+                scanId={scanId}
                 cmsConnected={cmsConnected}
               />
             )}
@@ -722,7 +758,7 @@ function CopyButton({ text }: { text: string }) {
   );
 }
 
-function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, cmsConnected }: { selectedIssues: Set<string>; allQuickIssues: Issue[]; websiteId: string; cmsConnected: boolean }) {
+function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, scanId, cmsConnected }: { selectedIssues: Set<string>; allQuickIssues: Issue[]; websiteId: string; scanId: string; cmsConnected: boolean }) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
   const [generating, setGenerating] = useState(false);
@@ -732,7 +768,7 @@ function BulkFixButton({ selectedIssues, allQuickIssues, websiteId, cmsConnected
   if (!cmsConnected) {
     return (
       <Link
-        href={`/website/${websiteId}/cms`}
+        href={`/website/${websiteId}/cms?returnScanId=${encodeURIComponent(scanId)}`}
         className="btn-press rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground transition-opacity hover:bg-primary/90"
       >
         Connect CMS to apply fixes

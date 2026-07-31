@@ -4,7 +4,7 @@ import { and, eq, isNull } from "drizzle-orm";
 import { db } from "@/lib/db";
 import { providerRequests, users } from "@/lib/db/schema";
 import { getServerSession, requireAdmin } from "@/lib/auth-utils";
-import { getNotificationProvider } from "@/lib/notifications";
+import { sendTransactionalEmail } from "@/lib/notifications/send";
 import { revalidatePath } from "next/cache";
 
 export async function requestMajorFixHelpBulk(issues: {
@@ -104,8 +104,7 @@ export async function forwardRequestToDeveloper(
 
     if (!req) return { success: false, error: "Request not found" };
 
-    const provider = await getNotificationProvider();
-    await provider.sendEmail({
+    await sendTransactionalEmail({
       to: developerEmail.trim(),
       subject: `Provider Request: ${req.type} — ${req.providerName}`,
       html: `

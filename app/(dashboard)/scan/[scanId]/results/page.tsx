@@ -17,10 +17,13 @@ export const metadata: Metadata = {
 
 type Props = {
   params: Promise<{ scanId: string }>;
+  searchParams: Promise<Record<string, string | string[] | undefined>>;
 };
 
-export default async function AuditResultsPage({ params }: Props) {
+export default async function AuditResultsPage({ params, searchParams }: Props) {
   const { scanId } = await params;
+  const sp = await searchParams;
+  const reassessed = sp.reassessed === "1";
   await getServerSession();
 
   const [scan] = await db
@@ -211,6 +214,7 @@ export default async function AuditResultsPage({ params }: Props) {
       approvedSnapshots={approvedSnapshots}
       cmsConnected={!!cmsConn}
       majorFixRequests={majorFixRequests}
+      reassessed={reassessed}
     />
   );
 }
