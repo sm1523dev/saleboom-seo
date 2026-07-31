@@ -1,31 +1,45 @@
 import type { AIProvider } from "./types";
 import { resolveInfraProvider } from "@/lib/providers/resolver";
+import { AzureAIProvider } from "./providers/azure";
+import { OpenAIProvider } from "./providers/openai";
+import { AnthropicAIProvider } from "./providers/anthropic";
+import { OllamaAIProvider } from "./providers/ollama";
+import { NimAIProvider } from "./providers/nim";
+import { GroqAIProvider } from "./providers/groq";
+import { CustomAIProvider } from "./providers/custom";
+import { MockAIProvider } from "./providers/mock";
 
 function createFromEnv(): AIProvider {
   const name = process.env.AI_PROVIDER ?? "mock";
   return createByName(name, undefined, {});
 }
 
-function createByName(name: string, apiKey: string | undefined, config: Record<string, string>): AIProvider {
+function createByName(
+  name: string,
+  apiKey: string | undefined,
+  config: Record<string, string>,
+): AIProvider {
   switch (name) {
     case "azure":
-      return new (require("./providers/azure").AzureAIProvider)(apiKey, config);
+      return new AzureAIProvider(apiKey, config);
     case "openai":
-      return new (require("./providers/openai").OpenAIProvider)(apiKey);
+      return new OpenAIProvider(apiKey);
     case "anthropic":
-      return new (require("./providers/anthropic").AnthropicAIProvider)(apiKey);
+      return new AnthropicAIProvider(apiKey);
     case "ollama":
-      return new (require("./providers/ollama").OllamaAIProvider)(apiKey, config);
+      return new OllamaAIProvider(apiKey, config);
     case "nim":
-      return new (require("./providers/nim").NimAIProvider)(apiKey, config);
+      return new NimAIProvider(apiKey, config);
     case "groq":
-      return new (require("./providers/groq").GroqAIProvider)(apiKey);
+      return new GroqAIProvider(apiKey);
     case "custom":
-      return new (require("./providers/custom").CustomAIProvider)(apiKey, config);
+      return new CustomAIProvider(apiKey, config);
     case "mock":
-      return new (require("./providers/mock").MockAIProvider)();
+      return new MockAIProvider();
     default:
-      throw new Error(`Unknown AI provider: "${name}". Valid: azure, nim, openai, anthropic, ollama, groq, custom, mock`);
+      throw new Error(
+        `Unknown AI provider: "${name}". Valid: azure, nim, openai, anthropic, ollama, groq, custom, mock`,
+      );
   }
 }
 

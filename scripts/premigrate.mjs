@@ -121,6 +121,34 @@ for (const [type, envValue] of Object.entries(ENV_OVERRIDES)) {
   }
 }
 
+// ── 3b. Sync Azure OpenAI config into infra_providers for runtime resolver ───
+//
+// When Azure env vars are present, persist endpoint/deployment/apiVersion into
+// infra_providers.config so getAiProvider() can use them as fallbacks.
+
+if (process.env.AI_PROVIDER === "azure") {
+  const azureConfig = {
+    ...(process.env.AZURE_OPENAI_ENDPOINT
+      ? { endpointUrl: process.env.AZURE_OPENAI_ENDPOINT }
+      : {}),
+    ...(process.env.AZURE_OPENAI_DEPLOYMENT
+      ? { deployment: process.env.AZURE_OPENAI_DEPLOYMENT }
+      : {}),
+    ...(process.env.AZURE_OPENAI_API_VERSION
+      ? { apiVersion: process.env.AZURE_OPENAI_API_VERSION }
+      : {}),
+  };
+  if (Object.keys(azureConfig).length > 0) {
+    await client`
+      UPDATE infra_providers
+      SET config = COALESCE(config, '{}'::jsonb) || ${JSON.stringify(azureConfig)}::jsonb,
+          updated_at = NOW()
+      WHERE type = 'ai' AND name = 'azure'
+    `;
+    console.log("[premigrate] synced Azure OpenAI config into infra_providers");
+  }
+}
+
 // ── 4. Seed AEO providers ────────────────────────────────────────────────────
 //
 // 6 NIM models across 3 architecture families — all routed via a single NIM API key.
