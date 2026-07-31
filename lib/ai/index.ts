@@ -23,15 +23,15 @@ function createByName(
     case "azure":
       return new AzureAIProvider(apiKey, config);
     case "openai":
-      return new OpenAIProvider(apiKey);
+      return new OpenAIProvider();
     case "anthropic":
-      return new AnthropicAIProvider(apiKey);
+      return new AnthropicAIProvider();
     case "ollama":
-      return new OllamaAIProvider(apiKey, config);
+      return new OllamaAIProvider();
     case "nim":
       return new NimAIProvider(apiKey, config);
     case "groq":
-      return new GroqAIProvider(apiKey);
+      return new GroqAIProvider();
     case "custom":
       return new CustomAIProvider(apiKey, config);
     case "mock":
